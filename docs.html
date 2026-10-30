@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation // AETHER Psychoacoustic Consciousness Lab</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      overflow-y: auto;
+      height: auto;
+      min-height: 100vh;
+    }
+    .docs-shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 80px;
+    }
+    .docs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 24px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      margin-bottom: 26px;
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 14px;
+      z-index: 40;
+    }
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 9px;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: var(--cyan);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .btn-back:hover {
+      background: rgba(56, 189, 248, 0.25);
+      transform: translateY(-1px);
+    }
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .docs-nav {
+      position: sticky;
+      top: 102px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .docs-nav h4 {
+      font-size: 0.72rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 10px;
+    }
+    .docs-nav ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .docs-nav a {
+      display: block;
+      padding: 6px 10px;
+      border-radius: 7px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.8rem;
+      transition: all 0.15s ease;
+    }
+    .docs-nav a:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--cyan);
+    }
+    .docs-content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .doc-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 26px 30px;
+    }
+    .doc-section h2 {
+      margin: 0 0 10px;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .doc-section h3 {
+      margin: 20px 0 8px;
+      font-size: 0.98rem;
+      color: var(--cyan);
+    }
+    .doc-section p, .doc-section li {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 0.83rem;
+    }
+    .param-table th, .param-table td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+    }
+    .param-table th {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .param-table td strong {
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+    .formula-box {
+      background: rgba(6, 9, 17, 0.65);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--cyan);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      margin: 12px 0;
+      overflow-x: auto;
+    }
+    @media (max-width: 900px) {
+      .docs-layout {
+        grid-template-columns: 1fr;
+      }
+      .docs-nav {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="docs-shell">
+    <header class="docs-header">
+      <div class="brand">
+        <div class="brand-glyph live"></div>
+        <div>
+          <h1>AETHER // FULL FEATURE &amp; NEUROSCIENCE DOCUMENTATION</h1>
+          <p class="brand-tagline">Complete guide to all 6 real-time WebAudio synthesis modules, parameters, visualizers &amp; psychoacoustic mechanisms</p>
+        </div>
+      </div>
+      <a href="index.html" class="btn-back">← Back to Consciousness Lab</a>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-nav">
+        <h4>Contents</h4>
+        <ul>
+          <li><a href="#overview">Overview &amp; Architecture</a></li>
+          <li><a href="#global">Global Controls &amp; Custom Config</a></li>
+          <li><a href="#mod1">01. Parietal Self-Model (3D HRTF)</a></li>
+          <li><a href="#mod2">02. Predictive-Coding Edge of Chaos</a></li>
+          <li><a href="#mod3">03. Cross-Frequency PAC (θ–γ)</a></li>
+          <li><a href="#mod4">04. Fractal &amp; Shepard-Risset</a></li>
+          <li><a href="#mod5">05. Infrasound &amp; Somatic Sub-Bass</a></li>
+          <li><a href="#mod6">06. Auditory Ganzfeld (1/f Void)</a></li>
+          <li><a href="#presets">Curated State Presets</a></li>
+          <li><a href="#visualizers">Real-Time Visualizers</a></li>
+        </ul>
+      </nav>
+
+      <div class="docs-content">
+        <!-- OVERVIEW -->
+        <section id="overview" class="doc-section">
+          <h2>Overview &amp; Scientific Foundations</h2>
+          <p>
+            <strong>AETHER</strong> is an interactive, zero-dependency real-time WebAudio synthesizer designed to explore how structured acoustic fields interact with human perception, predictive coding, spatial self-location, and neural oscillations. All sounds are synthesized mathematically in real time at <code>44.1 / 48 kHz</code> using the browser's native WebAudio API.
+          </p>
+          <p>
+            <strong>🎧 Stereo Headphones Required:</strong> Because the engine relies on interaural time differences (ITD), interaural level differences (ILD), Head-Related Transfer Function (HRTF) pinna cues, and dichotic binaural phase offsets, stereo headphones are essential.
+          </p>
+        </section>
+
+        <!-- GLOBAL CONTROLS -->
+        <section id="global" class="doc-section">
+          <h2>Global Transport, Telemetry &amp; Custom Configuration</h2>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Control / Indicator</th>
+                <th>Description &amp; Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>INITIALIZE AUDIO ENGINE</strong></td>
+                <td>Starts/pauses the real-time WebAudio synthesis graph and 60 FPS modulation &amp; telemetry loop.</td>
+              </tr>
+              <tr>
+                <td><strong>MASTER Level</strong></td>
+                <td>Controls overall master output level prior to the safety dynamics compressor.</td>
+              </tr>
+              <tr>
+                <td><strong>💾 Save Config / ↺ Restore Saved</strong></td>
+                <td>Captures a complete snapshot of your hand-tuned configuration across all 6 modules (every slider, toggle, tuning, rhythm, and trajectory) into <code>localStorage</code> (<code>aether_custom_config_v1</code>) and restores it on demand.</td>
+              </tr>
+              <tr>
+                <td><strong>SOLO Buttons (SOLO 3D / CHAOS / PAC / FRACTAL)</strong></td>
+                <td>Temporarily mutes all other modules so you can isolate and fine-tune a single synthesis engine, then restores your previous module states when unsoloed.</td>
+              </tr>
+              <tr>
+                <td><strong>Live Telemetry Bar</strong></td>
+                <td>Displays real-time <strong>Target State</strong>, <strong>Bayesian Surprise (bits)</strong> from the Edge-of-Chaos engine, <strong>PAC Coupling Index (θ–γ)</strong>, and the <strong>0.1 Hz Coherent Breath Guide (INHALE ▲ / EXHALE ▼)</strong>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 01 -->
+        <section id="mod1" class="doc-section">
+          <h2><span class="module-tag tag-cyan">01 // PARIETAL SELF-MODEL</span> Hyper-Spatial "Impossible Geometry"</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> The temporoparietal junction (TPJ) and posterior parietal cortex continuously construct the feeling of being a bounded self located inside the head by triangulating external acoustic sources. By moving harmonic sources along counter-rotating 3D trajectories (including paths that pass directly through the center of the head or travel far to the horizon and return), the brain's spatial bounding loop can soften or dissolve.
+          </p>
+          <div class="formula-box">
+            100% Dry Binaural HRTF PannerNode + Psychoacoustic Pinna Front/Back Shadow Filter + 7 kHz Elevation Notch/Peak
+          </div>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range / Options</th>
+                <th>Acoustic &amp; Spatial Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>3D Trajectory Geometry</strong></td>
+                <td>
+                  • <code>Figure-8 / Infinity (∞)</code><br/>
+                  • <code>Far-Horizon Excursion</code><br/>
+                  • <code>Mixed Geometries</code><br/>
+                  • <code>360° Circular Halo</code><br/>
+                  • <code>Breathing Spiral</code><br/>
+                  • <code>3D Toroidal Knot</code>
+                </td>
+                <td>Selects the 3D path of the sound sources: <em>Figure-8</em> sweeps wide left/right and crosses directly through the center of the head; <em>Far-Horizon Excursion</em> travels up to 6.5m away in one direction and rushes back through the head; <em>Mixed</em> assigns a different geometry to each voice.</td>
+              </tr>
+              <tr>
+                <td><strong>Number of 3D Sources</strong></td>
+                <td><code>1 – 8 Sources</code> (default <code>2</code>)</td>
+                <td>Selects how many independent 3D sound sources orbit simultaneously. Using 1–3 sources makes individual 3D trajectories effortless to track by ear.</td>
+              </tr>
+              <tr>
+                <td><strong>Lowest Source Pitch (Base Freq)</strong></td>
+                <td><code>36 – 320 Hz</code> (default <code>82 Hz</code>)</td>
+                <td>Sets the fundamental frequency of Source 1 (from deep sub-bass <code>36 Hz</code> to warm mid <code>320 Hz</code>). All other sources tune harmonically above this fundamental.</td>
+              </tr>
+              <tr>
+                <td><strong>Trajectory Speed</strong></td>
+                <td><code>0.03 – 0.80 Hz</code></td>
+                <td>Controls the orbital speed of the 3D sources around and through the head.</td>
+              </tr>
+              <tr>
+                <td><strong>Pulse / Oscillation</strong></td>
+                <td><code>0% – 100%</code> (default <code>0% Smooth</code>)</td>
+                <td>At <code>0%</code>, each source produces a 100% smooth, continuous sound with zero volume oscillation. Raising this introduces rhythmic amplitude pulsing.</td>
+              </tr>
+              <tr>
+                <td><strong>In-Cranial Phase Collapse</strong></td>
+                <td><code>0% – 100%</code> (default <code>0% Off</code>)</td>
+                <td>At <code>0%</code>, the phase-inverted core is strictly zeroed out. Raising it blends a $180^\circ$ phase-inverted dichotic wave that collapses acoustic localization inside the cranium.</td>
+              </tr>
+              <tr>
+                <td><strong>Distance Range &amp; 3D Elevation</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Scales the 3D radius and vertical elevation excursion ($Y$ axis) of the trajectories.</td>
+              </tr>
+              <tr>
+                <td><strong>Harmonic Tuning Intervals</strong></td>
+                <td><code>Octaves &amp; 5ths</code>, <code>Just Intonation</code>, <code>Golden Ratio (φ)</code>, <code>Overtone Series</code>, <code>Quartal Space</code></td>
+                <td>Determines the exact frequency ratios between the active 3D sources.</td>
+              </tr>
+              <tr>
+                <td><strong>Interactive 3D Canvas Drag</strong></td>
+                <td>Pointer drag on 3D Radar</td>
+                <td>Click and drag anywhere on the <em>3D HRTF Spatial Geometry</em> canvas to manually grab Source 1 and move it in real time around your head (Left, Right, Front, Behind).</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 02 -->
+        <section id="mod2" class="doc-section">
+          <h2><span class="module-tag tag-violet">02 // DEFAULT MODE NETWORK</span> Predictive-Coding "Edge of Chaos"</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> Under Karl Friston's Free Energy Principle, the brain constantly attempts to predict upcoming rhythmic and melodic patterns. Periodic music quickly habituates (low prediction error), while pure white noise is ignored as unlearnable. At the mathematical <strong>Edge of Chaos ($r \approx 3.57\text{–}3.82$)</strong>, short musical motifs emerge and immediately mutate before repeating too many times—maximizing continuous <em>Bayesian Surprise</em> and quieting Default Mode Network (DMN) rumination.
+          </p>
+          <div class="formula-box">
+            Coupled Logistic Map x_{n+1} = r · x_n (1 - x_n) + 2D Hénon Strange Attractor + 12-TET Motif Anti-Repetition Engine
+          </div>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range / Options</th>
+                <th>Musical &amp; Dynamical Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Sonic Archetype Palette</strong></td>
+                <td>
+                  • <code>All Archetypes (Hybrid)</code><br/>
+                  • <code>Harmonic FM Bells &amp; Singing Bowls</code><br/>
+                  • <code>Liquid Formant Vowels</code><br/>
+                  • <code>Modal Wood, Koto &amp; Bowed Glass</code><br/>
+                  • <code>Deep Sub-Drops &amp; Microclicks</code><br/>
+                  • <code>Reverse Envelope Swells</code>
+                </td>
+                <td>Selects the synthesis engine used for each event, or lets the strange attractor dynamically switch between all 5 acoustic families.</td>
+              </tr>
+              <tr>
+                <td><strong>Rhythmic &amp; Temporal Engine</strong></td>
+                <td>
+                  • <code>Neuronal Avalanche</code><br/>
+                  • <code>Strange-Attractor Groove</code><br/>
+                  • <code>Golden-Ratio (φ) Polyrhythm</code><br/>
+                  • <code>Elastic Time Gravity</code><br/>
+                  • <code>Logistic Cloud</code>
+                </td>
+                <td>Shapes inter-onset timing: <em>Neuronal Avalanche</em> creates rapid cascading flurries separated by contemplative silences; <em>Strange-Attractor Groove</em> quantizes chaotic states to shifting rhythmic subdivisions; <em>Golden-Ratio Polyrhythm</em> interlocks 3 streams at $1 : \phi : 2.333$; <em>Elastic Time</em> accelerates and decelerates like a bouncing ball.</td>
+              </tr>
+              <tr>
+                <td><strong>Musical Notes (12-TET Scale)</strong></td>
+                <td>
+                  • <code>All 12 Chromatic Notes</code><br/>
+                  • <code>Dorian Mode</code><br/>
+                  • <code>Lydian Dream Scale</code><br/>
+                  • <code>Suspended Pentatonic</code><br/>
+                  • <code>Phrygian Dominant</code>
+                </td>
+                <td>Every event is strictly quantized to exact 12-tone equal temperament ($f = 440 \cdot 2^{(m-69)/12}\text{ Hz}$) across multiple octaves. A transition-memory tracker forms 4–7 note motifs and mutates any note or interval as soon as a bigram repeats more than ~1–2 times (marked with <code>*</code> in the visualizer).</td>
+              </tr>
+              <tr>
+                <td><strong>Chaos Parameter ($r$)</strong></td>
+                <td><code>2.80 – 3.99</code> (default <code>3.74</code>)</td>
+                <td>Controls the bifurcation regime: <code>r &lt; 3.45</code> is periodic/looping; <code>3.55 – 3.82</code> is the Edge of Chaos (evolving motifs that refuse to loop); <code>r &gt; 3.85</code> is fully chaotic.</td>
+              </tr>
+              <tr>
+                <td><strong>Tempo / Event Density</strong></td>
+                <td><code>0.5 – 12.0 /s</code></td>
+                <td>Controls the average rate of musical events per second.</td>
+              </tr>
+              <tr>
+                <td><strong>Pitch Register</strong></td>
+                <td><code>0% (Sub/Low) – 100% (Crystalline)</code></td>
+                <td>Shifts the multi-octave window between deep bass octaves (<code>C1–C3</code>), wide 4.5-octave span (<code>C2–G6</code>), and high crystalline octaves (<code>C4–C7</code>).</td>
+              </tr>
+              <tr>
+                <td><strong>Timbral Mutation &amp; Envelope Skew</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Controls FM modulation depth, modal resonator Q, formant vowel sweep range, and grace-note inflections.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 03 -->
+        <section id="mod3" class="doc-section">
+          <h2><span class="module-tag tag-amber">03 // THALAMOCORTICAL BINDING</span> Cross-Frequency PAC ($\theta\text{–}\gamma$ Coupling)</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> In advanced meditative absorption and lucid hypnagogia, high-frequency <strong>Gamma oscillations ($25\text{–}75\text{ Hz}$)</strong>—which support conscious lucidity and perceptual binding—have their amplitude locked to the positive peaks of slow <strong>Theta oscillations ($4\text{–}8\text{ Hz}$)</strong>, riding atop a $0.1\text{ Hz}$ autonomic breath wave.
+          </p>
+          <div class="formula-box">
+            Dichotic Binaural Carrier (f_0 ± f_θ/2) + Audio-Rate (48 kHz) WaveShaped Gamma Oscillator (f_γ) × Theta-Peak Gate × 0.1 Hz Breath Bloom
+          </div>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range</th>
+                <th>Neuro-Acoustic Meaning &amp; Audible Impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Base Carrier Frequency</strong></td>
+                <td><code>55 – 432 Hz</code> (default <code>136 Hz</code>)</td>
+                <td>Sets the fundamental pitch of the binaural drone (<code>baseFreq - θ/2</code> in Left ear, <code>baseFreq + θ/2</code> in Right ear) and the harmonic Gamma burst overtones (<code>2x</code>, <code>3x</code>, <code>4x</code>).</td>
+              </tr>
+              <tr>
+                <td><strong>Slow Phase Rhythm ($\delta / \theta / \alpha$)</strong></td>
+                <td><code>1.5 – 12.0 Hz</code> (default <code>6.0 Hz</code>)</td>
+                <td>Sets both the binaural beat frequency between your ears and the slow wave whose positive crests gate the Gamma bursts (<code>1.5–4 Hz</code> Delta, <code>4–8 Hz</code> Theta, <code>8–12 Hz</code> Alpha).</td>
+              </tr>
+              <tr>
+                <td><strong>Nested Gamma Burst Freq</strong></td>
+                <td><code>25 – 75 Hz</code> (default <code>40 Hz</code>)</td>
+                <td>Drives a true audio-rate (<code>48 kHz</code>) oscillator + raised-power pulse waveshaper that creates rapid isochronic flutter pulses inside each Theta burst (<code>25 Hz</code> slow flutter → <code>40 Hz</code> binding hum → <code>75 Hz</code> rapid buzz).</td>
+              </tr>
+              <tr>
+                <td><strong>PAC Coupling Index ($\theta$-Peak Gate)</strong></td>
+                <td><code>0% – 100%</code> (default <code>75%</code>)</td>
+                <td>Controls how strongly Gamma bursts are locked to the Theta peaks: at <code>0%</code> (uncoupled), Gamma bursts are silent and only the smooth binaural wave plays; at <code>100%</code>, every Theta crest unleashes a high-contrast burst of Gamma pulses while troughs drop to silence.</td>
+              </tr>
+              <tr>
+                <td><strong>0.1 Hz Coherent Breath Swell (10s)</strong></td>
+                <td><code>0% – 100%</code> (default <code>60%</code>)</td>
+                <td>Synchronizes the sound with the human $0.1\text{ Hz}$ Mayer-wave / HRV resonance cycle (5s Inhale ▲, 5s Exhale ▼): swells volume from a quiet whisper on Exhale (<code>10%</code>) to full richness on Inhale (<code>135%</code>) while opening a harmonic lowpass filter bloom on every Inhale.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 04 -->
+        <section id="mod4" class="doc-section">
+          <h2><span class="module-tag tag-emerald">04 // TEMPORAL SUSPENSION</span> Fractal &amp; Shepard-Risset Horizon</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> An 8-octave Shepard-Risset glissando ascends or descends endlessly while returning to the same spectral locus. When combined with multi-scale $1/f$ Weierstrass self-similarity across time and frequency scales, every temporal zoom level exhibits nested structure, suspending linear time perception.
+          </p>
+          <div class="formula-box">
+            8 Octave-Spaced Voices × Raised-Cosine Spectral Bell × 4-Scale Weierstrass Pitch Curve × 2^(4.2·oct) Rhythmic Cascade
+          </div>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range</th>
+                <th>Acoustic Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Shepard Drift Velocity</strong></td>
+                <td><code>-0.25 to +0.25 oct/s</code></td>
+                <td>Controls the speed and direction of the endless octave glissando (negative = endless descent, <code>0</code> = suspended harmonic hover, positive = endless ascent).</td>
+              </tr>
+              <tr>
+                <td><strong>Multi-Scale $1/f$ Self-Similarity</strong></td>
+                <td><code>0% – 100%</code> (default <code>65%</code>)</td>
+                <td>
+                  At <code>0%</code>, produces a pure, linear smooth Shepard glissando. Raising toward <code>100%</code> activates three fractal mechanisms:<br/>
+                  1. <strong>Scale-Invariant Rhythmic Cascade:</strong> Low octaves swell slowly (<code>~0.45 Hz</code>), mid octaves ripple at medium rates (<code>~2–3.5 Hz</code>), and high octaves shimmer rapidly (<code>~8.2 Hz</code>).<br/>
+                  2. <strong>4-Scale Weierstrass Pitch Staircase:</strong> Recursive waves-within-waves of pitch motion ($0.38, 1.0, 2.62, 6.85\text{ Hz}$).<br/>
+                  3. <strong>Recursive Harmonic Branches:</strong> Each octave voice sprouts a 5th / octave-fifth resonant harmonic echo.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Spectral Bell Center</strong></td>
+                <td><code>65 – 528 Hz</code> (default <code>220 Hz</code>)</td>
+                <td>Shifts the center frequency of the Gaussian/raised-cosine spectral envelope across the 8-octave span.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 05 -->
+        <section id="mod5" class="doc-section">
+          <h2><span class="module-tag tag-rose">05 // VESTIBULAR &amp; VAGAL</span> Infrasound &amp; Somatic Sub-Bass</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> Very low frequencies ($24\text{–}60\text{ Hz}$) paired with $2\text{nd}$ and $3\text{rd}$ harmonic "missing-fundamental" psychoacoustic warmth and a slow vestibular pulse ($0.2\text{–}4.0\text{ Hz}$) provide grounded somatic resonance.
+          </p>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range</th>
+                <th>Acoustic Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Sub-Bass Carrier</strong></td>
+                <td><code>24 – 60 Hz</code></td>
+                <td>Sets the fundamental sub-bass frequency ($f_0$) along with its $2f_0$ and $3f_0$ harmonics.</td>
+              </tr>
+              <tr>
+                <td><strong>Vestibular Trance Pulse</strong></td>
+                <td><code>0.2 – 4.0 Hz</code></td>
+                <td>Modulates the sub-bass amplitude at an infrasonic / trance rhythm (e.g. <code>1.6 Hz</code> $\approx 96\text{ BPM}$).</td>
+              </tr>
+              <tr>
+                <td><strong>Missing-Fundamental Warmth</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Boosts $2\text{nd}$ and $3\text{rd}$ harmonics so the brain reconstructs a powerful deep fundamental pitch even on smaller headphone drivers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- MODULE 06 -->
+        <section id="mod6" class="doc-section">
+          <h2><span class="module-tag tag-sky">06 // STOCHASTIC RESONANCE</span> Auditory Ganzfeld ($1/f$ Sonic Void)</h2>
+          <p>
+            <strong>Neuroscience Mechanism:</strong> Binaurally decorrelated $1/f$ Pink and $1/f^2$ Brown noise sculpted by dual sweeping resonant cavern filters creates a uniform acoustic horizon (Auditory Ganzfeld). Through <em>stochastic resonance</em>, an optimal floor of broadband $1/f$ noise can enhance sensitivity to subtle internal neural dynamics.
+          </p>
+          <table class="param-table">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Range</th>
+                <th>Acoustic Effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Color ($1/f$ Pink ↔ $1/f^2$ Brown)</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Tilts the spectral roll-off from bright $1/f$ pink noise (<code>4500 Hz</code> cutoff) to deep, womb-like $1/f^2$ brown cavern warmth (<code>180 Hz</code> cutoff).</td>
+              </tr>
+              <tr>
+                <td><strong>Cavern Formant Sweep</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Controls the depth of two independent left/right resonant bandpass filters slowly sweeping across the stereo noise field.</td>
+              </tr>
+              <tr>
+                <td><strong>Cathedral Shimmer Space</strong></td>
+                <td><code>0% – 100%</code></td>
+                <td>Global stereo convolution reverb send level (6.5-second custom stereo impulse response).</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- PRESETS & VISUALIZERS -->
+        <section id="presets" class="doc-section">
+          <h2>Curated Phenomenological State Presets</h2>
+          <ul>
+            <li><strong>1. Non-Dual Spatial Unbinding:</strong> Emphasizes Module 01 (3D HRTF Figure-8 trajectories passing through the head) to soften spatial ego boundaries.</li>
+            <li><strong>2. DMN Quieting (Edge of Chaos):</strong> Emphasizes Module 02 ($r = 3.76$ Edge-of-Chaos 12-TET motifs with anti-repetition mutation) to interrupt inner narrative loops.</li>
+            <li><strong>3. Lucid Hypnagogia ($\theta\text{–}\gamma$ PAC):</strong> Emphasizes Module 03 (`6 Hz` Theta binaural wave gating `40 Hz` audio-rate Gamma bursts with `0.1 Hz` breath swell).</li>
+            <li><strong>4. Timeless Fractal Horizon:</strong> Emphasizes Module 04 (endless Shepard-Risset ascent + high Weierstrass $1/f$ self-similarity).</li>
+            <li><strong>5. Somatic &amp; Vagal Resonance:</strong> Emphasizes Module 05 (`30 Hz` sub-bass + `1.65 Hz` trance pulse + missing-fundamental warmth).</li>
+            <li><strong>6. Auditory Ganzfeld ($1/f$ Void):</strong> Emphasizes Module 06 (decorrelated brown/pink noise cavern + deep cathedral space).</li>
+          </ul>
+        </section>
+
+        <section id="visualizers" class="doc-section">
+          <h2>Real-Time Interactive Visualizers</h2>
+          <ul>
+            <li><strong>1. 3D HRTF Spatial Geometry:</strong> Top-down 3D radar around the listener's head showing the exact trajectory trails (<code>∞</code>, <code>FAR</code>, <code>360°</code>), live distance in meters, frequency, and Front/Back/In-Head zone, plus interactive pointer dragging.</li>
+            <li><strong>2. $\theta\text{–}\gamma$ PAC &amp; Binaural Lissajous:</strong> Left side displays the live Theta carrier wave, audio-rate nested Gamma burst pulses, and $0.1\text{ Hz}$ Breath Swell halo; right side displays a live Left-vs-Right ear XY stereo phase Lissajous scope.</li>
+            <li><strong>3. Edge-of-Chaos &amp; Fractal Spectrum:</strong> Displays the live 96-band FFT spectrum, the 8 Shepard-Risset octave voices with orbiting fractal harmonic satellites and Weierstrass curve, and color-coded 12-TET Chaos musical note droplets (`C#4 [FM-BELL]`, `F2* [SUB-DROP]`).</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
