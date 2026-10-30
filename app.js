@@ -559,6 +559,47 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSlider('ganzfeldColor', 'ganzfeld', 'color', (v) => `${Math.round(v * 100)}% Brown`);
   bindSlider('ganzfeldSweep', 'ganzfeld', 'sweep', (v) => `${Math.round(v * 100)}%`);
 
+  // Generic SOLO button factory (used for Module 05 Sub-Bass & Module 06 Ganzfeld)
+  const ALL_MODULES = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
+  function setupSoloButton(btnId, mod, label, vizTab) {
+    const btn = document.getElementById(btnId);
+    const state = { active: false, saved: null, btn, label };
+    if (!btn) return state;
+    const setModule = (m, enabled) => {
+      const toggle = document.getElementById(`${m}Enabled`);
+      const card = document.querySelector(`.module-card[data-module="${m}"]`);
+      if (toggle) toggle.checked = enabled;
+      if (card) card.classList.toggle('active-module', enabled);
+      engine.updateModule(m, 'enabled', enabled);
+    };
+    btn.addEventListener('click', () => {
+      const others = ALL_MODULES.filter((m) => m !== mod);
+      if (!state.active) {
+        state.saved = {};
+        others.forEach((m) => {
+          state.saved[m] = engine.params[m].enabled;
+          setModule(m, false);
+        });
+        setModule(mod, true);
+        if (vizTab) {
+          const tab = document.querySelector(`.viz-tab[data-viz="${vizTab}"]`);
+          if (tab) tab.click();
+        }
+        state.active = true;
+        btn.classList.add('active');
+        btn.textContent = `UNSOLO ${label}`;
+      } else {
+        others.forEach((m) => setModule(m, state.saved ? state.saved[m] : true));
+        state.active = false;
+        btn.classList.remove('active');
+        btn.textContent = `SOLO ${label}`;
+      }
+    });
+    return state;
+  }
+  const soloSubState = setupSoloButton('soloSubBtn', 'sub', 'SUB', 'chaos');
+  const soloGanzfeldState = setupSoloButton('soloGanzfeldBtn', 'ganzfeld', 'GANZFELD', 'chaos');
+
   // Apply Preset or Saved Custom Configuration Object
   function applyConfigObject(p, startIfStopped = true) {
     if (!p) return;
@@ -616,6 +657,13 @@ document.addEventListener('DOMContentLoaded', () => {
       soloFractalBtn.classList.remove('active');
       soloFractalBtn.textContent = 'SOLO FRACTAL';
     }
+    [soloSubState, soloGanzfeldState].forEach((s) => {
+      s.active = false;
+      if (s.btn) {
+        s.btn.classList.remove('active');
+        s.btn.textContent = `SOLO ${s.label}`;
+      }
+    });
 
     // 1. Spatial
     if (p.spatial) {

@@ -19,7 +19,7 @@
 ### Global Controls & Custom Configuration
 - **Initialize Audio Engine:** Starts/pauses the real-time WebAudio synthesis graph (`44.1 / 48 kHz`) and `60 FPS` modulation & telemetry loop.
 - **💾 Save Config / ↺ Restore Saved:** Saves and restores your complete hand-tuned configuration across all 6 modules (`masterGain`, `reverbMix`, and all module toggles, sliders, and selectors) via `localStorage` (`aether_custom_config_v1`).
-- **SOLO Module Buttons (`SOLO 3D`, `SOLO CHAOS`, `SOLO PAC`, `SOLO FRACTAL`):** Isolates any individual module by muting the others and switching to the corresponding real-time visualizer.
+- **SOLO Module Buttons (`SOLO 3D`, `SOLO CHAOS`, `SOLO PAC`, `SOLO FRACTAL`, `SOLO SUB`, `SOLO GANZFELD`):** Isolates any individual module by muting the others and switching to the corresponding real-time visualizer.
 - **Live Telemetry Strip:** Displays real-time **Target State**, **Bayesian Surprise (bits)**, **PAC Index ($\theta\text{–}\gamma$)**, and **0.1 Hz Breath Phase (`INHALE ▲ / EXHALE ▼`)**.
 
 ---
