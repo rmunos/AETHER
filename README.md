@@ -86,10 +86,7 @@ Pairs a dichotic binaural beat carrier ($f_0 \pm f_\theta/2$) with **true audio-
 - **Shepard Drift Velocity (`-0.25 to +0.25 oct/s`):** Endless descent, hover, or ascent.
 - **Multi-Scale $1/f$ Self-Similarity (`0%–100%`):**
   - At `0%`: Pure, smooth linear Shepard-Risset glissando.
-  - Toward `100%`:
-    1. **Scale-Invariant Rhythmic Cascade:** Low octaves pulse slowly (`~0.45 Hz`), mid octaves ripple at medium rates (`~2–3.5 Hz`), and high octaves shimmer rapidly (`~8.2 Hz`, scaling as $2^{4.2 \cdot \text{octave}}$).
-    2. **4-Scale Weierstrass Pitch Staircase:** Recursive waves-within-waves of pitch motion ($0.38, 1.0, 2.62, 6.85\text{ Hz}$).
-    3. **Recursive Harmonic Branches:** Each octave voice sprouts a 5th / octave-fifth resonant harmonic echo.
+  - Toward `100%`: Keeps all 8 voices in 100% pure octave alignment while blossoming a **Pure Just-Intonation Celestial Triad (Root $1:1$, Major 3rd $5:4$ / Major 9th $9:8$, Perfect 5th $3:2$)** across a 4-scale $1/f$ Weierstrass envelope: low octaves breathe slowly in warm major-fifth swells (`~0.26 Hz`), mid octaves weave medium triad waves (`~0.85 Hz`), and high octaves shimmer with delicate consonant bell arpeggios (`~2.2 Hz`).
 - **Spectral Bell Center (`65–528 Hz`):** Center frequency of the 8-octave spectral envelope.
 
 ---

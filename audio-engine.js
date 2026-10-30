@@ -1134,7 +1134,8 @@ class ConsciousnessAudioEngine {
 
   /**
    * MODULE 4: Fractal & Scale-Invariant Shepard-Risset Landscape
-   * 8 octave-spaced voices with recursive Weierstrass pitch curves, scale-invariant rhythmic cascades & harmonic branches
+   * 8 octave-locked voices with Pure Just-Intonation Celestial Harmonics (Root 1:1, Major 3rd 5:4, Perfect 5th 3:2)
+   * and Multi-Scale 1/f Weierstrass Harmonic Arpeggiation & Breathing
    */
   _setupFractalModule() {
     const bus = this.ctx.createGain();
@@ -1144,45 +1145,50 @@ class ConsciousnessAudioEngine {
 
     const voices = [];
     for (let i = 0; i < 8; i++) {
-      // Primary Shepard octave fundamental oscillator
+      // 1. Primary Shepard octave fundamental oscillator (Pure Root 1:1)
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
-      // Self-similar harmonic branch (5th / recursive overtone) activated by Multi-Scale 1/f Self-Similarity
-      const fractalOsc = this.ctx.createOscillator();
-      const fractalFilter = this.ctx.createBiquadFilter();
-      const fractalGain = this.ctx.createGain();
+      // 2. Pure Just-Intonation Major 3rd (5:4) / Major 9th (9:8) Celestial Branch
+      const thirdOsc = this.ctx.createOscillator();
+      const thirdGain = this.ctx.createGain();
+
+      // 3. Pure Just-Intonation Perfect 5th (3:2) Celestial Branch
+      const fifthOsc = this.ctx.createOscillator();
+      const fifthGain = this.ctx.createGain();
 
       const pan = this.ctx.createStereoPanner();
 
+      // All pure warm sine waves — zero harsh filters or whistling wind!
       osc.type = 'sine';
-      fractalOsc.type = 'triangle';
+      thirdOsc.type = 'sine';
+      fifthOsc.type = 'sine';
 
       const octavePos = i / 8; // 0..1 across 8-octave span
       osc.frequency.value = 220;
-      fractalOsc.frequency.value = 330;
-
-      fractalFilter.type = 'bandpass';
-      fractalFilter.frequency.value = 660;
-      fractalFilter.Q.value = 4.2;
+      thirdOsc.frequency.value = 275; // 5/4 Major 3rd
+      fifthOsc.frequency.value = 330; // 3/2 Perfect 5th
 
       gain.gain.value = 0.0;
-      fractalGain.gain.value = 0.0;
-      pan.pan.value = Math.sin((i / 8) * Math.PI * 2) * 0.65;
+      thirdGain.gain.value = 0.0;
+      fifthGain.gain.value = 0.0;
+      pan.pan.value = Math.sin((i / 8) * Math.PI * 2) * 0.6;
 
       osc.connect(gain);
-      gain.connect(pan);
+      thirdOsc.connect(thirdGain);
+      fifthOsc.connect(fifthGain);
 
-      fractalOsc.connect(fractalFilter);
-      fractalFilter.connect(fractalGain);
-      fractalGain.connect(pan);
+      gain.connect(pan);
+      thirdGain.connect(pan);
+      fifthGain.connect(pan);
 
       pan.connect(bus);
 
       osc.start();
-      fractalOsc.start();
+      thirdOsc.start();
+      fifthOsc.start();
 
-      voices.push({ osc, gain, fractalOsc, fractalFilter, fractalGain, pan, octavePos });
+      voices.push({ osc, gain, thirdOsc, thirdGain, fifthOsc, fifthGain, pan, octavePos });
       this.telemetry.shepardVoices.push({ octavePos, freq: 220, amp: 0, ripple: 0 });
     }
 
@@ -1468,14 +1474,14 @@ class ConsciousnessAudioEngine {
       this.telemetry.pacIndex = pacDepth;
     }
 
-    // 5. Update MODULE 4: Fractal Shepard-Risset Voices (with True Multi-Scale 1/f Self-Similarity)
+    // 5. Update MODULE 4: Fractal Shepard-Risset Voices (Harmonious Just-Intonation Multi-Scale 1/f Cascade)
     if (this.nodes.fractal) {
       const dt = Math.min(0.1, now - this.nodes.fractal.lastUpdateTime);
       this.nodes.fractal.lastUpdateTime = now;
 
       const speed = this.params.fractal.speed; // octaves per second
       const centerFreq = this.params.fractal.center;
-      const fDepth = this.params.fractal.depth; // 0 = pure linear Shepard, 1 = full multi-scale fractal
+      const fDepth = this.params.fractal.depth; // 0 = pure octave Shepard, 1 = full celestial multi-scale triad cascade
 
       const voices = this.nodes.fractal.voices;
       for (let i = 0; i < voices.length; i++) {
@@ -1484,50 +1490,64 @@ class ConsciousnessAudioEngine {
 
         // Raised-cosine bell envelope across 8-octave span
         const bell = 0.5 - 0.5 * Math.cos(v.octavePos * Math.PI * 2);
-        const baseOctaveOffset = (v.octavePos - 0.5) * 6.0; // +/- 3 octaves around center
+        const baseOctaveOffset = (v.octavePos - 0.5) * 5.2; // Warm 5.2-octave span around center
 
-        // A. Multi-Scale 1/f Weierstrass Pitch Curve (4 nested scales: 0.38 Hz, 1.0 Hz, 2.6 Hz, 6.8 Hz)
-        const octPhase = v.octavePos * Math.PI * 2;
-        const wPitch =
-          0.52 * Math.sin(elapsed * 0.38 * Math.PI * 2 + octPhase) +
-          0.28 * Math.sin(elapsed * 1.00 * Math.PI * 2 + octPhase * 2.0 + 1.1) +
-          0.15 * Math.sin(elapsed * 2.62 * Math.PI * 2 + octPhase * 4.0 + 2.4) +
-          0.08 * Math.sin(elapsed * 6.85 * Math.PI * 2 + octPhase * 8.0 + 0.7);
+        // Keep all 8 voices in 100% pure octave alignment (zero eerie microtonal detuning!)
+        const freq = Math.max(32, Math.min(6400, centerFreq * Math.pow(2, baseOctaveOffset)));
 
-        // At fDepth=0 -> linear glide; at fDepth=1 -> +/- 0.28 octaves (~3.3 semitones) of recursive pitch ripples
-        const fractalOctaveShift = fDepth * 0.28 * wPitch;
-        const freq = Math.max(28, Math.min(12000, centerFreq * Math.pow(2, baseOctaveOffset + fractalOctaveShift)));
+        // Pure Just-Intonation Celestial Triad ratios: Root (1:1), Major 3rd (5:4) / Major 9th (9:8), Perfect 5th (3:2)
+        const thirdRatio = i % 2 === 0 ? 1.25 : 1.125;
+        const fifthRatio = 1.5;
 
-        // B. Scale-Invariant Temporal Pulsing (Low octaves pulse slowly at ~0.45 Hz; high octaves shimmer fast at ~8.2 Hz)
-        const scaleRateHz = 0.45 * Math.pow(2.0, v.octavePos * 4.2);
-        const macroPulse = 0.5 + 0.5 * Math.sin(elapsed * scaleRateHz * Math.PI * 2 + i * 0.785);
-        const microPulse = 0.5 + 0.5 * Math.sin(elapsed * scaleRateHz * 2.618 * Math.PI * 2 + i * 1.618);
-        const selfSimilarPulse = Math.pow(0.62 * macroPulse + 0.38 * microPulse, 2.3);
+        v.osc.frequency.setTargetAtTime(freq, now, 0.025);
+        v.thirdOsc.frequency.setTargetAtTime(Math.min(8000, freq * thirdRatio), now, 0.025);
+        v.fifthOsc.frequency.setTargetAtTime(Math.min(8000, freq * fifthRatio), now, 0.025);
 
-        // At fDepth=0 -> smooth steady bell; at fDepth=1 -> high-contrast multi-scale rhythmic cascade across octaves
-        const activeBell = bell * ((1.0 - fDepth * 0.85) + fDepth * 1.55 * selfSimilarPulse);
+        // Scale-Invariant Multi-Scale 1/f Weierstrass Harmonic Blossoming:
+        // Low octaves breathe slowly (~0.26 Hz); mid octaves weave medium waves (~0.85 Hz); high octaves shimmer gently (~2.2 Hz)
+        const scaleRateHz = 0.26 * Math.pow(1.82, v.octavePos * 3.6);
+        const basePhase = elapsed * scaleRateHz * Math.PI * 2 + i * 0.785;
 
-        v.osc.frequency.setTargetAtTime(freq, now, 0.018);
-        v.gain.gain.setTargetAtTime(activeBell * 0.20, now, 0.015);
+        // 4-scale 1/f Weierstrass wave for Root (0 deg), Major 3rd (120 deg), and Perfect 5th (240 deg)
+        const wRoot =
+          0.52 * Math.sin(basePhase) +
+          0.26 * Math.sin(basePhase * 2.0 + 0.8) +
+          0.14 * Math.sin(basePhase * 4.0 + 1.9) +
+          0.08 * Math.sin(basePhase * 8.0 + 0.4);
 
-        // C. Recursive Harmonic Overtone Branch (5th/octave-fifth echo + resonant filter bloom)
-        const branchRatio = i % 2 === 0 ? 1.5 : 3.0;
-        const branchFreq = Math.min(14000, freq * branchRatio);
-        const filterCutoff = Math.min(14000, freq * (1.5 + 3.5 * macroPulse));
-        const branchGain = fDepth <= 0.005 ? 0.0 : bell * fDepth * (0.20 + 0.80 * microPulse) * 0.16;
+        const wThird =
+          0.52 * Math.sin(basePhase + 2.094) +
+          0.26 * Math.sin(basePhase * 2.0 + 2.894) +
+          0.14 * Math.sin(basePhase * 4.0 + 3.994) +
+          0.08 * Math.sin(basePhase * 8.0 + 2.494);
 
-        v.fractalOsc.frequency.setTargetAtTime(branchFreq, now, 0.018);
-        v.fractalFilter.frequency.setTargetAtTime(filterCutoff, now, 0.02);
-        v.fractalGain.gain.setTargetAtTime(branchGain, now, 0.015);
+        const wFifth =
+          0.52 * Math.sin(basePhase + 4.188) +
+          0.26 * Math.sin(basePhase * 2.0 + 4.988) +
+          0.14 * Math.sin(basePhase * 4.0 + 6.088) +
+          0.08 * Math.sin(basePhase * 8.0 + 4.588);
 
-        // Stereo self-similar spiral panning
-        const panPos = Math.max(-0.95, Math.min(0.95, Math.sin(octPhase + fDepth * wPitch * 1.8) * (0.6 + fDepth * 0.32)));
-        v.pan.pan.setTargetAtTime(panPos, now, 0.025);
+        const rootPulse = Math.pow(0.5 + 0.5 * wRoot, 1.8);
+        const thirdPulse = Math.pow(0.5 + 0.5 * wThird, 2.0);
+        const fifthPulse = Math.pow(0.5 + 0.5 * wFifth, 2.0);
+
+        // At fDepth=0 -> smooth pure octave glide; as fDepth->1 -> lush multi-scale Root / Major-3rd / Perfect-5th arpeggio cascade
+        const rootAmp = bell * ((1.0 - fDepth * 0.55) + fDepth * 0.95 * rootPulse);
+        const thirdAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * thirdPulse * 0.14;
+        const fifthAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * fifthPulse * 0.16;
+
+        v.gain.gain.setTargetAtTime(rootAmp * 0.19, now, 0.025);
+        v.thirdGain.gain.setTargetAtTime(thirdAmp, now, 0.025);
+        v.fifthGain.gain.setTargetAtTime(fifthAmp, now, 0.025);
+
+        // Gentle stereo breathing
+        const panPos = Math.max(-0.9, Math.min(0.9, Math.sin(v.octavePos * Math.PI * 2 + fDepth * wRoot * 0.9) * 0.65));
+        v.pan.pan.setTargetAtTime(panPos, now, 0.04);
 
         this.telemetry.shepardVoices[i].octavePos = v.octavePos;
         this.telemetry.shepardVoices[i].freq = freq;
-        this.telemetry.shepardVoices[i].amp = activeBell;
-        this.telemetry.shepardVoices[i].ripple = fDepth * wPitch;
+        this.telemetry.shepardVoices[i].amp = rootAmp + (thirdAmp + fifthAmp) * 2.5;
+        this.telemetry.shepardVoices[i].ripple = fDepth * wRoot;
       }
     }
 
