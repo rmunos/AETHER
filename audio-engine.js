@@ -148,60 +148,35 @@ class ConsciousnessAudioEngine {
     this.reverbReturn = this.ctx.createGain();
     this.reverbReturn.gain.value = 1.0;
 
-    // ACTIVE CATHEDRAL SHIMMER HALO GENERATOR:
-    // Authentic ambient shimmer (Strymon / Eno / Eventide) combines a diffused hall space
-    // with a celestial, breathing just-intonation crystal choir (C5, G5, C6, E6, G6, B6).
-    // Driven by multi-octave harmonic sine oscillators with slow organic chorusing & pitch-drift,
-    // smoothed directly into the stereo cathedral field.
+    // Cathedral Shimmer: high-Q passive resonators tuned to just-intonation intervals (C5..G6)
+    // excited exclusively by the reverb send, then diffused by the convolver -> a celestial "singing halo"
+    // that never generates autonomous tones and stays 100% silent when sub-bass / dry modules play.
     this.shimmerGain = this.ctx.createGain();
     this.shimmerGain.gain.value = this._shimmerLevel(this.params.reverbMix);
 
-    this.shimmerFilter = this.ctx.createBiquadFilter();
-    this.shimmerFilter.type = 'lowpass';
-    this.shimmerFilter.frequency.value = 4800;
-
     this.shimmerVoices = [];
-    const shimmerNotes = [
-      { f: 523.25, pan: -0.75, rate: 0.045, depth: 1.8 },  // C5 (Root)
-      { f: 654.06, pan: 0.65,  rate: 0.038, depth: 1.4 },  // E5 (Major 3rd)
-      { f: 784.88, pan: -0.55, rate: 0.052, depth: 2.1 },  // G5 (Perfect 5th)
-      { f: 1046.50, pan: 0.75, rate: 0.033, depth: 2.4 },  // C6 (Octave)
-      { f: 1308.13, pan: -0.65, rate: 0.041, depth: 2.8 }, // E6 (High 3rd)
-      { f: 1569.75, pan: 0.55, rate: 0.029, depth: 3.2 }   // G6 (High 5th)
-    ];
+    const shimmerFreqs = [523.25, 654.06, 784.88, 1046.50, 1308.13, 1569.75];
+    shimmerFreqs.forEach((f, i) => {
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = 24;
 
-    shimmerNotes.forEach((note, i) => {
-      const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
+      g.gain.value = 0.35;
+
       const pan = this.ctx.createStereoPanner();
+      pan.pan.value = i % 2 === 0 ? -0.65 : 0.65;
 
-      osc.type = 'sine';
-      osc.frequency.value = note.f;
-      g.gain.value = 0.0;
-      pan.pan.value = note.pan;
-
-      osc.connect(g);
+      this.reverbSendGain.connect(bp);
+      bp.connect(g);
       g.connect(pan);
-      pan.connect(this.shimmerFilter);
-      osc.start();
+      pan.connect(this.shimmerGain);
 
-      this.shimmerVoices.push({
-        osc,
-        g,
-        baseFreq: note.f,
-        rate: note.rate,
-        depth: note.depth,
-        phase: i * 1.15
-      });
+      this.shimmerVoices.push({ bp, g, pan, rate: 0.03 + i * 0.015, phase: i * 1.2 });
     });
 
-    this.shimmerFilter.connect(this.shimmerGain);
     this.shimmerGain.connect(this.reverbNode);
-    // Also feed a direct clean shimmer branch so the celestial sheen is bright & crystal-clear
-    this.cleanShimmerGain = this.ctx.createGain();
-    this.cleanShimmerGain.gain.value = 0.45;
-    this.shimmerGain.connect(this.cleanShimmerGain);
-    this.cleanShimmerGain.connect(this.compressor);
 
     // Stereo Split Analysers for Lissajous & Spectrum
     const splitter = this.ctx.createChannelSplitter(2);
@@ -1285,9 +1260,10 @@ class ConsciousnessAudioEngine {
   }
 
   /**
-   * MODULE 5: Infrasound & Somatic Sub-Bass
-   * Deep somatic sub-bass (24-60 Hz) + warm, velvety musical overtones (2f0 octave, 3f0 musical fifth).
-   * 100% pure sine waves with lowpass smoothing — zero distortion, zero harsh metallic edge.
+   * MODULE 5: Infrasound & Somatic Sub-Bass (Vestibular & Vagal)
+   * Pure low somatic tone (24-50 Hz) for bone & otolith resonance.
+   * 100% pure sine waves with steep 24 dB/oct dual low-pass filtering capped strictly at <= 85 Hz.
+   * Zero high frequencies, zero mid frequencies, zero distortion.
    */
   _setupSubBassModule() {
     const bus = this.ctx.createGain();
@@ -1297,90 +1273,81 @@ class ConsciousnessAudioEngine {
     const f0 = this.params.sub.freq;
     const warmth = this.params.sub.warmth;
 
-    // Three 100% PURE SINE oscillators:
-    // 1. Fundamental f0 (deep, chest-resonating infrasonic weight)
-    // 2. 2nd Harmonic 2*f0 (smooth octave body)
-    // 3. 3rd Harmonic 3*f0 (warm, mellow musical fifth)
+    // Pure low-frequency sine oscillators:
+    // 1. Fundamental f0 (24-45 Hz deep somatic/vestibular tone)
+    // 2. 2nd Harmonic 2*f0 (gentle octave low-bass reinforcement)
     const subOsc1 = this.ctx.createOscillator();
     const subOsc2 = this.ctx.createOscillator();
-    const subOsc3 = this.ctx.createOscillator();
 
     subOsc1.type = 'sine';
     subOsc2.type = 'sine';
-    subOsc3.type = 'sine';
 
     subOsc1.frequency.value = f0;
     subOsc2.frequency.value = f0 * 2;
-    subOsc3.frequency.value = f0 * 3;
 
     const gain1 = this.ctx.createGain();
     const gain2 = this.ctx.createGain();
-    const gain3 = this.ctx.createGain();
 
-    // Gentle lowpass filter that strictly cuts off anything above warm mid-bass (~240 Hz),
-    // guaranteeing zero high-frequency fizz, clicks, or harsh metallic artifacts.
-    const smoothingFilter = this.ctx.createBiquadFilter();
-    smoothingFilter.type = 'lowpass';
-    smoothingFilter.frequency.value = Math.min(260, f0 * 4.5);
-    smoothingFilter.Q.value = 0.7; // maximally flat Butterworth response (no resonant peak)
+    // Cascaded 2-pole lowpass filters (24 dB/octave attenuation)
+    // Strictly capped at <= 85 Hz to ensure ABSOLUTELY ZERO mid or high frequencies
+    const lp1 = this.ctx.createBiquadFilter();
+    lp1.type = 'lowpass';
+    lp1.frequency.value = Math.min(85, f0 * 2.2);
+    lp1.Q.value = 0.707;
+
+    const lp2 = this.ctx.createBiquadFilter();
+    lp2.type = 'lowpass';
+    lp2.frequency.value = Math.min(85, f0 * 2.2);
+    lp2.Q.value = 0.707;
 
     const pulseGain = this.ctx.createGain();
     pulseGain.gain.value = 0.8;
 
     subOsc1.connect(gain1);
     subOsc2.connect(gain2);
-    subOsc3.connect(gain3);
 
-    gain1.connect(smoothingFilter);
-    gain2.connect(smoothingFilter);
-    gain3.connect(smoothingFilter);
-
-    smoothingFilter.connect(pulseGain);
+    gain1.connect(lp1);
+    gain2.connect(lp1);
+    lp1.connect(lp2);
+    lp2.connect(pulseGain);
     pulseGain.connect(bus);
 
     subOsc1.start();
     subOsc2.start();
-    subOsc3.start();
 
     this.nodes.sub = {
       bus,
       subOsc1,
       subOsc2,
-      subOsc3,
       gain1,
       gain2,
-      gain3,
-      smoothingFilter,
+      lp1,
+      lp2,
       pulseGain
     };
 
     this._updateSubWarmth(warmth);
   }
 
-  // Smooth, velvet-soft missing-fundamental warmth:
-  // At warmth = 0%: 100% clean, deep sub-rumble fundamental
-  // At warmth -> 100%: smooth octave & fifth harmonic bloom that makes the bass feel rich, rounded, and full
-  // Perceived volume is dynamically balanced without any harsh harmonics!
+  // Smooth, deep missing-fundamental warmth strictly confined to low frequencies (< 85 Hz)
   _updateSubWarmth(w) {
     if (!this.nodes.sub || !this.ctx) return;
     const now = this.ctx.currentTime;
     const n = this.nodes.sub;
     const f0 = this.params.sub.freq;
 
-    // Fundamental stays powerful and deep
-    const g1 = 0.85 * (1.0 - w * 0.22);
-    // 2nd harmonic (octave) adds warm, rounded body
-    const g2 = w * 0.35;
-    // 3rd harmonic (perfect 5th) adds gentle acoustic presence
-    const g3 = Math.pow(w, 1.2) * 0.18;
+    // Fundamental remains solid low sub-bass
+    const g1 = 0.85 * (1.0 - w * 0.15);
+    // 2nd harmonic (octave) adds subtle warm body strictly in low bass (< 80 Hz)
+    const g2 = w * 0.22;
 
     n.gain1.gain.setTargetAtTime(g1, now, 0.05);
     n.gain2.gain.setTargetAtTime(g2, now, 0.05);
-    n.gain3.gain.setTargetAtTime(g3, now, 0.05);
 
-    // Filter gently follows f0, strictly staying below 260 Hz
-    const cutoff = Math.min(260, f0 * (2.8 + w * 1.8));
-    n.smoothingFilter.frequency.setTargetAtTime(cutoff, now, 0.05);
+    // Cascaded filter strictly caps anything above 85 Hz
+    const cutoff = Math.min(85, f0 * (1.8 + w * 0.4));
+    n.lp1.frequency.setTargetAtTime(cutoff, now, 0.05);
+    n.lp2.frequency.setTargetAtTime(cutoff, now, 0.05);
   }
 
   /**
@@ -1760,25 +1727,12 @@ class ConsciousnessAudioEngine {
       g.panR.pan.setTargetAtTime(0.85 - 0.5 * s * Math.sin(elapsed * 0.07 + 1.2), now, 0.1);
     }
 
-    // 8. Cathedral Shimmer: organic breathing & subtle choral pitch-drift
-    if (this.shimmerVoices && this.params.reverbMix > 0.01) {
-      const mix = this.params.reverbMix;
-      for (let i = 0; i < this.shimmerVoices.length; i++) {
-        const v = this.shimmerVoices[i];
-        // Slow organic breath wave (4-8 second period per voice)
-        const breath = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
-        // Subtle celestial micro-drift (±1.5 Hz)
-        const drift = Math.sin(elapsed * (v.rate * 1.8) * Math.PI * 2 + v.phase) * v.depth;
-        v.osc.frequency.setTargetAtTime(v.baseFreq + drift, now, 0.08);
-
-        // Vocal swell envelope
-        const voiceGain = Math.pow(breath, 1.6) * 0.12 * Math.min(1.0, mix * 1.4);
-        v.g.gain.setTargetAtTime(voiceGain, now, 0.08);
-      }
-    } else if (this.shimmerVoices) {
-      for (let i = 0; i < this.shimmerVoices.length; i++) {
-        this.shimmerVoices[i].g.gain.setTargetAtTime(0, now, 0.05);
-      }
+    // 8. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
+    if (this.shimmerVoices) {
+      this.shimmerVoices.forEach((v) => {
+        const a = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
+        v.g.gain.setTargetAtTime(0.15 + 0.85 * a * a, now, 0.2);
+      });
     }
   }
 
@@ -1872,7 +1826,6 @@ class ConsciousnessAudioEngine {
         const f0 = val;
         this.nodes.sub.subOsc1.frequency.setTargetAtTime(f0, now, 0.08);
         this.nodes.sub.subOsc2.frequency.setTargetAtTime(f0 * 2, now, 0.08);
-        this.nodes.sub.subOsc3.frequency.setTargetAtTime(f0 * 3, now, 0.08);
         this._updateSubWarmth(this.params.sub.warmth);
       } else if (key === 'warmth') {
         this._updateSubWarmth(val);
