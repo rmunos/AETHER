@@ -134,11 +134,40 @@ class ConsciousnessAudioEngine {
     this.dryBus = this.ctx.createGain();
     this.dryBus.gain.value = 1.0;
 
+    // Separate always-dry bus for the 3D HRTF module (never ducked by the cathedral space)
+    this.spatialDryBus = this.ctx.createGain();
+    this.spatialDryBus.gain.value = 1.0;
+
     this.reverbSendGain = this.ctx.createGain();
-    this.reverbSendGain.gain.value = this.params.reverbMix * 0.65;
+    this.reverbSendGain.gain.value = this._reverbSendLevel(this.params.reverbMix);
 
     this.reverbNode = this.ctx.createConvolver();
-    this.reverbNode.buffer = this._createCathedralImpulse(4.8, 2.4);
+    this.reverbNode.buffer = this._createCathedralImpulse(6.5, 2.6);
+
+    this.reverbReturn = this.ctx.createGain();
+    this.reverbReturn.gain.value = 1.0;
+
+    // Cathedral Shimmer: high-Q resonators tuned to a pure just-intonation major chord (C5..G6)
+    // excited by the reverb send, then smeared by the convolver -> a singing "choir halo" in the tail
+    this.shimmerGain = this.ctx.createGain();
+    this.shimmerGain.gain.value = this._shimmerLevel(this.params.reverbMix);
+    this.shimmerVoices = [];
+    const shimmerFreqs = [523.25, 654.06, 784.88, 1046.5, 1308.1, 1569.8];
+    shimmerFreqs.forEach((f, i) => {
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = 32;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.5;
+      const pan = this.ctx.createStereoPanner();
+      pan.pan.value = i % 2 === 0 ? -0.7 : 0.7;
+      this.reverbSendGain.connect(bp);
+      bp.connect(g);
+      g.connect(pan);
+      pan.connect(this.shimmerGain);
+      this.shimmerVoices.push({ bp, g, pan, rate: 0.031 + i * 0.017, phase: i * 1.3 });
+    });
 
     // Stereo Split Analysers for Lissajous & Spectrum
     const splitter = this.ctx.createChannelSplitter(2);
@@ -150,9 +179,13 @@ class ConsciousnessAudioEngine {
     this.analyserMaster.fftSize = 2048;
     this.analyserMaster.smoothingTimeConstant = 0.82;
 
+    this.dryBus.gain.value = this._dryLevel(this.params.reverbMix);
     this.dryBus.connect(this.compressor);
+    this.spatialDryBus.connect(this.compressor);
     this.reverbSendGain.connect(this.reverbNode);
-    this.reverbNode.connect(this.compressor);
+    this.shimmerGain.connect(this.reverbNode);
+    this.reverbNode.connect(this.reverbReturn);
+    this.reverbReturn.connect(this.compressor);
 
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.analyserMaster);
@@ -222,18 +255,39 @@ class ConsciousnessAudioEngine {
 
     let lpL = 0;
     let lpR = 0;
+    // Pre-delay (~35 ms) so the tail is perceived as a large distant space, separate from the dry sound
+    const preDelay = Math.floor(rate * 0.035);
     for (let i = 0; i < length; i++) {
-      const t = i / rate;
-      const env = Math.pow(1 - i / length, decay) * (1 - Math.exp(-t * 18));
-      // Warm filtered stereo noise with subtle slow phase modulation
+      if (i < preDelay) {
+        left[i] = 0;
+        right[i] = 0;
+        continue;
+      }
+      const t = (i - preDelay) / rate;
+      const env = Math.pow(1 - i / length, decay) * (1 - Math.exp(-t * 14));
+      // Progressive darkening: bright early reflections, warm late tail
+      const damp = 0.35 + 0.55 * (i / length);
       const whiteL = Math.random() * 2 - 1;
       const whiteR = Math.random() * 2 - 1;
-      lpL = lpL * 0.78 + whiteL * 0.22;
-      lpR = lpR * 0.78 + whiteR * 0.22;
-      left[i] = lpL * env * 0.6;
-      right[i] = lpR * env * 0.6;
+      lpL = lpL * damp + whiteL * (1 - damp);
+      lpR = lpR * damp + whiteR * (1 - damp);
+      left[i] = lpL * env * 0.55;
+      right[i] = lpR * env * 0.55;
     }
     return impulse;
+  }
+
+  // Cathedral Shimmer Space mapping (0..1): wet send, shimmer resonators, and gentle dry ducking
+  _reverbSendLevel(mix) {
+    return mix * 1.25;
+  }
+
+  _shimmerLevel(mix) {
+    return Math.pow(mix, 1.5) * 2.2;
+  }
+
+  _dryLevel(mix) {
+    return 1.0 - mix * 0.45;
   }
 
   /**
@@ -247,7 +301,7 @@ class ConsciousnessAudioEngine {
     const initialGain = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0.0001;
     bus.gain.value = initialGain;
     // Connect 100% DRY so no centered reverb tail ever bleeds into the middle of the head
-    bus.connect(this.dryBus);
+    bus.connect(this.spatialDryBus);
 
     // Shared steady pink-filtered air buffer for subtle pinna localization cues on low notes
     const rate = this.ctx.sampleRate;
@@ -1285,34 +1339,79 @@ class ConsciousnessAudioEngine {
     colorFilter.type = 'lowpass';
     colorFilter.frequency.value = this._colorToFreq(this.params.ganzfeld.color);
 
-    // Cavern Formant Sweep Filters
-    const cavernL = this.ctx.createBiquadFilter();
-    const cavernR = this.ctx.createBiquadFilter();
-    cavernL.type = 'bandpass';
-    cavernR.type = 'bandpass';
-    cavernL.Q.value = 2.2;
-    cavernR.Q.value = 2.2;
-    cavernL.frequency.value = 320;
-    cavernR.frequency.value = 480;
+    // Cavern Formant Sweep: two vocal-tract-like formant pairs (F1 + F2) per ear, fed from the
+    // FULL-BAND pink noise (pre color filter) so the formants stay audible even with deep brown color.
+    // Left and right morph independently through vowel shapes (oo → oh → ah → eh → ee), creating a
+    // slowly "breathing / whispering cave" that moves around the head.
+    const sweepAmt = this.params.ganzfeld.sweep;
+    const makeFormant = (freq) => {
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = freq;
+      f.Q.value = this._cavernQ(sweepAmt);
+      return f;
+    };
+    const cavernL1 = makeFormant(300);
+    const cavernL2 = makeFormant(870);
+    const cavernR1 = makeFormant(730);
+    const cavernR2 = makeFormant(1090);
+
+    const panL = this.ctx.createStereoPanner();
+    const panR = this.ctx.createStereoPanner();
+    panL.pan.value = -0.85;
+    panR.pan.value = 0.85;
 
     const directGain = this.ctx.createGain();
     const sweepGain = this.ctx.createGain();
-    directGain.gain.value = 0.65;
-    sweepGain.gain.value = this.params.ganzfeld.sweep * 0.85;
+    directGain.gain.value = this._cavernDirect(sweepAmt);
+    sweepGain.gain.value = this._cavernWet(sweepAmt);
 
     noiseSource.connect(colorFilter);
     colorFilter.connect(directGain);
     directGain.connect(bus);
 
-    colorFilter.connect(cavernL);
-    colorFilter.connect(cavernR);
-    cavernL.connect(sweepGain);
-    cavernR.connect(sweepGain);
+    noiseSource.connect(cavernL1);
+    noiseSource.connect(cavernL2);
+    noiseSource.connect(cavernR1);
+    noiseSource.connect(cavernR2);
+    cavernL1.connect(panL);
+    cavernL2.connect(panL);
+    cavernR1.connect(panR);
+    cavernR2.connect(panR);
+    panL.connect(sweepGain);
+    panR.connect(sweepGain);
     sweepGain.connect(bus);
 
     noiseSource.start();
 
-    this.nodes.ganzfeld = { bus, colorFilter, cavernL, cavernR, sweepGain };
+    this.nodes.ganzfeld = {
+      bus, colorFilter, directGain, sweepGain, panL, panR,
+      cavernL1, cavernL2, cavernR1, cavernR2
+    };
+  }
+
+  // Cavern Formant Sweep mapping (0..1)
+  _cavernQ(s) {
+    return 2.5 + s * 9.5; // narrower, more vocal resonances as sweep increases
+  }
+
+  _cavernDirect(s) {
+    return 0.75 * (1.0 - s * 0.8); // broadband noise fades back so the formants come forward
+  }
+
+  _cavernWet(s) {
+    return s * 3.2; // compensates the energy loss of narrow bandpass filters
+  }
+
+  // Vowel formant table (F1, F2 in Hz): oo, oh, ah, eh, ee
+  _vowelFormants(pos) {
+    const V = [[300, 870], [500, 1000], [730, 1090], [530, 1840], [270, 2290]];
+    const n = V.length;
+    const x = ((pos % n) + n) % n;
+    const i = Math.floor(x);
+    const j = (i + 1) % n;
+    const t = 0.5 - 0.5 * Math.cos((x - i) * Math.PI); // smooth cosine morph
+    return [V[i][0] + (V[j][0] - V[i][0]) * t, V[i][1] + (V[j][1] - V[i][1]) * t];
   }
 
   _colorToFreq(color) {
@@ -1558,12 +1657,29 @@ class ConsciousnessAudioEngine {
       this.nodes.sub.pulseGain.gain.setTargetAtTime(pulseMod, now, 0.025);
     }
 
-    // 7. Update MODULE 6: Ganzfeld Cavern Formant Sweeps
+    // 7. Update MODULE 6: Ganzfeld Cavern Vowel-Formant Sweeps (independent L/R morphing)
     if (this.nodes.ganzfeld) {
-      const sweepL = 260 + 180 * Math.sin(elapsed * 0.14);
-      const sweepR = 420 + 240 * Math.cos(elapsed * 0.11 + 0.8);
-      this.nodes.ganzfeld.cavernL.frequency.setTargetAtTime(sweepL, now, 0.08);
-      this.nodes.ganzfeld.cavernR.frequency.setTargetAtTime(sweepR, now, 0.08);
+      const g = this.nodes.ganzfeld;
+      const s = this.params.ganzfeld.sweep;
+      // Morph speed grows slightly with sweep depth (one full vowel cycle every ~45s → ~20s)
+      const rate = 0.11 + s * 0.14;
+      const [l1, l2] = this._vowelFormants(elapsed * rate);
+      const [r1, r2] = this._vowelFormants(elapsed * rate * 0.77 + 2.3);
+      g.cavernL1.frequency.setTargetAtTime(l1, now, 0.06);
+      g.cavernL2.frequency.setTargetAtTime(l2, now, 0.06);
+      g.cavernR1.frequency.setTargetAtTime(r1, now, 0.06);
+      g.cavernR2.frequency.setTargetAtTime(r2, now, 0.06);
+      // The two caverns slowly drift around the head
+      g.panL.pan.setTargetAtTime(-0.85 + 0.5 * s * Math.sin(elapsed * 0.09), now, 0.1);
+      g.panR.pan.setTargetAtTime(0.85 - 0.5 * s * Math.sin(elapsed * 0.07 + 1.2), now, 0.1);
+    }
+
+    // 8. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
+    if (this.shimmerVoices) {
+      this.shimmerVoices.forEach((v) => {
+        const a = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
+        v.g.gain.setTargetAtTime(0.15 + 0.85 * a * a, now, 0.2);
+      });
     }
   }
 
@@ -1580,7 +1696,10 @@ class ConsciousnessAudioEngine {
   setReverbMix(val) {
     this.params.reverbMix = val;
     if (this.ctx) {
-      this.reverbSendGain.gain.setTargetAtTime(val * 0.65, this.ctx.currentTime, 0.08);
+      const now = this.ctx.currentTime;
+      this.reverbSendGain.gain.setTargetAtTime(this._reverbSendLevel(val), now, 0.08);
+      this.shimmerGain.gain.setTargetAtTime(this._shimmerLevel(val), now, 0.08);
+      this.dryBus.gain.setTargetAtTime(this._dryLevel(val), now, 0.08);
     }
   }
 
@@ -1664,7 +1783,11 @@ class ConsciousnessAudioEngine {
       if (key === 'color') {
         this.nodes.ganzfeld.colorFilter.frequency.setTargetAtTime(this._colorToFreq(val), now, 0.1);
       } else if (key === 'sweep') {
-        this.nodes.ganzfeld.sweepGain.gain.setTargetAtTime(val * 0.85, now, 0.1);
+        const g = this.nodes.ganzfeld;
+        g.directGain.gain.setTargetAtTime(this._cavernDirect(val), now, 0.1);
+        g.sweepGain.gain.setTargetAtTime(this._cavernWet(val), now, 0.1);
+        const q = this._cavernQ(val);
+        [g.cavernL1, g.cavernL2, g.cavernR1, g.cavernR2].forEach((f) => f.Q.setTargetAtTime(q, now, 0.1));
       }
     }
   }

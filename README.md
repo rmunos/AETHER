@@ -96,8 +96,8 @@ Pairs a dichotic binaural beat carrier ($f_0 \pm f_\theta/2$) with **true audio-
 
 ### 06 // Stochastic Resonance: Auditory Ganzfeld ($1/f$ Sonic Void)
 - **Color (`1/f` Pink ↔ `1/f²` Brown):** Spectral roll-off tilt between bright pink and deep cavern brown noise.
-- **Cavern Formant Sweep (`0%–100%`):** Dual stereo resonant bandpass sweeps.
-- **Cathedral Shimmer Space (`0%–100%`):** Global 6.5-second stereo convolution reverb mix.
+- **Cavern Formant Sweep (`0%–100%`):** Independent left/right vocal formant pairs (F1+F2) morphing through vowel shapes (oo → oh → ah → eh → ee) — a breathing, whispering cave drifting around the head.
+- **Cathedral Shimmer Space (`0%–100%`):** Global 6.5-second stereo convolution reverb (35 ms pre-delay) + a shimmer choir of six high-Q resonators tuned to a just-intonation major chord, with gentle dry ducking (3D HRTF sources stay dry).
 
 ---
 
