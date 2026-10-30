@@ -6,15 +6,11 @@
 
 ---
 
-## Quick Start
+## Launch the Live App
 
-Run any static HTTP server from the repository root and open `http://localhost:8080` in a modern browser:
-
-```bash
-python3 -m http.server 8080
-```
-
-Click **📖 DOCUMENTATION** in the top bar of the web app (or open [`docs.html`](./docs.html)) for the interactive in-app guide.
+- **🌐 Live Web App (GitHub Pages):** [https://rmunos.github.io/AETHER/](https://rmunos.github.io/AETHER/)
+- **📖 Full Documentation & Guide:** [https://rmunos.github.io/AETHER/docs.html](https://rmunos.github.io/AETHER/docs.html)
+- **💻 Run Locally (Zero Server Required):** Simply open [`index.html`](./index.html) directly in your browser (`file://...`), or serve locally via `python3 -m http.server 8080`.
 
 ---
 
