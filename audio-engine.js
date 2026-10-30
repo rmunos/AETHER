@@ -141,33 +141,67 @@ class ConsciousnessAudioEngine {
     this.reverbSendGain = this.ctx.createGain();
     this.reverbSendGain.gain.value = this._reverbSendLevel(this.params.reverbMix);
 
+    // High-density diffused cathedral convolver
     this.reverbNode = this.ctx.createConvolver();
-    this.reverbNode.buffer = this._createCathedralImpulse(6.5, 2.6);
+    this.reverbNode.buffer = this._createCathedralImpulse(6.5, 2.4);
 
     this.reverbReturn = this.ctx.createGain();
     this.reverbReturn.gain.value = 1.0;
 
-    // Cathedral Shimmer: high-Q resonators tuned to a pure just-intonation major chord (C5..G6)
-    // excited by the reverb send, then smeared by the convolver -> a singing "choir halo" in the tail
+    // ACTIVE CATHEDRAL SHIMMER HALO GENERATOR:
+    // Authentic ambient shimmer (Strymon / Eno / Eventide) combines a diffused hall space
+    // with a celestial, breathing just-intonation crystal choir (C5, G5, C6, E6, G6, B6).
+    // Driven by multi-octave harmonic sine oscillators with slow organic chorusing & pitch-drift,
+    // smoothed directly into the stereo cathedral field.
     this.shimmerGain = this.ctx.createGain();
     this.shimmerGain.gain.value = this._shimmerLevel(this.params.reverbMix);
+
+    this.shimmerFilter = this.ctx.createBiquadFilter();
+    this.shimmerFilter.type = 'lowpass';
+    this.shimmerFilter.frequency.value = 4800;
+
     this.shimmerVoices = [];
-    const shimmerFreqs = [523.25, 654.06, 784.88, 1046.5, 1308.1, 1569.8];
-    shimmerFreqs.forEach((f, i) => {
-      const bp = this.ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.value = f;
-      bp.Q.value = 32;
+    const shimmerNotes = [
+      { f: 523.25, pan: -0.75, rate: 0.045, depth: 1.8 },  // C5 (Root)
+      { f: 654.06, pan: 0.65,  rate: 0.038, depth: 1.4 },  // E5 (Major 3rd)
+      { f: 784.88, pan: -0.55, rate: 0.052, depth: 2.1 },  // G5 (Perfect 5th)
+      { f: 1046.50, pan: 0.75, rate: 0.033, depth: 2.4 },  // C6 (Octave)
+      { f: 1308.13, pan: -0.65, rate: 0.041, depth: 2.8 }, // E6 (High 3rd)
+      { f: 1569.75, pan: 0.55, rate: 0.029, depth: 3.2 }   // G6 (High 5th)
+    ];
+
+    shimmerNotes.forEach((note, i) => {
+      const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
-      g.gain.value = 0.5;
       const pan = this.ctx.createStereoPanner();
-      pan.pan.value = i % 2 === 0 ? -0.7 : 0.7;
-      this.reverbSendGain.connect(bp);
-      bp.connect(g);
+
+      osc.type = 'sine';
+      osc.frequency.value = note.f;
+      g.gain.value = 0.0;
+      pan.pan.value = note.pan;
+
+      osc.connect(g);
       g.connect(pan);
-      pan.connect(this.shimmerGain);
-      this.shimmerVoices.push({ bp, g, pan, rate: 0.031 + i * 0.017, phase: i * 1.3 });
+      pan.connect(this.shimmerFilter);
+      osc.start();
+
+      this.shimmerVoices.push({
+        osc,
+        g,
+        baseFreq: note.f,
+        rate: note.rate,
+        depth: note.depth,
+        phase: i * 1.15
+      });
     });
+
+    this.shimmerFilter.connect(this.shimmerGain);
+    this.shimmerGain.connect(this.reverbNode);
+    // Also feed a direct clean shimmer branch so the celestial sheen is bright & crystal-clear
+    this.cleanShimmerGain = this.ctx.createGain();
+    this.cleanShimmerGain.gain.value = 0.45;
+    this.shimmerGain.connect(this.cleanShimmerGain);
+    this.cleanShimmerGain.connect(this.compressor);
 
     // Stereo Split Analysers for Lissajous & Spectrum
     const splitter = this.ctx.createChannelSplitter(2);
@@ -277,17 +311,18 @@ class ConsciousnessAudioEngine {
     return impulse;
   }
 
-  // Cathedral Shimmer Space mapping (0..1): wet send, shimmer resonators, and gentle dry ducking
+  // Cathedral Shimmer Space mapping (0..1): wet send, shimmer choir, and gentle dry ducking
   _reverbSendLevel(mix) {
-    return mix * 1.25;
+    return mix * 1.6;
   }
 
   _shimmerLevel(mix) {
-    return Math.pow(mix, 1.5) * 2.2;
+    // Responsive curve: clearly present from 20% upward, rich and celestial at 50-100%
+    return Math.pow(mix, 1.2) * 1.5;
   }
 
   _dryLevel(mix) {
-    return 1.0 - mix * 0.45;
+    return 1.0 - mix * 0.5;
   }
 
   /**
@@ -1674,12 +1709,25 @@ class ConsciousnessAudioEngine {
       g.panR.pan.setTargetAtTime(0.85 - 0.5 * s * Math.sin(elapsed * 0.07 + 1.2), now, 0.1);
     }
 
-    // 8. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
-    if (this.shimmerVoices) {
-      this.shimmerVoices.forEach((v) => {
-        const a = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
-        v.g.gain.setTargetAtTime(0.15 + 0.85 * a * a, now, 0.2);
-      });
+    // 8. Cathedral Shimmer: organic breathing & subtle choral pitch-drift
+    if (this.shimmerVoices && this.params.reverbMix > 0.01) {
+      const mix = this.params.reverbMix;
+      for (let i = 0; i < this.shimmerVoices.length; i++) {
+        const v = this.shimmerVoices[i];
+        // Slow organic breath wave (4-8 second period per voice)
+        const breath = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
+        // Subtle celestial micro-drift (±1.5 Hz)
+        const drift = Math.sin(elapsed * (v.rate * 1.8) * Math.PI * 2 + v.phase) * v.depth;
+        v.osc.frequency.setTargetAtTime(v.baseFreq + drift, now, 0.08);
+
+        // Vocal swell envelope
+        const voiceGain = Math.pow(breath, 1.6) * 0.12 * Math.min(1.0, mix * 1.4);
+        v.g.gain.setTargetAtTime(voiceGain, now, 0.08);
+      }
+    } else if (this.shimmerVoices) {
+      for (let i = 0; i < this.shimmerVoices.length; i++) {
+        this.shimmerVoices[i].g.gain.setTargetAtTime(0, now, 0.05);
+      }
     }
   }
 
