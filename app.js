@@ -273,47 +273,100 @@ document.addEventListener('DOMContentLoaded', () => {
     engine.updateModule('spatial', 'tuning', e.target.value);
   });
 
-  // SOLO 3D Button: mutes/restores other modules so user can isolate 3D trajectories cleanly
-  const soloSpatialBtn = document.getElementById('soloSpatialBtn');
-  let isSpatialSoloed = false;
-  let savedModuleStates = null;
-  if (soloSpatialBtn) {
-    soloSpatialBtn.addEventListener('click', () => {
-      const otherMods = ['chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
-      if (!isSpatialSoloed) {
-        savedModuleStates = {};
-        otherMods.forEach((m) => {
-          savedModuleStates[m] = engine.params[m].enabled;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = false;
-          if (card) card.classList.remove('active-module');
-          engine.updateModule(m, 'enabled', false);
-        });
-        const spToggle = document.getElementById('spatialEnabled');
-        const spCard = document.querySelector('.module-card[data-module="spatial"]');
-        if (spToggle) spToggle.checked = true;
-        if (spCard) spCard.classList.add('active-module');
-        engine.updateModule('spatial', 'enabled', true);
+  // ==========================================
+  // UNIFIED SOLO ENGINE (All 6 Modules)
+  // ==========================================
+  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
+  let currentSoloMod = null;
+  let savedSoloState = null;
 
-        isSpatialSoloed = true;
-        soloSpatialBtn.classList.add('active');
-        soloSpatialBtn.textContent = 'UNSOLO 3D';
-      } else {
-        otherMods.forEach((m) => {
-          const restore = savedModuleStates ? savedModuleStates[m] : true;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = restore;
-          if (card) card.classList.toggle('active-module', restore);
-          engine.updateModule(m, 'enabled', restore);
-        });
-        isSpatialSoloed = false;
-        soloSpatialBtn.classList.remove('active');
-        soloSpatialBtn.textContent = 'SOLO 3D';
+  const soloButtons = {
+    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '3D', tab: 'spatial' },
+    chaos: { btn: document.getElementById('soloChaosBtn'), label: 'CHAOS', tab: 'chaos' },
+    pac: { btn: document.getElementById('soloPacBtn'), label: 'PAC', tab: 'pac' },
+    fractal: { btn: document.getElementById('soloFractalBtn'), label: 'FRACTAL', tab: 'chaos' },
+    sub: { btn: document.getElementById('soloSubBtn'), label: 'SUB', tab: 'chaos' },
+    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' }
+  };
+
+  function setModuleActiveUIAndEngine(mod, enabled) {
+    const toggle = document.getElementById(`${mod}Enabled`);
+    const card = document.querySelector(`.module-card[data-module="${mod}"]`);
+    if (toggle) toggle.checked = enabled;
+    if (card) card.classList.toggle('active-module', enabled);
+    engine.updateModule(mod, 'enabled', enabled);
+  }
+
+  function resetAllSoloButtonsUI() {
+    Object.entries(soloButtons).forEach(([m, s]) => {
+      if (s.btn) {
+        s.btn.classList.remove('active');
+        s.btn.textContent = `SOLO ${s.label}`;
       }
     });
+    currentSoloMod = null;
+    savedSoloState = null;
   }
+
+  function toggleSolo(mod) {
+    const s = soloButtons[mod];
+    if (!s || !s.btn) return;
+
+    if (currentSoloMod === mod) {
+      // Unsolo: Restore previous state
+      ALL_MODULE_KEYS.forEach((m) => {
+        const restoreVal = savedSoloState ? (savedSoloState[m] ?? true) : true;
+        setModuleActiveUIAndEngine(m, restoreVal);
+      });
+      resetAllSoloButtonsUI();
+    } else {
+      // Soloing a module: if another module was already soloed, keep the original pre-solo snapshot
+      if (!savedSoloState) {
+        savedSoloState = {};
+        ALL_MODULE_KEYS.forEach((m) => {
+          savedSoloState[m] = !!engine.params[m]?.enabled;
+        });
+      }
+
+      // Mute all other modules, enable target module
+      ALL_MODULE_KEYS.forEach((m) => {
+        setModuleActiveUIAndEngine(m, m === mod);
+      });
+
+      // Update button labels & active classes
+      Object.entries(soloButtons).forEach(([m, info]) => {
+        if (!info.btn) return;
+        if (m === mod) {
+          info.btn.classList.add('active');
+          info.btn.textContent = `UNSOLO ${info.label}`;
+        } else {
+          info.btn.classList.remove('active');
+          info.btn.textContent = `SOLO ${info.label}`;
+        }
+      });
+
+      // Switch visualizer tab if defined
+      if (s.tab) {
+        const tabEl = document.querySelector(`.viz-tab[data-viz="${s.tab}"]`);
+        if (tabEl) tabEl.click();
+      }
+
+      currentSoloMod = mod;
+    }
+    updateTargetStateBadge();
+  }
+
+  // Bind click handlers for all 6 SOLO buttons
+  Object.keys(soloButtons).forEach((mod) => {
+    const btn = soloButtons[mod].btn;
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSolo(mod);
+      });
+    }
+  });
 
   // Interactive 3D Canvas Drag-to-Localize (Grab & move 3D sound source around head)
   let isDraggingSpatial = false;
@@ -386,52 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   bindSlider('chaosMorph', 'chaos', 'morph', (v) => `${Math.round(v * 100)}%`);
 
-  // SOLO CHAOS Button: mutes/restores other modules & switches to Chaos visualizer
-  const soloChaosBtn = document.getElementById('soloChaosBtn');
-  let isChaosSoloed = false;
-  let savedChaosStates = null;
-  if (soloChaosBtn) {
-    soloChaosBtn.addEventListener('click', () => {
-      const otherMods = ['spatial', 'pac', 'fractal', 'sub', 'ganzfeld'];
-      if (!isChaosSoloed) {
-        savedChaosStates = {};
-        otherMods.forEach((m) => {
-          savedChaosStates[m] = engine.params[m].enabled;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = false;
-          if (card) card.classList.remove('active-module');
-          engine.updateModule(m, 'enabled', false);
-        });
-        const chToggle = document.getElementById('chaosEnabled');
-        const chCard = document.querySelector('.module-card[data-module="chaos"]');
-        if (chToggle) chToggle.checked = true;
-        if (chCard) chCard.classList.add('active-module');
-        engine.updateModule('chaos', 'enabled', true);
-
-        // Switch visualizer tab to Chaos view so user sees the multi-archetype events
-        const chaosTab = document.querySelector('.viz-tab[data-viz="chaos"]');
-        if (chaosTab) chaosTab.click();
-
-        isChaosSoloed = true;
-        soloChaosBtn.classList.add('active');
-        soloChaosBtn.textContent = 'UNSOLO CHAOS';
-      } else {
-        otherMods.forEach((m) => {
-          const restore = savedChaosStates ? savedChaosStates[m] : true;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = restore;
-          if (card) card.classList.toggle('active-module', restore);
-          engine.updateModule(m, 'enabled', restore);
-        });
-        isChaosSoloed = false;
-        soloChaosBtn.classList.remove('active');
-        soloChaosBtn.textContent = 'SOLO CHAOS';
-      }
-    });
-  }
-
   // Bind Module 3: PAC
   bindToggle('pacEnabled', 'pac');
   bindSlider('pacGain', 'pac', 'gain', (v) => `${Math.round(v * 100)}%`);
@@ -447,104 +454,12 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSlider('pacDepth', 'pac', 'depth', (v) => `${Math.round(v * 100)}%`);
   bindSlider('pacBreath', 'pac', 'breath', (v) => `${Math.round(v * 100)}%`);
 
-  // SOLO PAC Button: mutes/restores other modules & switches to PAC visualizer
-  const soloPacBtn = document.getElementById('soloPacBtn');
-  let isPacSoloed = false;
-  let savedPacStates = null;
-  if (soloPacBtn) {
-    soloPacBtn.addEventListener('click', () => {
-      const otherMods = ['spatial', 'chaos', 'fractal', 'sub', 'ganzfeld'];
-      if (!isPacSoloed) {
-        savedPacStates = {};
-        otherMods.forEach((m) => {
-          savedPacStates[m] = engine.params[m].enabled;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = false;
-          if (card) card.classList.remove('active-module');
-          engine.updateModule(m, 'enabled', false);
-        });
-        const pacToggle = document.getElementById('pacEnabled');
-        const pacCard = document.querySelector('.module-card[data-module="pac"]');
-        if (pacToggle) pacToggle.checked = true;
-        if (pacCard) pacCard.classList.add('active-module');
-        engine.updateModule('pac', 'enabled', true);
-
-        // Switch visualizer tab to PAC view so user sees the nested Theta-Gamma wave & Lissajous
-        const pacTab = document.querySelector('.viz-tab[data-viz="pac"]');
-        if (pacTab) pacTab.click();
-
-        isPacSoloed = true;
-        soloPacBtn.classList.add('active');
-        soloPacBtn.textContent = 'UNSOLO PAC';
-      } else {
-        otherMods.forEach((m) => {
-          const restore = savedPacStates ? savedPacStates[m] : true;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = restore;
-          if (card) card.classList.toggle('active-module', restore);
-          engine.updateModule(m, 'enabled', restore);
-        });
-        isPacSoloed = false;
-        soloPacBtn.classList.remove('active');
-        soloPacBtn.textContent = 'SOLO PAC';
-      }
-    });
-  }
-
   // Bind Module 4: Fractal
   bindToggle('fractalEnabled', 'fractal');
   bindSlider('fractalGain', 'fractal', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('fractalSpeed', 'fractal', 'speed', (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} oct/s`);
   bindSlider('fractalDepth', 'fractal', 'depth', (v) => `${Math.round(v * 100)}%`);
   bindSlider('fractalCenter', 'fractal', 'center', (v) => `${Math.round(v)} Hz`);
-
-  // SOLO FRACTAL Button: mutes/restores other modules & switches to Chaos/Fractal visualizer
-  const soloFractalBtn = document.getElementById('soloFractalBtn');
-  let isFractalSoloed = false;
-  let savedFractalStates = null;
-  if (soloFractalBtn) {
-    soloFractalBtn.addEventListener('click', () => {
-      const otherMods = ['spatial', 'chaos', 'pac', 'sub', 'ganzfeld'];
-      if (!isFractalSoloed) {
-        savedFractalStates = {};
-        otherMods.forEach((m) => {
-          savedFractalStates[m] = engine.params[m].enabled;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = false;
-          if (card) card.classList.remove('active-module');
-          engine.updateModule(m, 'enabled', false);
-        });
-        const frToggle = document.getElementById('fractalEnabled');
-        const frCard = document.querySelector('.module-card[data-module="fractal"]');
-        if (frToggle) frToggle.checked = true;
-        if (frCard) frCard.classList.add('active-module');
-        engine.updateModule('fractal', 'enabled', true);
-
-        // Switch visualizer tab to Chaos & Fractal view
-        const chaosTab = document.querySelector('.viz-tab[data-viz="chaos"]');
-        if (chaosTab) chaosTab.click();
-
-        isFractalSoloed = true;
-        soloFractalBtn.classList.add('active');
-        soloFractalBtn.textContent = 'UNSOLO FRACTAL';
-      } else {
-        otherMods.forEach((m) => {
-          const restore = savedFractalStates ? savedFractalStates[m] : true;
-          const toggle = document.getElementById(`${m}Enabled`);
-          const card = document.querySelector(`.module-card[data-module="${m}"]`);
-          if (toggle) toggle.checked = restore;
-          if (card) card.classList.toggle('active-module', restore);
-          engine.updateModule(m, 'enabled', restore);
-        });
-        isFractalSoloed = false;
-        soloFractalBtn.classList.remove('active');
-        soloFractalBtn.textContent = 'SOLO FRACTAL';
-      }
-    });
-  }
 
   // Bind Module 5: Sub-Bass
   bindToggle('subEnabled', 'sub');
@@ -558,47 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSlider('ganzfeldGain', 'ganzfeld', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('ganzfeldColor', 'ganzfeld', 'color', (v) => `${Math.round(v * 100)}% Brown`);
   bindSlider('ganzfeldSweep', 'ganzfeld', 'sweep', (v) => `${Math.round(v * 100)}%`);
-
-  // Generic SOLO button factory (used for Module 05 Sub-Bass & Module 06 Ganzfeld)
-  const ALL_MODULES = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
-  function setupSoloButton(btnId, mod, label, vizTab) {
-    const btn = document.getElementById(btnId);
-    const state = { active: false, saved: null, btn, label };
-    if (!btn) return state;
-    const setModule = (m, enabled) => {
-      const toggle = document.getElementById(`${m}Enabled`);
-      const card = document.querySelector(`.module-card[data-module="${m}"]`);
-      if (toggle) toggle.checked = enabled;
-      if (card) card.classList.toggle('active-module', enabled);
-      engine.updateModule(m, 'enabled', enabled);
-    };
-    btn.addEventListener('click', () => {
-      const others = ALL_MODULES.filter((m) => m !== mod);
-      if (!state.active) {
-        state.saved = {};
-        others.forEach((m) => {
-          state.saved[m] = engine.params[m].enabled;
-          setModule(m, false);
-        });
-        setModule(mod, true);
-        if (vizTab) {
-          const tab = document.querySelector(`.viz-tab[data-viz="${vizTab}"]`);
-          if (tab) tab.click();
-        }
-        state.active = true;
-        btn.classList.add('active');
-        btn.textContent = `UNSOLO ${label}`;
-      } else {
-        others.forEach((m) => setModule(m, state.saved ? state.saved[m] : true));
-        state.active = false;
-        btn.classList.remove('active');
-        btn.textContent = `SOLO ${label}`;
-      }
-    });
-    return state;
-  }
-  const soloSubState = setupSoloButton('soloSubBtn', 'sub', 'SUB', 'chaos');
-  const soloGanzfeldState = setupSoloButton('soloGanzfeldBtn', 'ganzfeld', 'GANZFELD', 'chaos');
 
   // Apply Preset or Saved Custom Configuration Object
   function applyConfigObject(p, startIfStopped = true) {
@@ -637,33 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Reset Solo buttons state when loading a full config
-    isSpatialSoloed = false;
-    isChaosSoloed = false;
-    isPacSoloed = false;
-    isFractalSoloed = false;
-    if (soloSpatialBtn) {
-      soloSpatialBtn.classList.remove('active');
-      soloSpatialBtn.textContent = 'SOLO 3D';
-    }
-    if (soloChaosBtn) {
-      soloChaosBtn.classList.remove('active');
-      soloChaosBtn.textContent = 'SOLO CHAOS';
-    }
-    if (soloPacBtn) {
-      soloPacBtn.classList.remove('active');
-      soloPacBtn.textContent = 'SOLO PAC';
-    }
-    if (soloFractalBtn) {
-      soloFractalBtn.classList.remove('active');
-      soloFractalBtn.textContent = 'SOLO FRACTAL';
-    }
-    [soloSubState, soloGanzfeldState].forEach((s) => {
-      s.active = false;
-      if (s.btn) {
-        s.btn.classList.remove('active');
-        s.btn.textContent = `SOLO ${s.label}`;
-      }
-    });
+    resetAllSoloButtonsUI();
 
     // 1. Spatial
     if (p.spatial) {
