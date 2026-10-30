@@ -1286,50 +1286,104 @@ class ConsciousnessAudioEngine {
 
   /**
    * MODULE 5: Infrasound & Somatic Sub-Bass
-   * Deep sub-bass (24-60 Hz) + Missing-Fundamental 2nd/3rd harmonics + Infrasonic pulse
+   * Deep sub-bass (24-60 Hz) + psychoacoustic equal-loudness compensated missing-fundamental harmonics (2f0..5f0)
+   * with analog tape/tube saturation that transforms timbre without blowing up volume!
    */
   _setupSubBassModule() {
     const bus = this.ctx.createGain();
-    bus.gain.value = this.params.sub.enabled ? this.params.sub.gain * 0.42 : 0.0001;
+    bus.gain.value = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0.0001;
     bus.connect(this.dryBus);
 
     const f0 = this.params.sub.freq;
-    const subOsc1 = this.ctx.createOscillator(); // Fundamental
-    const subOsc2 = this.ctx.createOscillator(); // 2nd harmonic (Missing fundamental illusion)
-    const subOsc3 = this.ctx.createOscillator(); // 3rd harmonic
+    const warmth = this.params.sub.warmth;
 
-    const gain1 = this.ctx.createGain();
-    const gain2 = this.ctx.createGain();
-    const gain3 = this.ctx.createGain();
+    // 5 harmonic voices: 1x (fundamental), 2x (octave), 3x (5th), 4x (2nd octave), 5x (major 3rd)
+    const subOscs = [];
+    const subGains = [];
+    const ratios = [1, 2, 3, 4, 5];
+
+    for (let i = 0; i < 5; i++) {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = i === 0 ? 'sine' : (i % 2 === 1 ? 'sine' : 'triangle');
+      osc.frequency.value = f0 * ratios[i];
+      g.gain.value = 0.0;
+      osc.connect(g);
+      osc.start();
+      subOscs.push(osc);
+      subGains.push(g);
+    }
+
+    // Warm analog saturation waveshaper
+    const saturator = this.ctx.createWaveShaper();
+    const curveLen = 1024;
+    const satCurve = new Float32Array(curveLen);
+    for (let i = 0; i < curveLen; i++) {
+      const x = (i / (curveLen - 1)) * 2 - 1; // -1..1
+      // Smooth hyperbolic tangent soft-clipping for warm tube saturation
+      satCurve[i] = Math.tanh(x * 1.5) / Math.tanh(1.5);
+    }
+    saturator.curve = satCurve;
+
+    // Harmonic lowpass to tame extreme high-frequency fizz
+    const warmthFilter = this.ctx.createBiquadFilter();
+    warmthFilter.type = 'lowpass';
+    warmthFilter.frequency.value = Math.min(1200, f0 * 10);
+    warmthFilter.Q.value = 1.0;
+
     const pulseGain = this.ctx.createGain();
-
-    subOsc1.type = 'sine';
-    subOsc2.type = 'sine';
-    subOsc3.type = 'sine';
-
-    subOsc1.frequency.value = f0;
-    subOsc2.frequency.value = f0 * 2;
-    subOsc3.frequency.value = f0 * 3;
-
-    gain1.gain.value = 0.75;
-    gain2.gain.value = this.params.sub.warmth * 0.28;
-    gain3.gain.value = this.params.sub.warmth * 0.12;
     pulseGain.gain.value = 0.8;
 
-    subOsc1.connect(gain1);
-    subOsc2.connect(gain2);
-    subOsc3.connect(gain3);
-
-    gain1.connect(pulseGain);
-    gain2.connect(pulseGain);
-    gain3.connect(pulseGain);
+    // Connect voices:
+    // Fundamental (osc 0) bypasses saturation for ultra-clean sub pressure
+    subGains[0].connect(pulseGain);
+    // Harmonics 2..5 route through soft-saturator and lowpass filter for rich organic overtone warmth
+    for (let i = 1; i < 5; i++) {
+      subGains[i].connect(saturator);
+    }
+    saturator.connect(warmthFilter);
+    warmthFilter.connect(pulseGain);
     pulseGain.connect(bus);
 
-    subOsc1.start();
-    subOsc2.start();
-    subOsc3.start();
+    this.nodes.sub = {
+      bus,
+      subOscs,
+      subGains,
+      ratios,
+      warmthFilter,
+      pulseGain
+    };
 
-    this.nodes.sub = { bus, subOsc1, subOsc2, subOsc3, gain1, gain2, gain3, pulseGain };
+    this._updateSubWarmth(warmth);
+  }
+
+  // Equal-loudness compensated harmonic distribution:
+  // At warmth = 0: 100% pure deep fundamental sine wave, 0% harmonics
+  // As warmth -> 1.0: fundamental stays grounded while 2nd, 3rd, 4th, and 5th harmonics blossom,
+  // with loudness compensation so overall volume stays balanced while the timbre completely transforms!
+  _updateSubWarmth(w) {
+    if (!this.nodes.sub || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const gains = this.nodes.sub.subGains;
+    const f0 = this.params.sub.freq;
+
+    // Fundamental rebalances slightly so adding upper harmonics doesn't overpower the listener
+    const f0Gain = 0.95 * (1.0 - w * 0.35);
+    // Harmonics scaled by equal-loudness curves (higher harmonics need less power to be clearly heard):
+    const h2Gain = w * 0.42;  // 2f0 (octave body)
+    const h3Gain = Math.pow(w, 1.2) * 0.26; // 3f0 (warm 5th overtone)
+    const h4Gain = Math.pow(w, 1.4) * 0.16; // 4f0 (clarity 2nd octave)
+    const h5Gain = Math.pow(w, 1.6) * 0.10; // 5f0 (rich major 3rd sheen)
+
+    gains[0].gain.setTargetAtTime(f0Gain, now, 0.05);
+    gains[1].gain.setTargetAtTime(h2Gain, now, 0.05);
+    gains[2].gain.setTargetAtTime(h3Gain, now, 0.05);
+    gains[3].gain.setTargetAtTime(h4Gain, now, 0.05);
+    gains[4].gain.setTargetAtTime(h5Gain, now, 0.05);
+
+    // Warmth filter opens up from warm muffled bass to bright overtone clarity
+    const filterFreq = Math.min(1800, f0 * (3.5 + w * 8.5));
+    this.nodes.sub.warmthFilter.frequency.setTargetAtTime(filterFreq, now, 0.05);
   }
 
   /**
@@ -1815,15 +1869,16 @@ class ConsciousnessAudioEngine {
       const targetBus = this.params.fractal.enabled ? this.params.fractal.gain * 0.42 : 0.0001;
       this.nodes.fractal.bus.gain.setTargetAtTime(targetBus, now, 0.12);
     } else if (mod === 'sub') {
-      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.42 : 0.0001;
+      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0.0001;
       this.nodes.sub.bus.gain.setTargetAtTime(targetBus, now, 0.08);
       if (key === 'freq') {
-        this.nodes.sub.subOsc1.frequency.setTargetAtTime(val, now, 0.08);
-        this.nodes.sub.subOsc2.frequency.setTargetAtTime(val * 2, now, 0.08);
-        this.nodes.sub.subOsc3.frequency.setTargetAtTime(val * 3, now, 0.08);
+        const f0 = val;
+        this.nodes.sub.subOscs.forEach((osc, i) => {
+          osc.frequency.setTargetAtTime(f0 * this.nodes.sub.ratios[i], now, 0.08);
+        });
+        this.nodes.sub.warmthFilter.frequency.setTargetAtTime(Math.min(1800, f0 * (3.5 + this.params.sub.warmth * 8.5)), now, 0.08);
       } else if (key === 'warmth') {
-        this.nodes.sub.gain2.gain.setTargetAtTime(val * 0.28, now, 0.08);
-        this.nodes.sub.gain3.gain.setTargetAtTime(val * 0.12, now, 0.08);
+        this._updateSubWarmth(val);
       }
     } else if (mod === 'ganzfeld') {
       const targetBus = this.params.ganzfeld.enabled ? this.params.ganzfeld.gain * 0.35 : 0.0001;
