@@ -1057,8 +1057,9 @@ class ConsciousnessAudioEngine {
    */
   _setupPACModule() {
     const bus = this.ctx.createGain();
-    bus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.48 : 0.0001;
+    bus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.48 : 0;
     bus.connect(this.dryBus);
+    bus.connect(this.reverbSendGain);
 
     // 1. Strictly Isolated Binaural Beat Carrier Pair (baseFreq +/- theta/2)
     // Left channel receives strictly carrier - theta/2; Right channel receives strictly carrier + theta/2.
@@ -1181,8 +1182,6 @@ class ConsciousnessAudioEngine {
     pacFilter.connect(gammaPulseNode);
     gammaPulseNode.connect(pacModGain);
     pacModGain.connect(bus);
-    // Only the ethereal PAC shimmer bursts send gently to the cathedral space
-    pacModGain.connect(this.reverbSendGain);
 
     pacCarrier1.start();
     pacCarrier2.start();
@@ -1499,27 +1498,34 @@ class ConsciousnessAudioEngine {
 
     // 2. Update MODULE 1: 3D HRTF Trajectories (Figure-8 ∞, Far-Horizon Excursion, Circle, Mixed)
     if (this.nodes.spatial) {
-      const speed = this.params.spatial.speed;
-      const asym = this.params.spatial.asymmetry;
-      const count = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
-      const trajectory = this.params.spatial.trajectory || 'infinity';
-      const pulseDepth = this.params.spatial.pulse || 0;
-      const manualPos = this.params.spatial.manualPos;
-      const voices = this.nodes.spatial.voices;
-
-      for (let i = 0; i < voices.length; i++) {
-        const v = voices[i];
-
-        // Completely mute inactive sources above selected count
-        if (i >= count) {
-          v.voiceGain.gain.setTargetAtTime(0, now, 0.02);
-          v.pulseGain.gain.setTargetAtTime(0, now, 0.02);
+      if (!this.params.spatial.enabled) {
+        for (let i = 0; i < this.nodes.spatial.voices.length; i++) {
+          this.nodes.spatial.voices[i].voiceGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.spatial.voices[i].pulseGain.gain.setTargetAtTime(0, now, 0.04);
           this.telemetry.spatialVoices[i].activeEnergy = 0;
-          this.telemetry.spatialVoices[i].trail = [];
-          continue;
         }
+      } else {
+        const speed = this.params.spatial.speed;
+        const asym = this.params.spatial.asymmetry;
+        const count = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
+        const trajectory = this.params.spatial.trajectory || 'infinity';
+        const pulseDepth = this.params.spatial.pulse || 0;
+        const manualPos = this.params.spatial.manualPos;
+        const voices = this.nodes.spatial.voices;
 
-        v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
+        for (let i = 0; i < voices.length; i++) {
+          const v = voices[i];
+
+          // Completely mute inactive sources above selected count
+          if (i >= count) {
+            v.voiceGain.gain.setTargetAtTime(0, now, 0.02);
+            v.pulseGain.gain.setTargetAtTime(0, now, 0.02);
+            this.telemetry.spatialVoices[i].activeEnergy = 0;
+            this.telemetry.spatialVoices[i].trail = [];
+            continue;
+          }
+
+          v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
 
         let x, y, z, geomType;
         if (manualPos && i === 0) {
@@ -1582,6 +1588,7 @@ class ConsciousnessAudioEngine {
         }
       }
     }
+  }
 
     // 3. Update MODULE 2: Chaos Multi-Archetype & Rhythm Scheduler
     if (this.nodes.chaos && this.params.chaos.enabled) {
@@ -1594,149 +1601,173 @@ class ConsciousnessAudioEngine {
 
     // 4. Update MODULE 3: Cross-Frequency Phase-Amplitude Coupling (PAC)
     if (this.nodes.pac) {
-      const baseFreq = this.params.pac.baseFreq || 136.0;
-      const fTheta = this.params.pac.theta;
-      const pacDepth = this.params.pac.depth;
-      const breathDepth = this.params.pac.breath;
+      if (!this.params.pac.enabled) {
+        this.nodes.pac.pacModGain.gain.setTargetAtTime(0, now, 0.04);
+        this.nodes.pac.binGain.gain.setTargetAtTime(0, now, 0.04);
+        this.telemetry.gammaEnvelope = 0;
+      } else {
+        const baseFreq = this.params.pac.baseFreq || 136.0;
+        const fTheta = this.params.pac.theta;
+        const pacDepth = this.params.pac.depth;
+        const breathDepth = this.params.pac.breath;
 
-      // Slow Phase Rhythm (1.5 .. 12 Hz): Theta wave & sharp positive-peak gate
-      const thetaPhase = (elapsed * fTheta * Math.PI * 2) % (Math.PI * 2);
-      const thetaWave = Math.cos(thetaPhase);
-      // Gate Gamma bursts strictly on the positive crests of the Theta wave (0 in troughs, 1 at crest)
-      const thetaPeakGate = Math.pow(Math.max(0, thetaWave), 2.4);
+        // Slow Phase Rhythm (1.5 .. 12 Hz): Theta wave & sharp positive-peak gate
+        const thetaPhase = (elapsed * fTheta * Math.PI * 2) % (Math.PI * 2);
+        const thetaWave = Math.cos(thetaPhase);
+        // Gate Gamma bursts strictly on the positive crests of the Theta wave (0 in troughs, 1 at crest)
+        const thetaPeakGate = Math.pow(Math.max(0, thetaWave), 2.4);
 
-      // 0.1 Hz Coherent Breath Swell (10-second cycle: 5s Inhale ▲, 5s Exhale ▼)
-      const breathNorm = 0.5 + 0.5 * this.telemetry.breathValue; // 0 = Exhale trough, 1 = Inhale peak
-      // At breathDepth=0 -> steady 1.0; at breathDepth=1 -> swells from 0.10 (Exhale whisper) to 1.35 (Inhale peak)
-      const breathAmp = (1.0 - breathDepth * 0.90) + breathDepth * 1.25 * Math.pow(breathNorm, 1.4);
+        // 0.1 Hz Coherent Breath Swell (10-second cycle: 5s Inhale ▲, 5s Exhale ▼)
+        const breathNorm = 0.5 + 0.5 * this.telemetry.breathValue; // 0 = Exhale trough, 1 = Inhale peak
+        // At breathDepth=0 -> steady 1.0; at breathDepth=1 -> swells from 0.10 (Exhale whisper) to 1.35 (Inhale peak)
+        const breathAmp = (1.0 - breathDepth * 0.90) + breathDepth * 1.25 * Math.pow(breathNorm, 1.4);
 
-      // Harmonic Filter Bloom synchronized with the 10-second breath
-      const pacCutoff = breathDepth <= 0.01
-        ? Math.min(9500, baseFreq * 6.5)
-        : Math.min(10000, baseFreq * (1.4 + (1.0 - breathDepth) * 5.0 + breathDepth * 10.5 * Math.pow(breathNorm, 1.6)));
-      const binCutoff = breathDepth <= 0.01
-        ? Math.min(4800, baseFreq * 3.5)
-        : Math.min(5500, baseFreq * (1.2 + (1.0 - breathDepth) * 2.3 + breathDepth * 4.2 * breathNorm));
+        // Harmonic Filter Bloom synchronized with the 10-second breath
+        const pacCutoff = breathDepth <= 0.01
+          ? Math.min(9500, baseFreq * 6.5)
+          : Math.min(10000, baseFreq * (1.4 + (1.0 - breathDepth) * 5.0 + breathDepth * 10.5 * Math.pow(breathNorm, 1.6)));
+        const binCutoff = breathDepth <= 0.01
+          ? Math.min(4800, baseFreq * 3.5)
+          : Math.min(5500, baseFreq * (1.2 + (1.0 - breathDepth) * 2.3 + breathDepth * 4.2 * breathNorm));
 
-      this.nodes.pac.pacFilter.frequency.setTargetAtTime(pacCutoff, now, 0.03);
-      this.nodes.pac.binFilter.frequency.setTargetAtTime(binCutoff, now, 0.03);
+        this.nodes.pac.pacFilter.frequency.setTargetAtTime(pacCutoff, now, 0.03);
+        this.nodes.pac.binFilter.frequency.setTargetAtTime(binCutoff, now, 0.03);
 
-      // PAC Coupling Index (0% = pure binaural wave, no Gamma bursts; 100% = intense Theta-peak-locked Gamma bursts)
-      const gammaBurstTarget = pacDepth <= 0.005
-        ? 0.0
-        : pacDepth * thetaPeakGate * 0.92 * breathAmp;
+        // PAC Coupling Index (0% = pure binaural wave, no Gamma bursts; 100% = intense Theta-peak-locked Gamma bursts)
+        const gammaBurstTarget = pacDepth <= 0.005
+          ? 0.0
+          : pacDepth * thetaPeakGate * 0.92 * breathAmp;
 
-      // Binaural carrier also pulses deeper with Theta as PAC Coupling Index approaches 100%
-      const binThetaMod = (1.0 - pacDepth * 0.50) + pacDepth * 0.50 * (0.25 + 0.75 * thetaPeakGate);
-      const binTarget = 0.42 * binThetaMod * breathAmp;
+        // Binaural carrier also pulses deeper with Theta as PAC Coupling Index approaches 100%
+        const binThetaMod = (1.0 - pacDepth * 0.50) + pacDepth * 0.50 * (0.25 + 0.75 * thetaPeakGate);
+        const binTarget = 0.42 * binThetaMod * breathAmp;
 
-      this.nodes.pac.pacModGain.gain.setTargetAtTime(gammaBurstTarget, now, 0.006);
-      this.nodes.pac.binGain.gain.setTargetAtTime(binTarget, now, 0.015);
+        this.nodes.pac.pacModGain.gain.setTargetAtTime(gammaBurstTarget, now, 0.006);
+        this.nodes.pac.binGain.gain.setTargetAtTime(binTarget, now, 0.015);
 
-      this.telemetry.thetaPhase = thetaPhase;
-      this.telemetry.gammaEnvelope = gammaBurstTarget;
-      this.telemetry.pacIndex = pacDepth;
+        this.telemetry.thetaPhase = thetaPhase;
+        this.telemetry.gammaEnvelope = gammaBurstTarget;
+        this.telemetry.pacIndex = pacDepth;
+      }
     }
 
     // 5. Update MODULE 4: Fractal Shepard-Risset Voices (Harmonious Just-Intonation Multi-Scale 1/f Cascade)
     if (this.nodes.fractal) {
-      const dt = Math.min(0.1, now - this.nodes.fractal.lastUpdateTime);
-      this.nodes.fractal.lastUpdateTime = now;
+      if (!this.params.fractal.enabled) {
+        for (let i = 0; i < this.nodes.fractal.voices.length; i++) {
+          const v = this.nodes.fractal.voices[i];
+          v.gain.gain.setTargetAtTime(0, now, 0.04);
+          v.thirdGain.gain.setTargetAtTime(0, now, 0.04);
+          v.fifthGain.gain.setTargetAtTime(0, now, 0.04);
+        }
+      } else {
+        const dt = Math.min(0.1, now - this.nodes.fractal.lastUpdateTime);
+        this.nodes.fractal.lastUpdateTime = now;
 
-      const speed = this.params.fractal.speed; // octaves per second
-      const centerFreq = this.params.fractal.center;
-      const fDepth = this.params.fractal.depth; // 0 = pure octave Shepard, 1 = full celestial multi-scale triad cascade
+        const speed = this.params.fractal.speed; // octaves per second
+        const centerFreq = this.params.fractal.center;
+        const fDepth = this.params.fractal.depth; // 0 = pure octave Shepard, 1 = full celestial multi-scale triad cascade
 
-      const voices = this.nodes.fractal.voices;
-      for (let i = 0; i < voices.length; i++) {
-        const v = voices[i];
-        v.octavePos = (v.octavePos + speed * dt * 0.125 + 1.0) % 1.0;
+        const voices = this.nodes.fractal.voices;
+        for (let i = 0; i < voices.length; i++) {
+          const v = voices[i];
+          v.octavePos = (v.octavePos + speed * dt * 0.125 + 1.0) % 1.0;
 
-        // Raised-cosine bell envelope across 8-octave span
-        const bell = 0.5 - 0.5 * Math.cos(v.octavePos * Math.PI * 2);
-        const baseOctaveOffset = (v.octavePos - 0.5) * 5.2; // Warm 5.2-octave span around center
+          // Raised-cosine bell envelope across 8-octave span
+          const bell = 0.5 - 0.5 * Math.cos(v.octavePos * Math.PI * 2);
+          const baseOctaveOffset = (v.octavePos - 0.5) * 5.2; // Warm 5.2-octave span around center
 
-        // Keep all 8 voices in 100% pure octave alignment (zero eerie microtonal detuning!)
-        const freq = Math.max(32, Math.min(6400, centerFreq * Math.pow(2, baseOctaveOffset)));
+          // Keep all 8 voices in 100% pure octave alignment (zero eerie microtonal detuning!)
+          const freq = Math.max(32, Math.min(6400, centerFreq * Math.pow(2, baseOctaveOffset)));
 
-        // Pure Just-Intonation Celestial Triad ratios: Root (1:1), Major 3rd (5:4) / Major 9th (9:8), Perfect 5th (3:2)
-        const thirdRatio = i % 2 === 0 ? 1.25 : 1.125;
-        const fifthRatio = 1.5;
+          // Pure Just-Intonation Celestial Triad ratios: Root (1:1), Major 3rd (5:4) / Major 9th (9:8), Perfect 5th (3:2)
+          const thirdRatio = i % 2 === 0 ? 1.25 : 1.125;
+          const fifthRatio = 1.5;
 
-        v.osc.frequency.setTargetAtTime(freq, now, 0.025);
-        v.thirdOsc.frequency.setTargetAtTime(Math.min(8000, freq * thirdRatio), now, 0.025);
-        v.fifthOsc.frequency.setTargetAtTime(Math.min(8000, freq * fifthRatio), now, 0.025);
+          v.osc.frequency.setTargetAtTime(freq, now, 0.025);
+          v.thirdOsc.frequency.setTargetAtTime(Math.min(8000, freq * thirdRatio), now, 0.025);
+          v.fifthOsc.frequency.setTargetAtTime(Math.min(8000, freq * fifthRatio), now, 0.025);
 
-        // Scale-Invariant Multi-Scale 1/f Weierstrass Harmonic Blossoming:
-        // Low octaves breathe slowly (~0.26 Hz); mid octaves weave medium waves (~0.85 Hz); high octaves shimmer gently (~2.2 Hz)
-        const scaleRateHz = 0.26 * Math.pow(1.82, v.octavePos * 3.6);
-        const basePhase = elapsed * scaleRateHz * Math.PI * 2 + i * 0.785;
+          // Scale-Invariant Multi-Scale 1/f Weierstrass Harmonic Blossoming:
+          // Low octaves breathe slowly (~0.26 Hz); mid octaves weave medium waves (~0.85 Hz); high octaves shimmer gently (~2.2 Hz)
+          const scaleRateHz = 0.26 * Math.pow(1.82, v.octavePos * 3.6);
+          const basePhase = elapsed * scaleRateHz * Math.PI * 2 + i * 0.785;
 
-        // 4-scale 1/f Weierstrass wave for Root (0 deg), Major 3rd (120 deg), and Perfect 5th (240 deg)
-        const wRoot =
-          0.52 * Math.sin(basePhase) +
-          0.26 * Math.sin(basePhase * 2.0 + 0.8) +
-          0.14 * Math.sin(basePhase * 4.0 + 1.9) +
-          0.08 * Math.sin(basePhase * 8.0 + 0.4);
+          // 4-scale 1/f Weierstrass wave for Root (0 deg), Major 3rd (120 deg), and Perfect 5th (240 deg)
+          const wRoot =
+            0.52 * Math.sin(basePhase) +
+            0.26 * Math.sin(basePhase * 2.0 + 0.8) +
+            0.14 * Math.sin(basePhase * 4.0 + 1.9) +
+            0.08 * Math.sin(basePhase * 8.0 + 0.4);
 
-        const wThird =
-          0.52 * Math.sin(basePhase + 2.094) +
-          0.26 * Math.sin(basePhase * 2.0 + 2.894) +
-          0.14 * Math.sin(basePhase * 4.0 + 3.994) +
-          0.08 * Math.sin(basePhase * 8.0 + 2.494);
+          const wThird =
+            0.52 * Math.sin(basePhase + 2.094) +
+            0.26 * Math.sin(basePhase * 2.0 + 2.894) +
+            0.14 * Math.sin(basePhase * 4.0 + 3.994) +
+            0.08 * Math.sin(basePhase * 8.0 + 2.494);
 
-        const wFifth =
-          0.52 * Math.sin(basePhase + 4.188) +
-          0.26 * Math.sin(basePhase * 2.0 + 4.988) +
-          0.14 * Math.sin(basePhase * 4.0 + 6.088) +
-          0.08 * Math.sin(basePhase * 8.0 + 4.588);
+          const wFifth =
+            0.52 * Math.sin(basePhase + 4.188) +
+            0.26 * Math.sin(basePhase * 2.0 + 4.988) +
+            0.14 * Math.sin(basePhase * 4.0 + 6.088) +
+            0.08 * Math.sin(basePhase * 8.0 + 4.588);
 
-        const rootPulse = Math.pow(0.5 + 0.5 * wRoot, 1.8);
-        const thirdPulse = Math.pow(0.5 + 0.5 * wThird, 2.0);
-        const fifthPulse = Math.pow(0.5 + 0.5 * wFifth, 2.0);
+          const rootPulse = Math.pow(0.5 + 0.5 * wRoot, 1.8);
+          const thirdPulse = Math.pow(0.5 + 0.5 * wThird, 2.0);
+          const fifthPulse = Math.pow(0.5 + 0.5 * wFifth, 2.0);
 
-        // At fDepth=0 -> smooth pure octave glide; as fDepth->1 -> lush multi-scale Root / Major-3rd / Perfect-5th arpeggio cascade
-        const rootAmp = bell * ((1.0 - fDepth * 0.55) + fDepth * 0.95 * rootPulse);
-        const thirdAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * thirdPulse * 0.14;
-        const fifthAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * fifthPulse * 0.16;
+          // At fDepth=0 -> smooth pure octave glide; as fDepth->1 -> lush multi-scale Root / Major-3rd / Perfect-5th arpeggio cascade
+          const rootAmp = bell * ((1.0 - fDepth * 0.55) + fDepth * 0.95 * rootPulse);
+          const thirdAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * thirdPulse * 0.14;
+          const fifthAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * fifthPulse * 0.16;
 
-        v.gain.gain.setTargetAtTime(rootAmp * 0.19, now, 0.025);
-        v.thirdGain.gain.setTargetAtTime(thirdAmp, now, 0.025);
-        v.fifthGain.gain.setTargetAtTime(fifthAmp, now, 0.025);
+          v.gain.gain.setTargetAtTime(rootAmp * 0.19, now, 0.025);
+          v.thirdGain.gain.setTargetAtTime(thirdAmp, now, 0.025);
+          v.fifthGain.gain.setTargetAtTime(fifthAmp, now, 0.025);
 
-        // Gentle stereo breathing
-        const panPos = Math.max(-0.9, Math.min(0.9, Math.sin(v.octavePos * Math.PI * 2 + fDepth * wRoot * 0.9) * 0.65));
-        v.pan.pan.setTargetAtTime(panPos, now, 0.04);
+          // Gentle stereo breathing
+          const panPos = Math.max(-0.9, Math.min(0.9, Math.sin(v.octavePos * Math.PI * 2 + fDepth * wRoot * 0.9) * 0.65));
+          v.pan.pan.setTargetAtTime(panPos, now, 0.04);
 
-        this.telemetry.shepardVoices[i].octavePos = v.octavePos;
-        this.telemetry.shepardVoices[i].freq = freq;
-        this.telemetry.shepardVoices[i].amp = rootAmp + (thirdAmp + fifthAmp) * 2.5;
-        this.telemetry.shepardVoices[i].ripple = fDepth * wRoot;
+          this.telemetry.shepardVoices[i].octavePos = v.octavePos;
+          this.telemetry.shepardVoices[i].freq = freq;
+          this.telemetry.shepardVoices[i].amp = rootAmp + (thirdAmp + fifthAmp) * 2.5;
+          this.telemetry.shepardVoices[i].ripple = fDepth * wRoot;
+        }
       }
     }
 
     // 6. Update MODULE 5: Infrasound & Sub-Bass Pulse
     if (this.nodes.sub) {
-      const pulseHz = this.params.sub.pulse;
-      const pulseMod = 0.55 + 0.45 * Math.sin(elapsed * pulseHz * Math.PI * 2);
-      this.nodes.sub.pulseGain.gain.setTargetAtTime(pulseMod, now, 0.025);
+      if (!this.params.sub.enabled) {
+        this.nodes.sub.pulseGain.gain.setTargetAtTime(0, now, 0.04);
+      } else {
+        const pulseHz = this.params.sub.pulse;
+        const pulseMod = 0.55 + 0.45 * Math.sin(elapsed * pulseHz * Math.PI * 2);
+        this.nodes.sub.pulseGain.gain.setTargetAtTime(pulseMod, now, 0.025);
+      }
     }
 
     // 7. Update MODULE 6: Ganzfeld Cavern Vowel-Formant Sweeps (independent L/R morphing)
     if (this.nodes.ganzfeld) {
-      const g = this.nodes.ganzfeld;
-      const s = this.params.ganzfeld.sweep;
-      // Morph speed grows slightly with sweep depth (one full vowel cycle every ~45s → ~20s)
-      const rate = 0.11 + s * 0.14;
-      const [l1, l2] = this._vowelFormants(elapsed * rate);
-      const [r1, r2] = this._vowelFormants(elapsed * rate * 0.77 + 2.3);
-      g.cavernL1.frequency.setTargetAtTime(l1, now, 0.06);
-      g.cavernL2.frequency.setTargetAtTime(l2, now, 0.06);
-      g.cavernR1.frequency.setTargetAtTime(r1, now, 0.06);
-      g.cavernR2.frequency.setTargetAtTime(r2, now, 0.06);
-      // The two caverns slowly drift around the head
-      g.panL.pan.setTargetAtTime(-0.85 + 0.5 * s * Math.sin(elapsed * 0.09), now, 0.1);
-      g.panR.pan.setTargetAtTime(0.85 - 0.5 * s * Math.sin(elapsed * 0.07 + 1.2), now, 0.1);
+      if (!this.params.ganzfeld.enabled) {
+        this.nodes.ganzfeld.directGain.gain.setTargetAtTime(0, now, 0.04);
+        this.nodes.ganzfeld.sweepGain.gain.setTargetAtTime(0, now, 0.04);
+      } else {
+        const g = this.nodes.ganzfeld;
+        const s = this.params.ganzfeld.sweep;
+        // Morph speed grows slightly with sweep depth (one full vowel cycle every ~45s → ~20s)
+        const rate = 0.11 + s * 0.14;
+        const [l1, l2] = this._vowelFormants(elapsed * rate);
+        const [r1, r2] = this._vowelFormants(elapsed * rate * 0.77 + 2.3);
+        g.cavernL1.frequency.setTargetAtTime(l1, now, 0.06);
+        g.cavernL2.frequency.setTargetAtTime(l2, now, 0.06);
+        g.cavernR1.frequency.setTargetAtTime(r1, now, 0.06);
+        g.cavernR2.frequency.setTargetAtTime(r2, now, 0.06);
+        // The two caverns slowly drift around the head
+        g.panL.pan.setTargetAtTime(-0.85 + 0.5 * s * Math.sin(elapsed * 0.09), now, 0.1);
+        g.panR.pan.setTargetAtTime(0.85 - 0.5 * s * Math.sin(elapsed * 0.07 + 1.2), now, 0.1);
+      }
     }
 
     // 8. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
@@ -1776,8 +1807,8 @@ class ConsciousnessAudioEngine {
     const now = this.ctx.currentTime;
 
     if (mod === 'spatial') {
-      const targetBus = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0.0001;
-      this.nodes.spatial.bus.gain.setTargetAtTime(targetBus, now, 0.08);
+      const targetBus = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0;
+      this.nodes.spatial.bus.gain.setTargetAtTime(targetBus, now, 0.05);
 
       if (key === 'collapse') {
         this.nodes.spatial.coreGainL.gain.cancelScheduledValues(now);
@@ -1809,11 +1840,11 @@ class ConsciousnessAudioEngine {
         });
       }
     } else if (mod === 'chaos') {
-      const targetBus = this.params.chaos.enabled ? this.params.chaos.gain * 0.45 : 0.0001;
-      this.nodes.chaos.bus.gain.setTargetAtTime(targetBus, now, 0.08);
+      const targetBus = this.params.chaos.enabled ? this.params.chaos.gain * 0.45 : 0;
+      this.nodes.chaos.bus.gain.setTargetAtTime(targetBus, now, 0.05);
     } else if (mod === 'pac') {
-      const targetBus = this.params.pac.enabled ? this.params.pac.gain * 0.48 : 0.0001;
-      this.nodes.pac.bus.gain.setTargetAtTime(targetBus, now, 0.08);
+      const targetBus = this.params.pac.enabled ? this.params.pac.gain * 0.48 : 0;
+      this.nodes.pac.bus.gain.setTargetAtTime(targetBus, now, 0.05);
       if (key === 'baseFreq' || key === 'theta') {
         const c = this.params.pac.baseFreq || 136.0;
         const half = (this.params.pac.theta || 6.0) / 2;
@@ -1829,11 +1860,11 @@ class ConsciousnessAudioEngine {
         this.nodes.pac.gammaOsc.frequency.setTargetAtTime(val, now, 0.015);
       }
     } else if (mod === 'fractal') {
-      const targetBus = this.params.fractal.enabled ? this.params.fractal.gain * 0.42 : 0.0001;
-      this.nodes.fractal.bus.gain.setTargetAtTime(targetBus, now, 0.12);
+      const targetBus = this.params.fractal.enabled ? this.params.fractal.gain * 0.42 : 0;
+      this.nodes.fractal.bus.gain.setTargetAtTime(targetBus, now, 0.05);
     } else if (mod === 'sub') {
-      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0.0001;
-      this.nodes.sub.bus.gain.setTargetAtTime(targetBus, now, 0.08);
+      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0;
+      this.nodes.sub.bus.gain.setTargetAtTime(targetBus, now, 0.05);
       if (key === 'freq') {
         const f0 = val;
         this.nodes.sub.subOsc1.frequency.setTargetAtTime(f0, now, 0.08);
@@ -1843,8 +1874,8 @@ class ConsciousnessAudioEngine {
         this._updateSubWarmth(val);
       }
     } else if (mod === 'ganzfeld') {
-      const targetBus = this.params.ganzfeld.enabled ? this.params.ganzfeld.gain * 0.35 : 0.0001;
-      this.nodes.ganzfeld.bus.gain.setTargetAtTime(targetBus, now, 0.08);
+      const targetBus = this.params.ganzfeld.enabled ? this.params.ganzfeld.gain * 0.35 : 0;
+      this.nodes.ganzfeld.bus.gain.setTargetAtTime(targetBus, now, 0.05);
       if (key === 'color') {
         this.nodes.ganzfeld.colorFilter.frequency.setTargetAtTime(this._colorToFreq(val), now, 0.1);
       } else if (key === 'sweep') {
