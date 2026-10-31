@@ -202,8 +202,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Persistent HTML5 Audio for Android Audio Focus & Lock Screen Media Session
-  const bgAudio = document.getElementById('bgAudioKeepAlive');
+  // Background Lock-Screen Audio Session & Android Media Notification
+  const telemetryBgAudio = document.getElementById('telemetryBgAudio');
+
+  // In-memory 10-second 16-bit PCM silent WAV generator (zero network dependency!)
+  let bgAudioBlobUrl = null;
+  function getSilentWavUrl() {
+    if (!bgAudioBlobUrl) {
+      const durationSec = 10;
+      const sampleRate = 8000;
+      const numSamples = durationSec * sampleRate;
+      const dataSize = numSamples * 2;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+      view.setUint32(0, 0x52494646, false); // "RIFF"
+      view.setUint32(4, 36 + dataSize, true);
+      view.setUint32(8, 0x57415645, false); // "WAVE"
+      view.setUint32(12, 0x666d7420, false); // "fmt "
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM format
+      view.setUint16(22, 1, true); // Mono
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true); // Byte rate
+      view.setUint16(32, 2, true); // Block align
+      view.setUint16(34, 16, true); // 16-bit
+      view.setUint32(36, 0x64617461, false); // "data"
+      view.setUint32(40, dataSize, true);
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      bgAudioBlobUrl = URL.createObjectURL(blob);
+    }
+    return bgAudioBlobUrl;
+  }
+
+  let bgAudio = null;
+  function getOrCreateBackgroundAudio() {
+    if (!bgAudio) {
+      bgAudio = document.getElementById('bgAudioKeepAlive');
+    }
+    if (!bgAudio) {
+      bgAudio = document.createElement('audio');
+      bgAudio.id = 'bgAudioKeepAlive';
+      bgAudio.loop = true;
+      bgAudio.setAttribute('playsinline', '');
+      bgAudio.setAttribute('webkit-playsinline', '');
+      document.body.appendChild(bgAudio);
+    }
+    if (!bgAudio.src || bgAudio.src === '' || bgAudio.src.indexOf('blob:') === -1) {
+      bgAudio.src = getSilentWavUrl();
+    }
+    bgAudio.volume = 1.0;
+    bgAudio.muted = false; // Android Chrome requires unmuted audio to grant full MediaSession Audio Focus
+    return bgAudio;
+  }
 
   // Web Worker Ticker: guarantees continuous simulation ticks even with screen locked!
   let bgWorker = null;
@@ -236,56 +286,82 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function startBackgroundAudioSession() {
-    // 1. Play real HTML5 audio element synchronously to claim Android Audio Focus
-    if (bgAudio) {
-      bgAudio.currentTime = 0;
-      bgAudio.play().catch((err) => {
-        console.warn('HTML5 background audio play:', err);
-      });
+    const audio = getOrCreateBackgroundAudio();
+    if (audio) {
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(() => {
+          if (telemetryBgAudio) {
+            telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
+            telemetryBgAudio.style.color = '#38bdf8';
+          }
+        }).catch((err) => {
+          console.warn('HTML5 background audio play:', err);
+          if (telemetryBgAudio) {
+            telemetryBgAudio.textContent = 'PENDING (TAP TO UNLOCK)';
+            telemetryBgAudio.style.color = '#f87171';
+          }
+        });
+      }
     }
 
-    // 2. Start Web Worker ticker for lock-screen continuous simulation
     if (bgWorker) {
       bgWorker.postMessage('start');
     }
 
-    // 3. Register native Android Media Session
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: 'AETHER Consciousness Lab',
           artist: 'Remi Lab',
-          album: 'Neurophenomenology Soundscapes'
+          album: 'WebAudio Neurophenomenology Soundscapes',
+          artwork: [
+            { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
+          ]
         });
         navigator.mediaSession.playbackState = 'playing';
 
         navigator.mediaSession.setActionHandler('play', async () => {
+          const a = getOrCreateBackgroundAudio();
+          if (a) a.play().catch(() => {});
           if (!engine.isRunning) {
             await toggleAudio();
           } else if (engine.ctx && engine.ctx.state === 'suspended') {
             await engine.ctx.resume().catch(() => {});
           }
-          if (bgAudio) bgAudio.play().catch(() => {});
           if (bgWorker) bgWorker.postMessage('start');
           navigator.mediaSession.playbackState = 'playing';
+          if (telemetryBgAudio) {
+            telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
+            telemetryBgAudio.style.color = '#38bdf8';
+          }
         });
 
         navigator.mediaSession.setActionHandler('pause', () => {
+          const a = getOrCreateBackgroundAudio();
+          if (a) a.pause();
           if (engine.isRunning) {
             toggleAudio();
           }
-          if (bgAudio) bgAudio.pause();
           if (bgWorker) bgWorker.postMessage('stop');
           navigator.mediaSession.playbackState = 'paused';
+          if (telemetryBgAudio) {
+            telemetryBgAudio.textContent = 'PAUSED';
+            telemetryBgAudio.style.color = '';
+          }
         });
-      } catch (_) {}
+      } catch (err) {
+        console.warn('MediaSession initialization:', err);
+      }
     }
   }
 
   function stopBackgroundAudioSession() {
     try {
-      if (bgAudio) {
-        bgAudio.pause();
+      const a = getOrCreateBackgroundAudio();
+      if (a) {
+        a.pause();
       }
       if (bgWorker) {
         bgWorker.postMessage('stop');
@@ -293,7 +369,24 @@ document.addEventListener('DOMContentLoaded', () => {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
+      if (telemetryBgAudio) {
+        telemetryBgAudio.textContent = 'STANDBY';
+        telemetryBgAudio.style.color = '';
+      }
     } catch (_) {}
+  }
+
+  // Synchronous unlock helper called on any direct tap/click gesture
+  function unlockBackgroundAudioSynchronously() {
+    const a = getOrCreateBackgroundAudio();
+    if (a && a.paused) {
+      a.play().then(() => {
+        if (telemetryBgAudio && engine.isRunning) {
+          telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
+          telemetryBgAudio.style.color = '#38bdf8';
+        }
+      }).catch(() => {});
+    }
   }
 
   // Toggle Audio Engine Power
@@ -320,14 +413,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  powerBtn.addEventListener('click', toggleAudio);
+  powerBtn.addEventListener('click', (e) => {
+    unlockBackgroundAudioSynchronously();
+    toggleAudio();
+  });
 
   // Background fallback interval when Android locks screen or switches tabs
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
       if (engine.isRunning) {
-        if (bgAudio && bgAudio.paused) {
-          bgAudio.play().catch(() => {});
+        const a = getOrCreateBackgroundAudio();
+        if (a && a.paused) {
+          a.play().catch(() => {});
         }
         if (bgWorker) {
           bgWorker.postMessage('start');
@@ -772,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.preset-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      unlockBackgroundAudioSynchronously();
       applyPreset(btn.dataset.preset, true);
     });
   });

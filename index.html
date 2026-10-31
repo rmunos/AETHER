@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>AETHER // WebAudio Neurophenomenology & Consciousness Remi Lab</title>
-  <link rel="stylesheet" href="styles.css?v=2.5" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+  <link rel="apple-touch-icon" href="icon-512.png" />
+  <link rel="stylesheet" href="styles.css?v=2.9" />
 </head>
 <body>
   <div class="app-shell">
@@ -38,6 +40,10 @@
         <div class="telemetry-item" title="0.1 Hz autonomic heart-brain coherence breath phase">
           <span class="telemetry-label">0.1 Hz BREATH</span>
           <span class="telemetry-value" id="telemetryBreath">INHALE</span>
+        </div>
+        <div class="telemetry-item" title="Android background audio focus and lock-screen playback status">
+          <span class="telemetry-label">LOCK-SCREEN PLAY</span>
+          <span class="telemetry-value accent-cyan" id="telemetryBgAudio">STANDBY</span>
         </div>
       </div>
 
@@ -442,7 +448,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=2.8"></script>
-  <script src="app.js?v=2.8"></script>
+  <script src="audio-engine.js?v=2.9"></script>
+  <script src="app.js?v=2.9"></script>
 </body>
 </html>
