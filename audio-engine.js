@@ -1059,9 +1059,10 @@ class ConsciousnessAudioEngine {
     const bus = this.ctx.createGain();
     bus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.48 : 0.0001;
     bus.connect(this.dryBus);
-    bus.connect(this.reverbSendGain);
 
-    // 1. Binaural Beat Carrier Pair (baseFreq +/- theta/2) + Warm Harmonic Body
+    // 1. Strictly Isolated Binaural Beat Carrier Pair (baseFreq +/- theta/2)
+    // Left channel receives strictly carrier - theta/2; Right channel receives strictly carrier + theta/2.
+    // Zero cross-talk, zero monaural bleed, zero reverb smearing on the binaural carrier!
     const carrierFreq = this.params.pac.baseFreq || 136.0;
     const halfTheta = this.params.pac.theta / 2;
 
@@ -1069,8 +1070,8 @@ class ConsciousnessAudioEngine {
     const binOscR = this.ctx.createOscillator();
     const binBodyL = this.ctx.createOscillator();
     const binBodyR = this.ctx.createOscillator();
-    const binBodyGain = this.ctx.createGain();
-    const binFilter = this.ctx.createBiquadFilter();
+    const binBodyGainL = this.ctx.createGain();
+    const binBodyGainR = this.ctx.createGain();
     const binPanL = this.ctx.createStereoPanner();
     const binPanR = this.ctx.createStereoPanner();
     const binGain = this.ctx.createGain();
@@ -1085,25 +1086,34 @@ class ConsciousnessAudioEngine {
     binBodyL.frequency.value = Math.max(20, carrierFreq - halfTheta);
     binBodyR.frequency.value = Math.max(20, carrierFreq + halfTheta);
 
-    binBodyGain.gain.value = 0.22;
-    binFilter.type = 'lowpass';
-    binFilter.frequency.value = carrierFreq * 3.5;
-    binFilter.Q.value = 1.2;
+    binBodyGainL.gain.value = 0.15;
+    binBodyGainR.gain.value = 0.15;
 
+    // Hard stereo panning: Left = -1.0, Right = +1.0 (strict binaural isolation)
     binPanL.pan.value = -1;
     binPanR.pan.value = 1;
     binGain.gain.value = 0.42;
 
+    // Route left oscillators strictly to Left Panner
     binOscL.connect(binPanL);
-    binOscR.connect(binPanR);
-    binBodyL.connect(binBodyGain);
-    binBodyR.connect(binBodyGain);
-    binBodyGain.connect(binFilter);
-    binFilter.connect(binGain);
+    binBodyL.connect(binBodyGainL);
+    binBodyGainL.connect(binPanL);
 
+    // Route right oscillators strictly to Right Panner
+    binOscR.connect(binPanR);
+    binBodyR.connect(binBodyGainR);
+    binBodyGainR.connect(binPanR);
+
+    const binFilter = this.ctx.createBiquadFilter();
+    binFilter.type = 'lowpass';
+    binFilter.frequency.value = carrierFreq * 3.5;
+    binFilter.Q.value = 1.2;
+
+    // Both panners feed the binaural gain and stereo filter straight to the dry bus
     binPanL.connect(binGain);
     binPanR.connect(binGain);
-    binGain.connect(bus);
+    binGain.connect(binFilter);
+    binFilter.connect(bus);
 
     binOscL.start();
     binOscR.start();
@@ -1171,6 +1181,8 @@ class ConsciousnessAudioEngine {
     pacFilter.connect(gammaPulseNode);
     gammaPulseNode.connect(pacModGain);
     pacModGain.connect(bus);
+    // Only the ethereal PAC shimmer bursts send gently to the cathedral space
+    pacModGain.connect(this.reverbSendGain);
 
     pacCarrier1.start();
     pacCarrier2.start();
