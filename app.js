@@ -202,11 +202,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Background Audio Keep-Alive & Android Lock Screen Media Session
+  let silentAudio = null;
+  function startBackgroundAudioSession() {
+    try {
+      if (!silentAudio) {
+        silentAudio = new Audio();
+        // 48-byte minimal valid RIFF WAV silent loop
+        silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        silentAudio.loop = true;
+        silentAudio.setAttribute('playsinline', '');
+        silentAudio.setAttribute('webkit-playsinline', '');
+      }
+      silentAudio.play().catch(() => {});
+    } catch (_) {}
+
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'AETHER Consciousness Lab',
+          artist: 'Remi Lab',
+          album: 'Neurophenomenology Soundscapes'
+        });
+        navigator.mediaSession.playbackState = 'playing';
+
+        navigator.mediaSession.setActionHandler('play', async () => {
+          if (!engine.isRunning) {
+            await toggleAudio();
+          } else if (engine.ctx && engine.ctx.state === 'suspended') {
+            await engine.ctx.resume().catch(() => {});
+          }
+          if (silentAudio) silentAudio.play().catch(() => {});
+          navigator.mediaSession.playbackState = 'playing';
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (engine.isRunning) {
+            toggleAudio();
+          }
+          if (silentAudio) silentAudio.pause();
+          navigator.mediaSession.playbackState = 'paused';
+        });
+      } catch (_) {}
+    }
+  }
+
+  function stopBackgroundAudioSession() {
+    try {
+      if (silentAudio) {
+        silentAudio.pause();
+      }
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    } catch (_) {}
+  }
+
   // Toggle Audio Engine Power
   async function toggleAudio() {
     if (!engine.isRunning) {
       await engine.start();
       await acquireWakeLock();
+      startBackgroundAudioSession();
       powerBtn.classList.add('active');
       powerBtn.setAttribute('aria-pressed', 'true');
       powerBtnText.textContent = 'ENGINE ACTIVE (MUTE)';
@@ -215,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       engine.stop();
       releaseWakeLock();
+      stopBackgroundAudioSession();
       powerBtn.classList.remove('active');
       powerBtn.setAttribute('aria-pressed', 'false');
       powerBtnText.textContent = 'RESUME AUDIO ENGINE';
