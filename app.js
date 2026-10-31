@@ -182,10 +182,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const presetKeys = Object.keys(PRESETS);
 
+  // Mobile Screen Wake Lock & Background Audio Keep-Alive
+  let wakeLock = null;
+  async function acquireWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
+      } catch (err) {
+        // Silently continue if wake lock is denied or unsupported
+      }
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+
   // Toggle Audio Engine Power
   async function toggleAudio() {
     if (!engine.isRunning) {
       await engine.start();
+      await acquireWakeLock();
       powerBtn.classList.add('active');
       powerBtn.setAttribute('aria-pressed', 'true');
       powerBtnText.textContent = 'ENGINE ACTIVE (MUTE)';
@@ -194,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateTargetStateBadge();
     } else {
       engine.stop();
+      releaseWakeLock();
       powerBtn.classList.remove('active');
       powerBtn.setAttribute('aria-pressed', 'false');
       powerBtnText.textContent = 'RESUME AUDIO ENGINE';
@@ -204,6 +228,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   powerBtn.addEventListener('click', toggleAudio);
   overlayStartBtn.addEventListener('click', toggleAudio);
+
+  // Background fallback interval when Android locks screen or switches tabs
+  let bgTickInterval = null;
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      if (engine.isRunning && !bgTickInterval) {
+        bgTickInterval = setInterval(() => {
+          engine.tick();
+        }, 33); // ~30 fps fallback
+      }
+    } else {
+      if (bgTickInterval) {
+        clearInterval(bgTickInterval);
+        bgTickInterval = null;
+      }
+      if (engine.isRunning) {
+        if (engine.ctx && engine.ctx.state === 'suspended') {
+          await engine.ctx.resume().catch(() => {});
+        }
+        await acquireWakeLock();
+      }
+    }
+  });
+
+  // Mobile AudioContext auto-unlock on user touch
+  document.addEventListener('touchstart', () => {
+    if (engine.isRunning && engine.ctx && engine.ctx.state === 'suspended') {
+      engine.ctx.resume().catch(() => {});
+    }
+  }, { passive: true });
 
   // Master & Reverb Controls
   const masterGainInput = document.getElementById('masterGain');
