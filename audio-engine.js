@@ -117,7 +117,8 @@ class ConsciousnessAudioEngine {
     if (this.ctx) return;
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+    // Use 'playback' latency hint for glitch-free, underrun-proof buffer depth on Android background
+    this.ctx = new AudioCtx({ latencyHint: 'playback' });
     this.ctx.onstatechange = () => {
       if (this.ctx && this.ctx.state === 'suspended' && this.isRunning) {
         this.ctx.resume().catch(() => {});
@@ -1530,6 +1531,7 @@ class ConsciousnessAudioEngine {
 
     const now = this.ctx.currentTime;
     const elapsed = now - this.startTime;
+    const isBg = typeof document !== 'undefined' && document.hidden;
 
     // 1. Global 0.1 Hz Coherent Breath Oscillator (10-second cycle = 6 breaths/min)
     this.telemetry.breathPhase = (elapsed * 0.1 * Math.PI * 2) % (Math.PI * 2);
@@ -1580,10 +1582,11 @@ class ConsciousnessAudioEngine {
           geomType = pos.geomType;
         }
 
+        const spatTc = isBg ? 0.065 : 0.025;
         if (v.panner.positionX) {
-          v.panner.positionX.setTargetAtTime(x, now, 0.025);
-          v.panner.positionY.setTargetAtTime(y, now, 0.025);
-          v.panner.positionZ.setTargetAtTime(z, now, 0.025);
+          v.panner.positionX.setTargetAtTime(x, now, spatTc);
+          v.panner.positionY.setTargetAtTime(y, now, spatTc);
+          v.panner.positionZ.setTargetAtTime(z, now, spatTc);
         } else {
           v.panner.setPosition(x, y, z);
         }
@@ -1597,11 +1600,11 @@ class ConsciousnessAudioEngine {
         const baseShadow = frontness >= 0
           ? 3400 + frontness * 5800   // Front: bright pinna cues
           : 3400 * Math.pow(0.30, -frontness); // Behind head: pinna cartilage shadow
-        v.shadowFilter.frequency.setTargetAtTime(Math.max(450, baseShadow * distAirDamp), now, 0.03);
+        v.shadowFilter.frequency.setTargetAtTime(Math.max(450, baseShadow * distAirDamp), now, isBg ? 0.065 : 0.03);
 
         // Psychoacoustic Elevation Notch/Peak:
         const elevGainDb = Math.max(-1, Math.min(1, y)) * 9.5;
-        v.elevFilter.gain.setTargetAtTime(elevGainDb, now, 0.03);
+        v.elevFilter.gain.setTargetAtTime(elevGainDb, now, isBg ? 0.065 : 0.03);
 
         // Envelope: when pulseDepth == 0 (default), sound is 100% smooth & continuous (zero oscillation!)
         let activeEnergy = 1.0;
@@ -1610,7 +1613,7 @@ class ConsciousnessAudioEngine {
           activeEnergy = (1 - pulseDepth) + pulseDepth * Math.pow(wave, 2.0) * 1.4;
         }
 
-        v.pulseGain.gain.setTargetAtTime(activeEnergy, now, 0.025);
+        v.pulseGain.gain.setTargetAtTime(activeEnergy, now, spatTc);
 
         const tv = this.telemetry.spatialVoices[i];
         tv.x = x;
@@ -1620,10 +1623,12 @@ class ConsciousnessAudioEngine {
         tv.geomType = geomType;
         tv.activeEnergy = activeEnergy;
 
-        // Store trail point for 3D geometric path visualization
-        tv.trail.push({ x, y, z });
-        if (tv.trail.length > 56) {
-          tv.trail.shift();
+        // Store trail point for 3D geometric path visualization (skip in background to save CPU)
+        if (!isBg) {
+          tv.trail.push({ x, y, z });
+          if (tv.trail.length > 56) {
+            tv.trail.shift();
+          }
         }
       }
     }
@@ -1684,8 +1689,11 @@ class ConsciousnessAudioEngine {
         const binThetaMod = (1.0 - pacDepth * 0.35) + pacDepth * 0.35 * (0.45 + 0.55 * thetaPeakGate);
         const binTarget = 0.65 * binThetaMod * binBreathMod;
 
-        this.nodes.pac.pacModGain.gain.setTargetAtTime(gammaBurstTarget, now, 0.006);
-        this.nodes.pac.binGain.gain.setTargetAtTime(binTarget, now, 0.015);
+        const pacTc = isBg ? 0.045 : 0.012;
+        const binTc = isBg ? 0.060 : 0.020;
+
+        this.nodes.pac.pacModGain.gain.setTargetAtTime(gammaBurstTarget, now, pacTc);
+        this.nodes.pac.binGain.gain.setTargetAtTime(binTarget, now, binTc);
 
         this.telemetry.thetaPhase = thetaPhase;
         this.telemetry.gammaEnvelope = gammaBurstTarget;
@@ -1726,9 +1734,10 @@ class ConsciousnessAudioEngine {
           const thirdRatio = i % 2 === 0 ? 1.25 : 1.125;
           const fifthRatio = 1.5;
 
-          v.osc.frequency.setTargetAtTime(freq, now, 0.025);
-          v.thirdOsc.frequency.setTargetAtTime(Math.min(8000, freq * thirdRatio), now, 0.025);
-          v.fifthOsc.frequency.setTargetAtTime(Math.min(8000, freq * fifthRatio), now, 0.025);
+          const fTc = isBg ? 0.060 : 0.025;
+          v.osc.frequency.setTargetAtTime(freq, now, fTc);
+          v.thirdOsc.frequency.setTargetAtTime(Math.min(8000, freq * thirdRatio), now, fTc);
+          v.fifthOsc.frequency.setTargetAtTime(Math.min(8000, freq * fifthRatio), now, fTc);
 
           // Scale-Invariant Multi-Scale 1/f Weierstrass Harmonic Blossoming:
           // Low octaves breathe slowly (~0.26 Hz); mid octaves weave medium waves (~0.85 Hz); high octaves shimmer gently (~2.2 Hz)
@@ -1763,13 +1772,13 @@ class ConsciousnessAudioEngine {
           const thirdAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * thirdPulse * 0.14;
           const fifthAmp = fDepth <= 0.005 ? 0.0 : bell * fDepth * fifthPulse * 0.16;
 
-          v.gain.gain.setTargetAtTime(rootAmp * 0.19, now, 0.025);
-          v.thirdGain.gain.setTargetAtTime(thirdAmp, now, 0.025);
-          v.fifthGain.gain.setTargetAtTime(fifthAmp, now, 0.025);
+          v.gain.gain.setTargetAtTime(rootAmp * 0.19, now, fTc);
+          v.thirdGain.gain.setTargetAtTime(thirdAmp, now, fTc);
+          v.fifthGain.gain.setTargetAtTime(fifthAmp, now, fTc);
 
           // Gentle stereo breathing
           const panPos = Math.max(-0.9, Math.min(0.9, Math.sin(v.octavePos * Math.PI * 2 + fDepth * wRoot * 0.9) * 0.65));
-          v.pan.pan.setTargetAtTime(panPos, now, 0.04);
+          v.pan.pan.setTargetAtTime(panPos, now, isBg ? 0.080 : 0.04);
 
           this.telemetry.shepardVoices[i].octavePos = v.octavePos;
           this.telemetry.shepardVoices[i].freq = freq;
@@ -1786,7 +1795,7 @@ class ConsciousnessAudioEngine {
       } else {
         const pulseHz = this.params.sub.pulse;
         const pulseMod = 0.55 + 0.45 * Math.sin(elapsed * pulseHz * Math.PI * 2);
-        this.nodes.sub.pulseGain.gain.setTargetAtTime(pulseMod, now, 0.025);
+        this.nodes.sub.pulseGain.gain.setTargetAtTime(pulseMod, now, isBg ? 0.055 : 0.025);
       }
     }
 

@@ -265,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!timer) {
             timer = setInterval(function() {
               self.postMessage('tick');
-            }, 30);
+            }, 50); // 20 Hz background tick (smooth & energy-efficient)
           }
         } else if (e.data === 'stop') {
           if (timer) {
