@@ -312,15 +312,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if ('mediaSession' in navigator) {
       try {
+        const artworkUrl = new URL('icon-512.png', window.location.href).href;
         navigator.mediaSession.metadata = new MediaMetadata({
           title: 'AETHER Consciousness Lab',
           artist: 'Remi Lab',
           album: 'WebAudio Neurophenomenology Soundscapes',
           artwork: [
-            { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
+            { src: artworkUrl, sizes: '512x512', type: 'image/png' },
+            { src: artworkUrl, sizes: '256x256', type: 'image/png' },
+            { src: artworkUrl, sizes: '192x192', type: 'image/png' }
           ]
         });
         navigator.mediaSession.playbackState = 'playing';
+
+        const updatePosition = () => {
+          if ('setPositionState' in navigator.mediaSession && audio) {
+            try {
+              if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+                navigator.mediaSession.setPositionState({
+                  duration: audio.duration,
+                  playbackRate: 1.0,
+                  position: Math.min(audio.currentTime, audio.duration)
+                });
+              }
+            } catch (_) {}
+          }
+        };
+        if (audio) {
+          audio.ontimeupdate = updatePosition;
+          updatePosition();
+        }
 
         navigator.mediaSession.setActionHandler('play', async () => {
           const a = getOrCreateBackgroundAudio();
@@ -332,6 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           if (bgWorker) bgWorker.postMessage('start');
           navigator.mediaSession.playbackState = 'playing';
+
           if (telemetryBgAudio) {
             telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
             telemetryBgAudio.style.color = '#38bdf8';
@@ -351,6 +373,22 @@ document.addEventListener('DOMContentLoaded', () => {
             telemetryBgAudio.style.color = '';
           }
         });
+
+        try {
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime !== undefined && audio) {
+              audio.currentTime = details.seekTime % 10;
+              updatePosition();
+            }
+          });
+        } catch (_) {}
+        try {
+          navigator.mediaSession.setActionHandler('previoustrack', () => {});
+          navigator.mediaSession.setActionHandler('nexttrack', () => {});
+          navigator.mediaSession.setActionHandler('stop', () => {
+            stopBackgroundAudioSession();
+          });
+        } catch (_) {}
       } catch (err) {
         console.warn('MediaSession initialization:', err);
       }
