@@ -202,21 +202,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Background Audio Keep-Alive & Android Lock Screen Media Session
-  let silentAudio = null;
-  function startBackgroundAudioSession() {
-    try {
-      if (!silentAudio) {
-        silentAudio = new Audio();
-        // 48-byte minimal valid RIFF WAV silent loop
-        silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-        silentAudio.loop = true;
-        silentAudio.setAttribute('playsinline', '');
-        silentAudio.setAttribute('webkit-playsinline', '');
-      }
-      silentAudio.play().catch(() => {});
-    } catch (_) {}
+  // Persistent HTML5 Audio for Android Audio Focus & Lock Screen Media Session
+  const bgAudio = document.getElementById('bgAudioKeepAlive');
 
+  // Web Worker Ticker: guarantees continuous simulation ticks even with screen locked!
+  let bgWorker = null;
+  try {
+    const workerBlob = new Blob([`
+      let timer = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          if (!timer) {
+            timer = setInterval(function() {
+              self.postMessage('tick');
+            }, 30);
+          }
+        } else if (e.data === 'stop') {
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        }
+      };
+    `], { type: 'application/javascript' });
+    bgWorker = new Worker(URL.createObjectURL(workerBlob));
+    bgWorker.onmessage = function() {
+      if (document.hidden && engine.isRunning) {
+        engine.tick();
+      }
+    };
+  } catch (err) {
+    console.warn('Web Worker ticker unsupported:', err);
+  }
+
+  function startBackgroundAudioSession() {
+    // 1. Play real HTML5 audio element synchronously to claim Android Audio Focus
+    if (bgAudio) {
+      bgAudio.currentTime = 0;
+      bgAudio.play().catch((err) => {
+        console.warn('HTML5 background audio play:', err);
+      });
+    }
+
+    // 2. Start Web Worker ticker for lock-screen continuous simulation
+    if (bgWorker) {
+      bgWorker.postMessage('start');
+    }
+
+    // 3. Register native Android Media Session
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -232,7 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
           } else if (engine.ctx && engine.ctx.state === 'suspended') {
             await engine.ctx.resume().catch(() => {});
           }
-          if (silentAudio) silentAudio.play().catch(() => {});
+          if (bgAudio) bgAudio.play().catch(() => {});
+          if (bgWorker) bgWorker.postMessage('start');
           navigator.mediaSession.playbackState = 'playing';
         });
 
@@ -240,7 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (engine.isRunning) {
             toggleAudio();
           }
-          if (silentAudio) silentAudio.pause();
+          if (bgAudio) bgAudio.pause();
+          if (bgWorker) bgWorker.postMessage('stop');
           navigator.mediaSession.playbackState = 'paused';
         });
       } catch (_) {}
@@ -249,8 +284,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function stopBackgroundAudioSession() {
     try {
-      if (silentAudio) {
-        silentAudio.pause();
+      if (bgAudio) {
+        bgAudio.pause();
+      }
+      if (bgWorker) {
+        bgWorker.postMessage('stop');
       }
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
@@ -261,9 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toggle Audio Engine Power
   async function toggleAudio() {
     if (!engine.isRunning) {
+      // Must be called synchronously inside user gesture before any await
+      startBackgroundAudioSession();
       await engine.start();
       await acquireWakeLock();
-      startBackgroundAudioSession();
       powerBtn.classList.add('active');
       powerBtn.setAttribute('aria-pressed', 'true');
       powerBtnText.textContent = 'ENGINE ACTIVE (MUTE)';
@@ -284,19 +323,17 @@ document.addEventListener('DOMContentLoaded', () => {
   powerBtn.addEventListener('click', toggleAudio);
 
   // Background fallback interval when Android locks screen or switches tabs
-  let bgTickInterval = null;
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
-      if (engine.isRunning && !bgTickInterval) {
-        bgTickInterval = setInterval(() => {
-          engine.tick();
-        }, 33); // ~30 fps fallback
+      if (engine.isRunning) {
+        if (bgAudio && bgAudio.paused) {
+          bgAudio.play().catch(() => {});
+        }
+        if (bgWorker) {
+          bgWorker.postMessage('start');
+        }
       }
     } else {
-      if (bgTickInterval) {
-        clearInterval(bgTickInterval);
-        bgTickInterval = null;
-      }
       if (engine.isRunning) {
         if (engine.ctx && engine.ctx.state === 'suspended') {
           await engine.ctx.resume().catch(() => {});
@@ -849,8 +886,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function animate(nowMs) {
     requestAnimationFrame(animate);
 
-    // Step audio engine modulations
-    engine.tick();
+    // Step audio engine modulations when foreground is active (bgWorker steps it when screen is locked)
+    if (!document.hidden) {
+      engine.tick();
+    }
 
     // Update Telemetry Readouts
     telemetrySurprise.textContent = `${engine.telemetry.bayesianSurprise.toFixed(2)} bits`;

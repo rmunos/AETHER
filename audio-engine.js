@@ -118,6 +118,11 @@ class ConsciousnessAudioEngine {
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     this.ctx = new AudioCtx({ latencyHint: 'interactive' });
+    this.ctx.onstatechange = () => {
+      if (this.ctx && this.ctx.state === 'suspended' && this.isRunning) {
+        this.ctx.resume().catch(() => {});
+      }
+    };
     this.startTime = this.ctx.currentTime;
 
     // Create Master Bus, Safety Limiter, Analysers & Algorithmic Cathedral Reverb

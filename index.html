@@ -439,7 +439,10 @@
     </main>
   </div>
 
-  <script src="audio-engine.js?v=2.7"></script>
-  <script src="app.js?v=2.7"></script>
+  <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
+  <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
+
+  <script src="audio-engine.js?v=2.8"></script>
+  <script src="app.js?v=2.8"></script>
 </body>
 </html>
