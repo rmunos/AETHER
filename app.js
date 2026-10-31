@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindToggle('pacEnabled', 'pac');
   bindSlider('pacGain', 'pac', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('pacBaseFreq', 'pac', 'baseFreq', (v) => {
-    const tag = v < 90 ? 'Sub' : v < 180 ? 'Low' : 'Mid';
+    const tag = v < 65 ? 'Sub-Bass' : v < 115 ? 'Deep Bass' : v < 185 ? 'Low-Mid' : 'Mid';
     return `${Math.round(v)} Hz (${tag})`;
   });
   bindSlider('pacTheta', 'pac', 'theta', (v) => {
