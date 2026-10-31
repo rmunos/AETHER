@@ -1799,12 +1799,37 @@ class ConsciousnessAudioEngine {
     }
   }
 
+  _checkAllModulesDisabled() {
+    return !this.params.spatial.enabled &&
+           !this.params.chaos.enabled &&
+           !this.params.pac.enabled &&
+           !this.params.fractal.enabled &&
+           !this.params.sub.enabled &&
+           !this.params.ganzfeld.enabled;
+  }
+
   updateModule(mod, key, val) {
     if (!this.params[mod]) return;
     this.params[mod][key] = val;
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
+
+    // Bulletproof zero-bleed master bus muting when all 6 modules are disabled
+    if (key === 'enabled') {
+      const allOff = this._checkAllModulesDisabled();
+      if (allOff) {
+        this.dryBus.gain.setTargetAtTime(0, now, 0.03);
+        this.spatialDryBus.gain.setTargetAtTime(0, now, 0.03);
+        this.reverbSendGain.gain.setTargetAtTime(0, now, 0.03);
+        this.reverbReturn.gain.setTargetAtTime(0, now, 0.03);
+      } else {
+        this.dryBus.gain.setTargetAtTime(this._dryLevel(this.params.reverbMix), now, 0.04);
+        this.spatialDryBus.gain.setTargetAtTime(1.0, now, 0.04);
+        this.reverbSendGain.gain.setTargetAtTime(this._reverbSendLevel(this.params.reverbMix), now, 0.04);
+        this.reverbReturn.gain.setTargetAtTime(1.0, now, 0.04);
+      }
+    }
 
     if (mod === 'spatial') {
       const targetBus = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0;
