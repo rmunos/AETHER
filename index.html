@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AETHER // WebAudio Neurophenomenology & Consciousness Lab</title>
+  <title>AETHER // WebAudio Neurophenomenology & Consciousness Remi Lab</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -17,7 +17,7 @@
       <div class="brand">
         <div class="brand-glyph" id="statusOrb"></div>
         <div>
-          <h1>AETHER <span class="brand-sub">// PSYCHOACOUSTIC CONSCIOUSNESS LAB</span></h1>
+          <h1>AETHER <span class="brand-sub">// PSYCHOACOUSTIC CONSCIOUSNESS REMI LAB</span></h1>
           <p class="brand-tagline">Real-time WebAudio synthesis for neural entrainment, DMN suppression &amp; spatial ego unbinding</p>
         </div>
       </div>
@@ -42,14 +42,16 @@
       </div>
 
       <div class="master-controls">
-        <a href="docs.html" class="btn-docs" title="Open Full Feature &amp; Neuroscience Documentation">
-          <span>📖</span>
-          <span>DOCUMENTATION</span>
-        </a>
-        <div class="master-Gain-wrap">
-          <label for="masterGain">MASTER</label>
-          <input type="range" id="masterGain" min="0" max="1" step="0.01" value="0.7" />
-          <span id="masterGainVal" class="mono-val">70%</span>
+        <div class="master-top-row">
+          <a href="docs.html" class="btn-docs" title="Open Full Feature &amp; Neuroscience Documentation">
+            <span>📖</span>
+            <span>DOCUMENTATION</span>
+          </a>
+          <div class="master-Gain-wrap">
+            <label for="masterGain">MASTER</label>
+            <input type="range" id="masterGain" min="0" max="1" step="0.01" value="0.7" />
+            <span id="masterGainVal" class="mono-val">70%</span>
+          </div>
         </div>
         <button id="powerBtn" class="btn-power" aria-pressed="false">
           <span class="power-icon">⏻</span>
@@ -70,20 +72,10 @@
               <button class="viz-tab" data-viz="pac" role="tab">θ–γ PAC &amp; Binaural Lissajous</button>
               <button class="viz-tab" data-viz="chaos" role="tab">Edge-of-Chaos &amp; Fractal Spectrum</button>
             </div>
-            <div class="headphone-badge" title="Use stereo headphones for HRTF 3D spatialization and binaural phase locking">
-              🎧 Stereo Headphones Required
-            </div>
           </div>
 
           <div class="canvas-container">
             <canvas id="neuroCanvas"></canvas>
-            <div class="canvas-overlay" id="canvasOverlay">
-              <div class="overlay-box">
-                <h2>Ready for Acoustic Induction</h2>
-                <p>Put on stereo headphones. Click <strong>Initialize Audio Engine</strong> or select a phenomenological state preset below to begin real-time synthesis.</p>
-                <button id="overlayStartBtn" class="btn-primary">Start Experience</button>
-              </div>
-            </div>
             <div class="viz-hud">
               <div class="hud-pill" id="hudLeft">HRTF Voices: 8 + In-Cranial Core</div>
               <div class="hud-pill" id="hudRight">0.1 Hz Vagal Coherence Guide</div>

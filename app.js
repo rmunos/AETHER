@@ -8,8 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // DOM References
   const powerBtn = document.getElementById('powerBtn');
   const powerBtnText = document.getElementById('powerBtnText');
-  const overlayStartBtn = document.getElementById('overlayStartBtn');
-  const canvasOverlay = document.getElementById('canvasOverlay');
   const statusOrb = document.getElementById('statusOrb');
 
   const telemetryState = document.getElementById('telemetryState');
@@ -213,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
       powerBtn.setAttribute('aria-pressed', 'true');
       powerBtnText.textContent = 'ENGINE ACTIVE (MUTE)';
       statusOrb.classList.add('live');
-      canvasOverlay.classList.add('hidden');
       updateTargetStateBadge();
     } else {
       engine.stop();
@@ -227,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   powerBtn.addEventListener('click', toggleAudio);
-  overlayStartBtn.addEventListener('click', toggleAudio);
 
   // Background fallback interval when Android locks screen or switches tabs
   let bgTickInterval = null;
