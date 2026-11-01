@@ -1075,95 +1075,48 @@ class ConsciousnessAudioEngine {
 
     const bus = binBus; // backward compatibility handle
 
-    // 1. Strictly Isolated Binaural Beat Carrier Pair (baseFreq +/- theta/2)
-    // with Harmonically-Aligned Polyphonic Overtones (2f, 3f) for Rich Physical Body on all devices
+    // 1. Strictly Isolated Pure Binaural Beat Sine Carrier Pair (baseFreq +/- theta/2)
+    // Left ear receives strictly carrier - theta/2 at constant amplitude.
+    // Right ear receives strictly carrier + theta/2 at constant amplitude.
+    // Zero harmonics, zero cross-talk, zero monaural amplitude modulation!
+    // In one ear alone: a steady, motionless, pure sine tone (no beating, no rhythm).
+    // In both ears: the brain's superior olivary complex creates the phantom binaural beat at delta f = theta!
     const carrierFreq = this.params.pac.baseFreq || 136.0;
     const halfTheta = (this.params.pac.theta || 6.0) / 2;
     const fL = Math.max(20, carrierFreq - halfTheta);
     const fR = Math.max(20, carrierFreq + halfTheta);
 
-    // Left Ear: Fundamental + Harmonically-Aligned Overtones
     const binOscL = this.ctx.createOscillator();
-    const binHarm2L = this.ctx.createOscillator();
-    const binHarm3L = this.ctx.createOscillator();
-    const binGainL1 = this.ctx.createGain();
-    const binGainL2 = this.ctx.createGain();
-    const binGainL3 = this.ctx.createGain();
-
-    // Right Ear: Fundamental + Harmonically-Aligned Overtones
     const binOscR = this.ctx.createOscillator();
-    const binHarm2R = this.ctx.createOscillator();
-    const binHarm3R = this.ctx.createOscillator();
-    const binGainR1 = this.ctx.createGain();
-    const binGainR2 = this.ctx.createGain();
-    const binGainR3 = this.ctx.createGain();
 
     binOscL.type = 'sine';
-    binHarm2L.type = 'sine';
-    binHarm3L.type = 'sine';
-
     binOscR.type = 'sine';
-    binHarm2R.type = 'sine';
-    binHarm3R.type = 'sine';
 
     binOscL.frequency.value = fL;
-    binHarm2L.frequency.value = fL * 2.0;
-    binHarm3L.frequency.value = fL * 3.0;
-
     binOscR.frequency.value = fR;
-    binHarm2R.frequency.value = fR * 2.0;
-    binHarm3R.frequency.value = fR * 3.0;
-
-    binGainL1.gain.value = 0.85;
-    binGainL2.gain.value = 0.22;
-    binGainL3.gain.value = 0.09;
-
-    binGainR1.gain.value = 0.85;
-    binGainR2.gain.value = 0.22;
-    binGainR3.gain.value = 0.09;
 
     const binPanL = this.ctx.createStereoPanner();
     const binPanR = this.ctx.createStereoPanner();
     const binGain = this.ctx.createGain();
 
-    // Hard stereo panning: Left = -1.0, Right = +1.0 (strict interaural phase isolation)
+    // Absolute hard stereo panning: Left = -1.0, Right = +1.0 (strict interaural phase isolation)
     binPanL.pan.value = -1;
     binPanR.pan.value = 1;
     binGain.gain.value = 0.70;
 
-    // Route left oscillators strictly to Left Panner
-    binOscL.connect(binGainL1);
-    binHarm2L.connect(binGainL2);
-    binHarm3L.connect(binGainL3);
-    binGainL1.connect(binPanL);
-    binGainL2.connect(binPanL);
-    binGainL3.connect(binPanL);
-
-    // Route right oscillators strictly to Right Panner
-    binOscR.connect(binGainR1);
-    binHarm2R.connect(binGainR2);
-    binHarm3R.connect(binGainR3);
-    binGainR1.connect(binPanR);
-    binGainR2.connect(binPanR);
-    binGainR3.connect(binPanR);
-
-    const binFilter = this.ctx.createBiquadFilter();
-    binFilter.type = 'lowpass';
-    binFilter.frequency.value = carrierFreq * 4.5;
-    binFilter.Q.value = 0.8;
-
-    // Panners feed the binaural gain & filter directly into the 100% dry bus
+    // Route Left oscillator directly to Left Panner
+    binOscL.connect(binPanL);
     binPanL.connect(binGain);
+
+    // Route Right oscillator directly to Right Panner
+    binOscR.connect(binPanR);
     binPanR.connect(binGain);
-    binGain.connect(binFilter);
-    binFilter.connect(binBus);
+
+    // Feed directly into the dedicated dry bus (100% dry, ZERO reverb crosstalk)
+    binGain.connect(binBus);
 
     binOscL.start();
-    binHarm2L.start();
-    binHarm3L.start();
     binOscR.start();
-    binHarm2R.start();
-    binHarm3R.start();
 
     // 2. Harmonic Shimmer Carriers for Nested Gamma PAC Bursts (2x, 3x, 4x of Base Carrier)
     const pacCarrier1 = this.ctx.createOscillator();
@@ -1238,11 +1191,6 @@ class ConsciousnessAudioEngine {
       pacBus,
       binOscL,
       binOscR,
-      binHarm2L,
-      binHarm2R,
-      binHarm3L,
-      binHarm3R,
-      binFilter,
       binGain,
       pacCarrier1,
       pacCarrier2,
@@ -1689,14 +1637,14 @@ class ConsciousnessAudioEngine {
           ? 0.0
           : pacDepth * thetaPeakGate * 0.90 * breathAmp;
 
-        // Slow Phase Rhythm Entrainment Pulse:
-        // Always provides a clear, hypnotic, rhythmic pulsation at fTheta (1.5 - 12 Hz)
-        // whether listening on phone, laptop, or headphones!
-        const rhythmPulseDepth = 0.35 + 0.25 * (1.0 - pacDepth); // 60% modulation when PAC=0%, 35% when PAC=100%
-        const slowRhythmMod = (1.0 - rhythmPulseDepth) + rhythmPulseDepth * Math.pow(thetaWave, 1.4);
-
+        // Pure Binaural Beat Carrier:
+        // Strictly CONSTANT AMPLITUDE in Left ear and Right ear! Zero artificial amplitude modulation!
+        // Left ear receives strictly carrier - theta/2 at constant volume.
+        // Right ear receives strictly carrier + theta/2 at constant volume.
+        // If you listen to ONE ear alone, you hear ONLY a steady, unvarying pure sine tone.
+        // The low-frequency beating rhythm is generated SOLELY by the brain when BOTH ears are engaged!
         const binBreathMod = (1.0 - breathDepth * 0.20) + breathDepth * 0.30 * Math.pow(breathNorm, 1.2);
-        const binTarget = 0.70 * slowRhythmMod * binBreathMod;
+        const binTarget = 0.70 * binBreathMod;
 
         const pacTc = isBg ? 0.050 : 0.015;
         const binTc = isBg ? 0.060 : 0.022;
@@ -1950,12 +1898,7 @@ class ConsciousnessAudioEngine {
         const fR = Math.max(20, c + half);
         this.nodes.pac.carrierFreq = c;
         this.nodes.pac.binOscL.frequency.setTargetAtTime(fL, now, 0.05);
-        this.nodes.pac.binHarm2L.frequency.setTargetAtTime(fL * 2.0, now, 0.05);
-        this.nodes.pac.binHarm3L.frequency.setTargetAtTime(fL * 3.0, now, 0.05);
-
         this.nodes.pac.binOscR.frequency.setTargetAtTime(fR, now, 0.05);
-        this.nodes.pac.binHarm2R.frequency.setTargetAtTime(fR * 2.0, now, 0.05);
-        this.nodes.pac.binHarm3R.frequency.setTargetAtTime(fR * 3.0, now, 0.05);
 
         this.nodes.pac.pacCarrier1.frequency.setTargetAtTime(c * 2.0, now, 0.05);
         this.nodes.pac.pacCarrier2.frequency.setTargetAtTime(c * 3.0, now, 0.05);
