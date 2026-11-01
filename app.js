@@ -209,8 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let bgAudioBlobUrl = null;
   function getSilentWavUrl() {
     if (!bgAudioBlobUrl) {
-      const durationSec = 10;
-      const sampleRate = 8000;
+      const durationSec = 20;
+      const sampleRate = 44100;
       const numSamples = durationSec * sampleRate;
       const dataSize = numSamples * 2;
       const buffer = new ArrayBuffer(44 + dataSize);
