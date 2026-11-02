@@ -300,7 +300,7 @@
               </label>
             </div>
           </div>
-          <p class="module-subtitle">Audio-rate Gamma bursts (25–75 Hz) gated by Theta peaks + binaural beat carrier &amp; 10s vagal breath bloom.</p>
+          <p class="module-subtitle">Multi-harmonic binaural carrier with phase-locked overtones + silk crystalline shimmer gated by Theta peaks &amp; 10s vagal breath.</p>
 
           <div class="control-list">
             <div class="control-row">
@@ -312,20 +312,24 @@
               <input type="range" id="pacBaseFreq" min="40" max="432" step="1" value="136" />
             </div>
             <div class="control-row">
+              <div class="control-label"><span>Binaural Harmonics (Rich Drone)</span><span class="mono-val" id="pacHarmonicsVal">45% (Warm Tone)</span></div>
+              <input type="range" id="pacHarmonics" min="0" max="1" step="0.01" value="0.45" />
+            </div>
+            <div class="control-row">
               <div class="control-label"><span>Slow Phase Rhythm (δ / θ / α)</span><span class="mono-val" id="pacThetaVal">6.0 Hz (Theta)</span></div>
               <input type="range" id="pacTheta" min="1.5" max="12.0" step="0.1" value="6.0" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Nested Gamma Burst Freq</span><span class="mono-val" id="pacGammaVal">40 Hz</span></div>
+              <div class="control-label"><span>Silk Gamma Flutter Rate (γ)</span><span class="mono-val" id="pacGammaVal">40 Hz</span></div>
               <input type="range" id="pacGamma" min="25" max="75" step="1" value="40" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>PAC Coupling Index (θ-Peak Gate)</span><span class="mono-val" id="pacDepthVal">75%</span></div>
-              <input type="range" id="pacDepth" min="0" max="1" step="0.01" value="0.75" />
+              <div class="control-label"><span>PAC Silk Shimmer (θ-Peak Bloom)</span><span class="mono-val" id="pacDepthVal">70%</span></div>
+              <input type="range" id="pacDepth" min="0" max="1" step="0.01" value="0.70" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>0.1 Hz Coherent Breath Swell (10s)</span><span class="mono-val" id="pacBreathVal">60%</span></div>
-              <input type="range" id="pacBreath" min="0" max="1" step="0.01" value="0.60" />
+              <div class="control-label"><span>0.1 Hz Coherent Breath Swell (10s)</span><span class="mono-val" id="pacBreathVal">65%</span></div>
+              <input type="range" id="pacBreath" min="0" max="1" step="0.01" value="0.65" />
             </div>
           </div>
         </article>
@@ -448,7 +452,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=3.3"></script>
-  <script src="app.js?v=3.3"></script>
+  <script src="audio-engine.js?v=3.4"></script>
+  <script src="app.js?v=3.4"></script>
 </body>
 </html>

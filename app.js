@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'octaves'
       },
       chaos: { enabled: true, gain: 0.25, r: 3.68, rate: 2.0, morph: 0.75 },
-      pac: { enabled: true, gain: 0.40, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
+      pac: { enabled: true, gain: 0.40, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.60, center: 220 },
       sub: { enabled: true, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
       ganzfeld: { enabled: true, gain: 0.24, color: 0.65, sweep: 0.60 }
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'quartal'
       },
       chaos: { enabled: true, gain: 0.75, r: 3.76, rate: 4.8, morph: 0.85 },
-      pac: { enabled: true, gain: 0.40, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
+      pac: { enabled: true, gain: 0.40, harmonics: 0.35, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
       fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
       sub: { enabled: false, gain: 0.30, freq: 36.0, pulse: 1.5, warmth: 0.35 },
       ganzfeld: { enabled: true, gain: 0.42, color: 0.52, sweep: 0.72 }
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'just'
       },
       chaos: { enabled: false, gain: 0.25, r: 3.62, rate: 1.8, morph: 0.50 },
-      pac: { enabled: true, gain: 0.82, theta: 6.0, gamma: 40, depth: 0.92, breath: 0.80 },
+      pac: { enabled: true, gain: 0.82, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.92, breath: 0.80 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.50, center: 216 },
       sub: { enabled: true, gain: 0.52, freq: 32.0, pulse: 1.5, warmth: 0.50 },
       ganzfeld: { enabled: true, gain: 0.25, color: 0.70, sweep: 0.45 }
@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'overtone'
       },
       chaos: { enabled: true, gain: 0.35, r: 3.69, rate: 2.4, morph: 0.60 },
-      pac: { enabled: false, gain: 0.40, theta: 6.5, gamma: 40, depth: 0.60, breath: 0.65 },
+      pac: { enabled: false, gain: 0.40, harmonics: 0.40, theta: 6.5, gamma: 40, depth: 0.60, breath: 0.65 },
       fractal: { enabled: true, gain: 0.72, speed: 0.07, depth: 0.85, center: 216 },
       sub: { enabled: true, gain: 0.42, freq: 36.0, pulse: 0.8, warmth: 0.45 },
       ganzfeld: { enabled: true, gain: 0.22, color: 0.58, sweep: 0.50 }
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'octaves'
       },
       chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.5, morph: 0.40 },
-      pac: { enabled: true, gain: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
+      pac: { enabled: true, gain: 0.55, harmonics: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
       fractal: { enabled: false, gain: 0.20, speed: -0.04, depth: 0.40, center: 144 },
       sub: { enabled: true, gain: 0.82, freq: 30.0, pulse: 1.65, warmth: 0.68 },
       ganzfeld: { enabled: true, gain: 0.35, color: 0.82, sweep: 0.65 }
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'quartal'
       },
       chaos: { enabled: true, gain: 0.28, r: 3.71, rate: 1.6, morph: 0.80 },
-      pac: { enabled: true, gain: 0.48, theta: 5.0, gamma: 40, depth: 0.65, breath: 0.75 },
+      pac: { enabled: true, gain: 0.48, harmonics: 0.30, theta: 5.0, gamma: 40, depth: 0.65, breath: 0.75 },
       fractal: { enabled: true, gain: 0.38, speed: -0.03, depth: 0.70, center: 180 },
       sub: { enabled: true, gain: 0.45, freq: 28.0, pulse: 0.9, warmth: 0.35 },
       ganzfeld: { enabled: true, gain: 0.78, color: 0.68, sweep: 0.85 }
@@ -726,6 +726,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const tag = v < 65 ? 'Sub-Bass' : v < 115 ? 'Deep Bass' : v < 185 ? 'Low-Mid' : 'Mid';
     return `${Math.round(v)} Hz (${tag})`;
   });
+  bindSlider('pacHarmonics', 'pac', 'harmonics', (v) => {
+    const hTag = v < 0.15 ? 'Pure Sine' : v < 0.55 ? 'Warm Tone' : 'Rich Choral';
+    return `${Math.round(v * 100)}% (${hTag})`;
+  });
   bindSlider('pacTheta', 'pac', 'theta', (v) => {
     const band = v < 4 ? 'Delta' : v < 8 ? 'Theta' : 'Alpha';
     return `${v.toFixed(1)} Hz (${band})`;
@@ -853,6 +857,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p.pac.baseFreq !== undefined) {
         const bTag = p.pac.baseFreq < 90 ? 'Sub' : p.pac.baseFreq < 180 ? 'Low' : 'Mid';
         syncControl('pacBaseFreq', p.pac.baseFreq, `${Math.round(p.pac.baseFreq)} Hz (${bTag})`);
+      }
+      if (p.pac.harmonics !== undefined) {
+        const hTag = p.pac.harmonics < 0.15 ? 'Pure Sine' : p.pac.harmonics < 0.55 ? 'Warm Tone' : 'Rich Choral';
+        syncControl('pacHarmonics', p.pac.harmonics, `${Math.round(p.pac.harmonics * 100)}% (${hTag})`);
       }
       syncControl('pacTheta', p.pac.theta, `${p.pac.theta.toFixed(1)} Hz (${band})`);
       syncControl('pacGamma', p.pac.gamma, `${Math.round(p.pac.gamma)} Hz`);
@@ -1248,9 +1256,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const normX = i / plotWidth; // 0.35 seconds window
       const t = tSec + normX * 0.35;
       const thetaWave = Math.cos(t * fTheta * Math.PI * 2);
-      const gate = Math.pow(Math.max(0, thetaWave), 2.4);
-      const gammaPulse = Math.pow(Math.max(0, (Math.cos(t * fGamma * Math.PI * 2) + 1) * 0.5), 3.2) * 2 - 1;
-      const gammaBurst = gammaPulse * gate * pacDepth;
+      const gate = Math.pow(Math.max(0, thetaWave), 2.2);
+      const gammaFlutter = Math.sin(t * fGamma * Math.PI * 2) * 0.55;
+      const gammaBurst = gammaFlutter * gate * pacDepth;
 
       const y = cy - (thetaWave * 0.52 + gammaBurst * 0.48) * amp;
       if (i === 0) ctx2d.moveTo(plotLeft + i, y);
@@ -1277,8 +1285,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Telemetry label on PAC plot
     ctx2d.font = '11px "JetBrains Mono", monospace';
     ctx2d.fillStyle = 'rgba(226, 232, 240, 0.85)';
+    const harmPct = Math.round((engine.params.pac.harmonics !== undefined ? engine.params.pac.harmonics : 0.45) * 100);
     ctx2d.fillText(
-      `Carrier: ${Math.round(baseFreq)}Hz (±${(fTheta / 2).toFixed(1)}Hz L/R) | γ-Burst: ${Math.round(fGamma)}Hz | PAC Gate: ${Math.round(pacDepth * 100)}% | Breath: ${Math.round(breathAmp * 100)}%`,
+      `Carrier: ${Math.round(baseFreq)}Hz (${harmPct}% Harmonics) | Slow Rhythm: ${(fTheta).toFixed(1)}Hz | Silk PAC: ${Math.round(pacDepth * 100)}% | Breath: ${Math.round(breathNorm * 100)}%`,
       plotLeft,
       h - 14
     );

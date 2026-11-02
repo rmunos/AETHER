@@ -58,10 +58,11 @@ class ConsciousnessAudioEngine {
         enabled: true,
         gain: 0.55,
         baseFreq: 136.0,        // 55..432 Hz selectable base carrier frequency
+        harmonics: 0.45,        // 0 = pure fundamental sine, 1 = rich singing bowl / tanpura drone
         theta: 6.0,
         gamma: 40.0,
-        depth: 0.75,
-        breath: 0.60
+        depth: 0.70,
+        breath: 0.65
       },
       fractal: {
         enabled: false,
@@ -1059,7 +1060,7 @@ class ConsciousnessAudioEngine {
 
   /**
    * MODULE 3: Cross-Frequency Phase-Amplitude Coupled (PAC) Audio
-   * Selectable Base Carrier + True Audio-Rate Gamma Bursts (25-75 Hz) gated by Theta Peaks + 0.1 Hz Breath Bloom
+   * Multi-Harmonic Binaural Carrier Drone + Ethereal Silk Shimmer (25-75 Hz) gated by Theta Peaks + 0.1 Hz Vagal Breath
    */
   _setupPACModule() {
     // Dedicated dry bus for binaural beats (100% dry, ZERO reverb cross-talk between Left and Right)
@@ -1067,7 +1068,7 @@ class ConsciousnessAudioEngine {
     binBus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.65 : 0;
     binBus.connect(this.dryBus);
 
-    // Reverb-send bus for the ambient PAC Gamma bursts only
+    // Reverb-send bus for the ambient PAC Silk Shimmer only
     const pacBus = this.ctx.createGain();
     pacBus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.45 : 0;
     pacBus.connect(this.dryBus);
@@ -1075,99 +1076,122 @@ class ConsciousnessAudioEngine {
 
     const bus = binBus; // backward compatibility handle
 
-    // 1. Strictly Isolated Pure Binaural Beat Sine Carrier Pair (baseFreq +/- theta/2)
-    // Left ear receives strictly carrier - theta/2 at constant amplitude.
-    // Right ear receives strictly carrier + theta/2 at constant amplitude.
-    // Zero harmonics, zero cross-talk, zero monaural amplitude modulation!
-    // In one ear alone: a steady, motionless, pure sine tone (no beating, no rhythm).
-    // In both ears: the brain's superior olivary complex creates the phantom binaural beat at delta f = theta!
+    // 1. Multi-Harmonic Binaural Carrier Pairs (1x Fundamental, 2x Octave, 3x Perfect 5th, 4x Double Octave)
+    // Left ear receives strictly (k*carrier - theta/2) at constant amplitude.
+    // Right ear receives strictly (k*carrier + theta/2) at constant amplitude.
+    // Zero monaural amplitude modulation: the distance between harmonics in a SINGLE ear is carrierFreq (e.g. 136 Hz, pure pitch).
+    // In one ear alone: a steady, motionless, rich harmonic drone (zero beating, zero rhythm).
+    // In both ears: every harmonic pair beats at the exact same phase delta f = theta!
     const carrierFreq = this.params.pac.baseFreq || 136.0;
     const halfTheta = (this.params.pac.theta || 6.0) / 2;
-    const fL = Math.max(20, carrierFreq - halfTheta);
-    const fR = Math.max(20, carrierFreq + halfTheta);
+    const harmonicsAmt = this.params.pac.harmonics !== undefined ? this.params.pac.harmonics : 0.45;
 
-    const binOscL = this.ctx.createOscillator();
-    const binOscR = this.ctx.createOscillator();
+    const harmRatios = [1.0, 2.0, 3.0, 4.0];
+    const harmBaseGains = [0.65, 0.32, 0.18, 0.09]; // 1/k natural acoustic overtone series
 
-    binOscL.type = 'sine';
-    binOscR.type = 'sine';
+    const binOscsL = [];
+    const binOscsR = [];
+    const binGainsL = [];
+    const binGainsR = [];
 
-    binOscL.frequency.value = fL;
-    binOscR.frequency.value = fR;
-
+    const binPrePanL = this.ctx.createGain();
+    const binPrePanR = this.ctx.createGain();
     const binPanL = this.ctx.createStereoPanner();
     const binPanR = this.ctx.createStereoPanner();
-    const binGain = this.ctx.createGain();
-
-    // Absolute hard stereo panning: Left = -1.0, Right = +1.0 (strict interaural phase isolation)
     binPanL.pan.value = -1;
     binPanR.pan.value = 1;
+
+    for (let k = 0; k < harmRatios.length; k++) {
+      const r = harmRatios[k];
+      const oscL = this.ctx.createOscillator();
+      const oscR = this.ctx.createOscillator();
+      oscL.type = 'sine';
+      oscR.type = 'sine';
+
+      const fL = Math.max(20, carrierFreq * r - halfTheta);
+      const fR = Math.max(20, carrierFreq * r + halfTheta);
+      oscL.frequency.value = fL;
+      oscR.frequency.value = fR;
+
+      const gL = this.ctx.createGain();
+      const gR = this.ctx.createGain();
+      const hScale = k === 0 ? 1.0 : harmonicsAmt;
+      const initialGain = harmBaseGains[k] * hScale;
+      gL.gain.value = initialGain;
+      gR.gain.value = initialGain;
+
+      oscL.connect(gL);
+      oscR.connect(gR);
+      gL.connect(binPrePanL);
+      gR.connect(binPrePanR);
+
+      oscL.start();
+      oscR.start();
+
+      binOscsL.push(oscL);
+      binOscsR.push(oscR);
+      binGainsL.push(gL);
+      binGainsR.push(gR);
+    }
+
+    binPrePanL.connect(binPanL);
+    binPrePanR.connect(binPanR);
+
+    // Warm breath filter for the binaural harmonic bus
+    const binFilter = this.ctx.createBiquadFilter();
+    binFilter.type = 'lowpass';
+    binFilter.frequency.value = Math.min(6500, carrierFreq * 5.0);
+    binFilter.Q.value = 0.9;
+
+    const binGain = this.ctx.createGain();
     binGain.gain.value = 0.70;
 
-    // Route Left oscillator directly to Left Panner
-    binOscL.connect(binPanL);
-    binPanL.connect(binGain);
-
-    // Route Right oscillator directly to Right Panner
-    binOscR.connect(binPanR);
-    binPanR.connect(binGain);
-
-    // Feed directly into the dedicated dry bus (100% dry, ZERO reverb crosstalk)
+    binPanL.connect(binFilter);
+    binPanR.connect(binFilter);
+    binFilter.connect(binGain);
     binGain.connect(binBus);
 
-    binOscL.start();
-    binOscR.start();
-
-    // 2. Harmonic Shimmer Carriers for Nested Gamma PAC Bursts (2x, 3x, 4x of Base Carrier)
+    // 2. PAC Silk Crystalline Shimmer (Nested onto Theta peaks)
+    // Instead of a harsh buzzing WaveShaper, we use lush golden-ratio celestial partials
+    // with smooth sinusoidal 40Hz micro-flutter for an ethereal, silky neural shimmer.
     const pacCarrier1 = this.ctx.createOscillator();
     const pacCarrier2 = this.ctx.createOscillator();
     const pacCarrier3 = this.ctx.createOscillator();
-    const c1Gain = this.ctx.createGain();
-    const c2Gain = this.ctx.createGain();
-    const c3Gain = this.ctx.createGain();
-    const pacFilter = this.ctx.createBiquadFilter();
-
-    // Audio-rate Gamma Pulse Gate (modulated at 48kHz sample rate by gammaOsc + gammaShaper!)
-    const gammaPulseNode = this.ctx.createGain();
-    // Theta-peak & Breath envelope gate
-    const pacModGain = this.ctx.createGain();
-
     pacCarrier1.type = 'sine';
     pacCarrier2.type = 'triangle';
     pacCarrier3.type = 'sine';
     pacCarrier1.frequency.value = carrierFreq * 2.0;
-    pacCarrier2.frequency.value = carrierFreq * 3.0;
-    pacCarrier3.frequency.value = carrierFreq * 4.0;
+    pacCarrier2.frequency.value = carrierFreq * 3.236; // golden-ratio overtone
+    pacCarrier3.frequency.value = carrierFreq * 5.0;
 
-    c1Gain.gain.value = 0.48;
-    c2Gain.gain.value = 0.34;
-    c3Gain.gain.value = 0.22;
+    const c1Gain = this.ctx.createGain();
+    const c2Gain = this.ctx.createGain();
+    const c3Gain = this.ctx.createGain();
+    c1Gain.gain.value = 0.38;
+    c2Gain.gain.value = 0.24;
+    c3Gain.gain.value = 0.14;
 
-    pacFilter.type = 'lowpass';
-    pacFilter.frequency.value = Math.min(8000, carrierFreq * 6.0);
-    pacFilter.Q.value = 2.4;
+    const pacFilter = this.ctx.createBiquadFilter();
+    pacFilter.type = 'bandpass';
+    pacFilter.frequency.value = Math.min(5000, carrierFreq * 3.5);
+    pacFilter.Q.value = 1.6;
 
-    // 3. True Audio-Rate Gamma Oscillator (25..75 Hz) + Raised-Cosine Pulse WaveShaper
+    // Smooth sinusoidal Gamma flutter (silky micro-flutter at 25-75 Hz, zero harsh buzz)
     const gammaOsc = this.ctx.createOscillator();
     gammaOsc.type = 'sine';
     gammaOsc.frequency.value = this.params.pac.gamma || 40.0;
 
-    const gammaShaper = this.ctx.createWaveShaper();
-    const curveLen = 2048;
-    const pulseCurve = new Float32Array(curveLen);
-    for (let i = 0; i < curveLen; i++) {
-      const x = (i / (curveLen - 1)) * 2 - 1; // -1 .. +1
-      // Sharp raised pulse: 0 in the negative half-cycle, crisp peak of 1.0 at crest
-      pulseCurve[i] = Math.pow(Math.max(0, (x + 1) * 0.5), 3.2);
-    }
-    gammaShaper.curve = pulseCurve;
+    const gammaDepthNode = this.ctx.createGain();
+    gammaDepthNode.gain.value = 0.32; // gentle, musical 32% modulation depth
 
-    // Base gain is 0 so audio-rate gammaShaper (0..1) directly multiplies the carrier at 25-75 Hz!
-    gammaPulseNode.gain.value = 0.0;
-    gammaOsc.connect(gammaShaper);
-    gammaShaper.connect(gammaPulseNode.gain);
+    const gammaPulseNode = this.ctx.createGain();
+    gammaPulseNode.gain.value = 0.68; // base level
 
-    pacModGain.gain.value = 0.35;
+    gammaOsc.connect(gammaDepthNode);
+    gammaDepthNode.connect(gammaPulseNode.gain);
+
+    const pacModGain = this.ctx.createGain();
+    pacModGain.gain.value = 0.0; // gated by Theta peaks
 
     pacCarrier1.connect(c1Gain);
     pacCarrier2.connect(c2Gain);
@@ -1175,7 +1199,6 @@ class ConsciousnessAudioEngine {
     c1Gain.connect(pacFilter);
     c2Gain.connect(pacFilter);
     c3Gain.connect(pacFilter);
-
     pacFilter.connect(gammaPulseNode);
     gammaPulseNode.connect(pacModGain);
     pacModGain.connect(pacBus);
@@ -1189,8 +1212,13 @@ class ConsciousnessAudioEngine {
       bus,
       binBus,
       pacBus,
-      binOscL,
-      binOscR,
+      binOscsL,
+      binOscsR,
+      binOscL: binOscsL[0],
+      binOscR: binOscsR[0],
+      binGainsL,
+      binGainsR,
+      binFilter,
       binGain,
       pacCarrier1,
       pacCarrier2,
@@ -1623,28 +1651,24 @@ class ConsciousnessAudioEngine {
 
         // 0.1 Hz Coherent Breath Swell (10-second cycle: 5s Inhale ▲, 5s Exhale ▼)
         const breathNorm = 0.5 + 0.5 * this.telemetry.breathValue; // 0 = Exhale trough, 1 = Inhale peak
-        const breathAmp = (1.0 - breathDepth * 0.70) + breathDepth * 1.10 * Math.pow(breathNorm, 1.3);
+        const breathAmp = (1.0 - breathDepth * 0.40) + breathDepth * 0.60 * Math.pow(breathNorm, 1.2);
 
-        // Harmonic Filter Bloom synchronized with the 10-second breath
-        const pacCutoff = Math.min(9500, baseFreq * (2.8 + breathNorm * 6.0));
-        const binCutoff = Math.min(5500, baseFreq * (2.2 + breathNorm * 3.5));
+        // Vagal Filter Bloom: On Inhale, opens up to reveal rich glowing harmonics; on Exhale, warms down into deep grounding bass
+        const pacCutoff = Math.min(8500, baseFreq * (2.2 + breathNorm * (2.0 + breathDepth * 4.0)));
+        const binCutoff = Math.min(6500, baseFreq * (1.4 + breathNorm * (1.2 + breathDepth * 3.5)));
 
         this.nodes.pac.pacFilter.frequency.setTargetAtTime(pacCutoff, now, isBg ? 0.08 : 0.03);
         this.nodes.pac.binFilter.frequency.setTargetAtTime(binCutoff, now, isBg ? 0.08 : 0.03);
 
-        // PAC Coupling Index (0% = pure binaural wave, no Gamma bursts; 100% = intense Theta-peak-locked Gamma bursts)
+        // PAC Silk Shimmer Gate: Ethereal golden-ratio celestial shimmer gated onto Theta crests
         const gammaBurstTarget = pacDepth <= 0.005
           ? 0.0
-          : pacDepth * thetaPeakGate * 0.90 * breathAmp;
+          : pacDepth * thetaPeakGate * 0.75 * breathAmp;
 
-        // Pure Binaural Beat Carrier:
-        // Strictly CONSTANT AMPLITUDE in Left ear and Right ear! Zero artificial amplitude modulation!
-        // Left ear receives strictly carrier - theta/2 at constant volume.
-        // Right ear receives strictly carrier + theta/2 at constant volume.
-        // If you listen to ONE ear alone, you hear ONLY a steady, unvarying pure sine tone.
-        // The low-frequency beating rhythm is generated SOLELY by the brain when BOTH ears are engaged!
-        const binBreathMod = (1.0 - breathDepth * 0.20) + breathDepth * 0.30 * Math.pow(breathNorm, 1.2);
-        const binTarget = 0.70 * binBreathMod;
+        // Multi-Harmonic Binaural Carrier Breath Swell:
+        // Slow 10-second gentle tidal breath swell (zero fast monaural AM pulsation)
+        const binBreathMod = (1.0 - breathDepth * 0.25) + breathDepth * 0.35 * breathNorm;
+        const binTarget = 0.68 * binBreathMod;
 
         const pacTc = isBg ? 0.050 : 0.015;
         const binTc = isBg ? 0.060 : 0.022;
@@ -1894,17 +1918,36 @@ class ConsciousnessAudioEngine {
       if (key === 'baseFreq' || key === 'theta') {
         const c = this.params.pac.baseFreq || 136.0;
         const half = (this.params.pac.theta || 6.0) / 2;
-        const fL = Math.max(20, c - half);
-        const fR = Math.max(20, c + half);
+        const harmRatios = [1.0, 2.0, 3.0, 4.0];
         this.nodes.pac.carrierFreq = c;
-        this.nodes.pac.binOscL.frequency.setTargetAtTime(fL, now, 0.05);
-        this.nodes.pac.binOscR.frequency.setTargetAtTime(fR, now, 0.05);
-
-        this.nodes.pac.pacCarrier1.frequency.setTargetAtTime(c * 2.0, now, 0.05);
-        this.nodes.pac.pacCarrier2.frequency.setTargetAtTime(c * 3.0, now, 0.05);
-        this.nodes.pac.pacCarrier3.frequency.setTargetAtTime(c * 4.0, now, 0.05);
+        if (this.nodes.pac.binOscsL) {
+          for (let k = 0; k < harmRatios.length; k++) {
+            const r = harmRatios[k];
+            const fL = Math.max(20, c * r - half);
+            const fR = Math.max(20, c * r + half);
+            this.nodes.pac.binOscsL[k].frequency.setTargetAtTime(fL, now, 0.05);
+            this.nodes.pac.binOscsR[k].frequency.setTargetAtTime(fR, now, 0.05);
+          }
+        }
+        if (this.nodes.pac.pacCarrier1) {
+          this.nodes.pac.pacCarrier1.frequency.setTargetAtTime(c * 2.0, now, 0.05);
+          this.nodes.pac.pacCarrier2.frequency.setTargetAtTime(c * 3.236, now, 0.05);
+          this.nodes.pac.pacCarrier3.frequency.setTargetAtTime(c * 5.0, now, 0.05);
+        }
+      } else if (key === 'harmonics') {
+        const hAmt = Math.max(0, Math.min(1, val));
+        const harmBaseGains = [0.65, 0.32, 0.18, 0.09];
+        if (this.nodes.pac.binGainsL) {
+          for (let k = 1; k < this.nodes.pac.binGainsL.length; k++) {
+            const g = harmBaseGains[k] * hAmt;
+            this.nodes.pac.binGainsL[k].gain.setTargetAtTime(g, now, 0.04);
+            this.nodes.pac.binGainsR[k].gain.setTargetAtTime(g, now, 0.04);
+          }
+        }
       } else if (key === 'gamma') {
-        this.nodes.pac.gammaOsc.frequency.setTargetAtTime(val, now, 0.015);
+        if (this.nodes.pac.gammaOsc) {
+          this.nodes.pac.gammaOsc.frequency.setTargetAtTime(val, now, 0.015);
+        }
       }
     } else if (mod === 'fractal') {
       const targetBus = this.params.fractal.enabled ? this.params.fractal.gain * 0.42 : 0;
