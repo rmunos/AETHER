@@ -1065,7 +1065,7 @@ class ConsciousnessAudioEngine {
   _setupPACModule() {
     // Dedicated dry bus for binaural beats (100% dry, ZERO reverb cross-talk between Left and Right)
     const binBus = this.ctx.createGain();
-    binBus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.65 : 0;
+    binBus.gain.value = this.params.pac.enabled ? this.params.pac.gain * 0.88 : 0;
     binBus.connect(this.dryBus);
 
     // Reverb-send bus for the ambient PAC Silk Shimmer only
@@ -1087,19 +1087,15 @@ class ConsciousnessAudioEngine {
     const harmonicsAmt = this.params.pac.harmonics !== undefined ? this.params.pac.harmonics : 0.45;
 
     const harmRatios = [1.0, 2.0, 3.0, 4.0];
-    const harmBaseGains = [0.65, 0.32, 0.18, 0.09]; // 1/k natural acoustic overtone series
+    const harmBaseGains = [1.0, 0.42, 0.22, 0.10]; // Fundamental is 1.0 (loud, crystal-clear carrier)
 
     const binOscsL = [];
     const binOscsR = [];
     const binGainsL = [];
     const binGainsR = [];
 
-    const binPrePanL = this.ctx.createGain();
-    const binPrePanR = this.ctx.createGain();
-    const binPanL = this.ctx.createStereoPanner();
-    const binPanR = this.ctx.createStereoPanner();
-    binPanL.pan.value = -1;
-    binPanR.pan.value = 1;
+    const binBusL = this.ctx.createGain();
+    const binBusR = this.ctx.createGain();
 
     for (let k = 0; k < harmRatios.length; k++) {
       const r = harmRatios[k];
@@ -1122,8 +1118,8 @@ class ConsciousnessAudioEngine {
 
       oscL.connect(gL);
       oscR.connect(gR);
-      gL.connect(binPrePanL);
-      gR.connect(binPrePanR);
+      gL.connect(binBusL);
+      gR.connect(binBusR);
 
       oscL.start();
       oscR.start();
@@ -1134,21 +1130,30 @@ class ConsciousnessAudioEngine {
       binGainsR.push(gR);
     }
 
-    binPrePanL.connect(binPanL);
-    binPrePanR.connect(binPanR);
+    // Warm independent filters for left and right channels to shape overtones without stereo bleed
+    const binFilterL = this.ctx.createBiquadFilter();
+    const binFilterR = this.ctx.createBiquadFilter();
+    binFilterL.type = 'lowpass';
+    binFilterR.type = 'lowpass';
+    binFilterL.frequency.value = Math.min(8000, carrierFreq * 6.0);
+    binFilterR.frequency.value = Math.min(8000, carrierFreq * 6.0);
+    binFilterL.Q.value = 0.7;
+    binFilterR.Q.value = 0.7;
 
-    // Warm breath filter for the binaural harmonic bus
-    const binFilter = this.ctx.createBiquadFilter();
-    binFilter.type = 'lowpass';
-    binFilter.frequency.value = Math.min(6500, carrierFreq * 5.0);
-    binFilter.Q.value = 0.9;
+    binBusL.connect(binFilterL);
+    binBusR.connect(binFilterR);
+
+    // ChannelMergerNode ensures absolute 100.00% physical stereo channel separation:
+    // Left ear receives strictly Channel 0 with 0.000% leakage into Channel 1.
+    // Right ear receives strictly Channel 1 with 0.000% leakage into Channel 0.
+    const binMerger = this.ctx.createChannelMerger(2);
+    binFilterL.connect(binMerger, 0, 0); // Strictly Left
+    binFilterR.connect(binMerger, 0, 1); // Strictly Right
 
     const binGain = this.ctx.createGain();
-    binGain.gain.value = 0.70;
+    binGain.gain.value = 0.85;
 
-    binPanL.connect(binFilter);
-    binPanR.connect(binFilter);
-    binFilter.connect(binGain);
+    binMerger.connect(binGain);
     binGain.connect(binBus);
 
     // 2. PAC Silk Crystalline Shimmer (Nested onto Theta peaks)
@@ -1218,7 +1223,9 @@ class ConsciousnessAudioEngine {
       binOscR: binOscsR[0],
       binGainsL,
       binGainsR,
-      binFilter,
+      binFilter: binFilterL,
+      binFilterL,
+      binFilterR,
       binGain,
       pacCarrier1,
       pacCarrier2,
@@ -1655,10 +1662,15 @@ class ConsciousnessAudioEngine {
 
         // Vagal Filter Bloom: On Inhale, opens up to reveal rich glowing harmonics; on Exhale, warms down into deep grounding bass
         const pacCutoff = Math.min(8500, baseFreq * (2.2 + breathNorm * (2.0 + breathDepth * 4.0)));
-        const binCutoff = Math.min(6500, baseFreq * (1.4 + breathNorm * (1.2 + breathDepth * 3.5)));
+        const binCutoff = Math.min(8000, baseFreq * (3.0 + breathNorm * (2.0 + breathDepth * 4.0)));
 
         this.nodes.pac.pacFilter.frequency.setTargetAtTime(pacCutoff, now, isBg ? 0.08 : 0.03);
-        this.nodes.pac.binFilter.frequency.setTargetAtTime(binCutoff, now, isBg ? 0.08 : 0.03);
+        if (this.nodes.pac.binFilterL) {
+          this.nodes.pac.binFilterL.frequency.setTargetAtTime(binCutoff, now, isBg ? 0.08 : 0.03);
+          this.nodes.pac.binFilterR.frequency.setTargetAtTime(binCutoff, now, isBg ? 0.08 : 0.03);
+        } else if (this.nodes.pac.binFilter) {
+          this.nodes.pac.binFilter.frequency.setTargetAtTime(binCutoff, now, isBg ? 0.08 : 0.03);
+        }
 
         // PAC Silk Shimmer Gate: Ethereal golden-ratio celestial shimmer gated onto Theta crests
         const gammaBurstTarget = pacDepth <= 0.005
@@ -1667,8 +1679,8 @@ class ConsciousnessAudioEngine {
 
         // Multi-Harmonic Binaural Carrier Breath Swell:
         // Slow 10-second gentle tidal breath swell (zero fast monaural AM pulsation)
-        const binBreathMod = (1.0 - breathDepth * 0.25) + breathDepth * 0.35 * breathNorm;
-        const binTarget = 0.68 * binBreathMod;
+        const binBreathMod = (1.0 - breathDepth * 0.15) + breathDepth * 0.20 * breathNorm;
+        const binTarget = 0.85 * binBreathMod;
 
         const pacTc = isBg ? 0.050 : 0.015;
         const binTc = isBg ? 0.060 : 0.022;
@@ -1904,7 +1916,7 @@ class ConsciousnessAudioEngine {
       const targetBus = this.params.chaos.enabled ? this.params.chaos.gain * 0.45 : 0;
       this.nodes.chaos.bus.gain.setTargetAtTime(targetBus, now, 0.05);
     } else if (mod === 'pac') {
-      const targetBinBus = this.params.pac.enabled ? this.params.pac.gain * 0.65 : 0;
+      const targetBinBus = this.params.pac.enabled ? this.params.pac.gain * 0.88 : 0;
       const targetPacBus = this.params.pac.enabled ? this.params.pac.gain * 0.45 : 0;
       if (this.nodes.pac.binBus) {
         this.nodes.pac.binBus.gain.setTargetAtTime(targetBinBus, now, 0.05);
@@ -1936,7 +1948,7 @@ class ConsciousnessAudioEngine {
         }
       } else if (key === 'harmonics') {
         const hAmt = Math.max(0, Math.min(1, val));
-        const harmBaseGains = [0.65, 0.32, 0.18, 0.09];
+        const harmBaseGains = [1.0, 0.42, 0.22, 0.10];
         if (this.nodes.pac.binGainsL) {
           for (let k = 1; k < this.nodes.pac.binGainsL.length; k++) {
             const g = harmBaseGains[k] * hAmt;
