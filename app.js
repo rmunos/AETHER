@@ -54,7 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.40, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.60, center: 220 },
       sub: { enabled: true, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
-      ganzfeld: { enabled: true, gain: 0.24, color: 0.65, sweep: 0.60 }
+      ganzfeld: { enabled: true, gain: 0.24, color: 0.65, sweep: 0.60 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
     },
     dmnQuieting: {
       name: 'DMN SUPPRESSION',
@@ -78,7 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.40, harmonics: 0.35, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
       fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
       sub: { enabled: false, gain: 0.30, freq: 36.0, pulse: 1.5, warmth: 0.35 },
-      ganzfeld: { enabled: true, gain: 0.42, color: 0.52, sweep: 0.72 }
+      ganzfeld: { enabled: true, gain: 0.42, color: 0.52, sweep: 0.72 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
     },
     lucidHypnagogia: {
       name: 'LUCID θ–γ PAC',
@@ -102,7 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.82, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.92, breath: 0.80 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.50, center: 216 },
       sub: { enabled: true, gain: 0.52, freq: 32.0, pulse: 1.5, warmth: 0.50 },
-      ganzfeld: { enabled: true, gain: 0.25, color: 0.70, sweep: 0.45 }
+      ganzfeld: { enabled: true, gain: 0.25, color: 0.70, sweep: 0.45 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
     },
     timelessFractal: {
       name: 'FRACTAL HORIZON',
@@ -126,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: false, gain: 0.40, harmonics: 0.40, theta: 6.5, gamma: 40, depth: 0.60, breath: 0.65 },
       fractal: { enabled: true, gain: 0.72, speed: 0.07, depth: 0.85, center: 216 },
       sub: { enabled: true, gain: 0.42, freq: 36.0, pulse: 0.8, warmth: 0.45 },
-      ganzfeld: { enabled: true, gain: 0.22, color: 0.58, sweep: 0.50 }
+      ganzfeld: { enabled: true, gain: 0.22, color: 0.58, sweep: 0.50 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
     },
     somaticVagal: {
       name: 'SOMATIC INFRASOUND',
@@ -150,7 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.55, harmonics: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
       fractal: { enabled: false, gain: 0.20, speed: -0.04, depth: 0.40, center: 144 },
       sub: { enabled: true, gain: 0.82, freq: 30.0, pulse: 1.65, warmth: 0.68 },
-      ganzfeld: { enabled: true, gain: 0.35, color: 0.82, sweep: 0.65 }
+      ganzfeld: { enabled: true, gain: 0.35, color: 0.82, sweep: 0.65 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
     },
     auditoryGanzfeld: {
       name: 'GANZFELD SONIC VOID',
@@ -174,7 +179,58 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.48, harmonics: 0.30, theta: 5.0, gamma: 40, depth: 0.65, breath: 0.75 },
       fractal: { enabled: true, gain: 0.38, speed: -0.03, depth: 0.70, center: 180 },
       sub: { enabled: true, gain: 0.45, freq: 28.0, pulse: 0.9, warmth: 0.35 },
-      ganzfeld: { enabled: true, gain: 0.78, color: 0.68, sweep: 0.85 }
+      ganzfeld: { enabled: true, gain: 0.78, color: 0.68, sweep: 0.85 },
+      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+    },
+    shamanicTrance: {
+      name: 'SHAMANIC THETA FLIGHT',
+      mechTitle: 'Neuro-Mechanism: 4.5 Hz Auditory Steady-State Entrainment & Overtone Trance',
+      mechText:
+        'A steady 4.5 Hz skin-frame drum driving thalamocortical theta synchronization paired with Tuvan/Tibetan overtone singing at the 110 Hz ancient megalithic chamber resonance induces hypnagogic dream-journey states and deep contemplative absorption.',
+      reverbMix: 0.52,
+      spatial: {
+        enabled: true,
+        trajectory: 'circle',
+        count: 2,
+        baseFreq: 55,
+        gain: 0.45,
+        speed: 0.10,
+        pulse: 0.0,
+        collapse: 0.0,
+        asymmetry: 0.70,
+        tuning: 'just'
+      },
+      chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.40 },
+      pac: { enabled: true, gain: 0.60, harmonics: 0.40, theta: 4.5, gamma: 40, depth: 0.55, breath: 0.70 },
+      fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
+      sub: { enabled: true, gain: 0.65, freq: 32.0, pulse: 1.125, warmth: 0.55 },
+      ganzfeld: { enabled: false, gain: 0.25, color: 0.70, sweep: 0.50 },
+      asmr: { enabled: true, gain: 0.75, palette: 'shamanic', proximity: 0.35, rate: 4.5, resonance: 0.70 }
+    },
+    somaticTingles: {
+      name: 'PERIPERSONAL ASMR TINGLES',
+      mechTitle: 'Neuro-Mechanism: Somatosensory De-Gating & Oxytocinergic Vagal Cascade',
+      mechText:
+        'Micro-tactile silk brushing, hollow bamboo taps, and intimate whispered vocal formants orbiting within 5–15 cm of the ear pinna activate the insular cortex and superior temporal sulcus, triggering immediate scalp-to-spine ASMR paresthesia.',
+      reverbMix: 0.28,
+      spatial: {
+        enabled: true,
+        trajectory: 'spiral',
+        count: 2,
+        baseFreq: 96,
+        gain: 0.35,
+        speed: 0.08,
+        pulse: 0.0,
+        collapse: 0.0,
+        asymmetry: 0.85,
+        tuning: 'golden'
+      },
+      chaos: { enabled: true, gain: 0.22, r: 3.60, rate: 1.2, morph: 0.45 },
+      pac: { enabled: true, gain: 0.40, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.45, breath: 0.85 },
+      fractal: { enabled: false, gain: 0.20, speed: 0.03, depth: 0.40, center: 216 },
+      sub: { enabled: true, gain: 0.35, freq: 36.0, pulse: 0.8, warmth: 0.40 },
+      ganzfeld: { enabled: true, gain: 0.20, color: 0.60, sweep: 0.40 },
+      asmr: { enabled: true, gain: 0.85, palette: 'crackle', proximity: 0.15, rate: 4.0, resonance: 0.75 }
     }
   };
 
@@ -554,9 +610,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // UNIFIED SOLO ENGINE (All 6 Modules)
+  // UNIFIED SOLO ENGINE (All 7 Modules)
   // ==========================================
-  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
+  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld', 'asmr'];
   let currentSoloMod = null;
   let savedSoloState = null;
 
@@ -566,7 +622,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pac: { btn: document.getElementById('soloPacBtn'), label: 'PAC', tab: 'pac' },
     fractal: { btn: document.getElementById('soloFractalBtn'), label: 'FRACTAL', tab: 'chaos' },
     sub: { btn: document.getElementById('soloSubBtn'), label: 'SUB', tab: 'chaos' },
-    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' }
+    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' },
+    asmr: { btn: document.getElementById('soloAsmrBtn'), label: 'ASMR', tab: 'spatial' }
   };
 
   function setModuleActiveUIAndEngine(mod, enabled) {
@@ -758,6 +815,14 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSlider('ganzfeldColor', 'ganzfeld', 'color', (v) => `${Math.round(v * 100)}% Brown`);
   bindSlider('ganzfeldSweep', 'ganzfeld', 'sweep', (v) => `${Math.round(v * 100)}%`);
 
+  // Bind Module 7: ASMR & Ritual Trance
+  bindToggle('asmrEnabled', 'asmr');
+  bindSelect('asmrPalette', 'asmr', 'palette');
+  bindSlider('asmrGain', 'asmr', 'gain', (v) => `${Math.round(v * 100)}%`);
+  bindSlider('asmrProximity', 'asmr', 'proximity', (v) => `${v < 0.2 ? 'Intimate (5cm)' : v < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
+  bindSlider('asmrRate', 'asmr', 'rate', (v) => `${v.toFixed(1)} /s`);
+  bindSlider('asmrResonance', 'asmr', 'resonance', (v) => `${Math.round(v * 100)}%`);
+
   // Apply Preset or Saved Custom Configuration Object
   function applyConfigObject(p, startIfStopped = true) {
     if (!p) return;
@@ -896,6 +961,20 @@ document.addEventListener('DOMContentLoaded', () => {
       syncControl('ganzfeldColor', p.ganzfeld.color, `${Math.round(p.ganzfeld.color * 100)}% Brown`);
       syncControl('ganzfeldSweep', p.ganzfeld.sweep, `${Math.round(p.ganzfeld.sweep * 100)}%`);
       Object.entries(p.ganzfeld).forEach(([k, v]) => engine.updateModule('ganzfeld', k, v));
+    }
+
+    // 7. ASMR & Ritual Trance
+    if (p.asmr) {
+      syncToggle('asmrEnabled', 'asmr', p.asmr.enabled);
+      if (p.asmr.palette) {
+        const palInput = document.getElementById('asmrPalette');
+        if (palInput) palInput.value = p.asmr.palette;
+      }
+      syncControl('asmrGain', p.asmr.gain, `${Math.round(p.asmr.gain * 100)}%`);
+      syncControl('asmrProximity', p.asmr.proximity, `${p.asmr.proximity < 0.2 ? 'Intimate (5cm)' : p.asmr.proximity < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
+      syncControl('asmrRate', p.asmr.rate, `${p.asmr.rate.toFixed(1)} /s`);
+      syncControl('asmrResonance', p.asmr.resonance, `${Math.round(p.asmr.resonance * 100)}%`);
+      Object.entries(p.asmr).forEach(([k, v]) => engine.updateModule('asmr', k, v));
     }
 
     if (startIfStopped && !engine.isRunning) {

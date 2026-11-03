@@ -624,6 +624,7 @@ body {
 .tag-emerald { background: rgba(52, 211, 153, 0.14); color: var(--emerald); }
 .tag-rose { background: rgba(251, 113, 133, 0.14); color: var(--rose); }
 .tag-sky { background: rgba(96, 165, 250, 0.14); color: var(--sky); }
+.tag-fuchsia { background: rgba(232, 121, 249, 0.16); color: #f472b6; }
 
 .module-header h3 {
   font-size: 0.9rem;

@@ -128,6 +128,14 @@
               <span class="preset-title">6. Auditory Ganzfeld Void</span>
               <span class="preset-desc">Decorrelated 3D 1/f pink/brown cavern resonance for stochastic internal imagery</span>
             </button>
+            <button class="preset-btn" data-preset="shamanicTrance">
+              <span class="preset-title">7. Shamanic Theta Flight</span>
+              <span class="preset-desc">4.5 Hz theta skin drum &amp; seed rattle + Tuvan overtone whistling and 110 Hz megalith resonance</span>
+            </button>
+            <button class="preset-btn" data-preset="somaticTingles">
+              <span class="preset-title">8. Peripersonal ASMR Tingles</span>
+              <span class="preset-desc">Micro-tactile silk brushing &amp; bamboo taps orbiting centimeters from the pinna for somatic paresthesia</span>
+            </button>
           </div>
 
           <!-- Active Phenomenology Mechanism Note -->
@@ -445,6 +453,53 @@
           </div>
         </article>
 
+        <!-- MODULE 7: 3D Binaural ASMR & Shamanic Ritual Trance -->
+        <article class="module-card" data-module="asmr">
+          <div class="module-header">
+            <div>
+              <span class="module-tag tag-fuchsia">07 // PERIPERSONAL ASMR &amp; RITUAL TRANCE</span>
+              <h3>3D Binaural ASMR &amp; Ritual Trance</h3>
+            </div>
+            <div class="header-actions">
+              <button type="button" id="soloAsmrBtn" class="btn-solo" title="Mute all other modules to isolate 3D Binaural ASMR &amp; Ritual Trance">SOLO ASMR</button>
+              <label class="toggle-switch">
+                <input type="checkbox" id="asmrEnabled" />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <p class="module-subtitle">Micro-tactile binaural triggers, 4.5 Hz theta frame drum &amp; Tibetan overtone singing in near-field 3D space.</p>
+
+          <div class="control-list">
+            <div class="control-row">
+              <div class="control-label"><span>Acoustic Trigger Palette</span></div>
+              <select id="asmrPalette" class="select-input">
+                <option value="crackle" selected>Silk Brush &amp; Micro-Crackle Tingles (ASMR)</option>
+                <option value="whisper">Whispered Air &amp; Intimate Breath Halo (ASMR)</option>
+                <option value="tapping">Hollow Bamboo &amp; Wooden Taps (Binaural)</option>
+                <option value="shamanic">4.5 Hz Shamanic Trance Drum &amp; Seed Rattle</option>
+                <option value="throat">Tibetan Overtone Singing (110 Hz Megalith)</option>
+              </select>
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="asmrGainVal">50%</span></div>
+              <input type="range" id="asmrGain" min="0" max="1" step="0.01" value="0.50" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Spatial Proximity / Intimacy</span><span class="mono-val" id="asmrProximityVal">Intimate (5cm)</span></div>
+              <input type="range" id="asmrProximity" min="0.05" max="1.0" step="0.01" value="0.25" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Event Density / Cadence</span><span class="mono-val" id="asmrRateVal">3.5 /s</span></div>
+              <input type="range" id="asmrRate" min="0.5" max="8.0" step="0.1" value="3.5" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Tingle Resonance / Overtone Q</span><span class="mono-val" id="asmrResonanceVal">65%</span></div>
+              <input type="range" id="asmrResonance" min="0" max="1" step="0.01" value="0.65" />
+            </div>
+          </div>
+        </article>
+
       </section>
     </main>
   </div>
@@ -452,7 +507,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=3.5"></script>
-  <script src="app.js?v=3.5"></script>
+  <script src="audio-engine.js?v=3.6"></script>
+  <script src="app.js?v=3.6"></script>
 </body>
 </html>

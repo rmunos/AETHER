@@ -83,6 +83,14 @@ class ConsciousnessAudioEngine {
         gain: 0.30,
         color: 0.62,
         sweep: 0.55
+      },
+      asmr: {
+        enabled: false,
+        gain: 0.50,
+        palette: 'crackle',   // 'whisper' | 'crackle' | 'tapping' | 'shamanic' | 'throat'
+        proximity: 0.25,      // 0.05 (intimate 5cm) .. 1.0 (ambient room)
+        rate: 3.5,            // 0.5 .. 8.0 events/s
+        resonance: 0.65       // 0..1 filter Q / tingle brightness / overtone purity
       }
     };
 
@@ -229,13 +237,14 @@ class ConsciousnessAudioEngine {
       }
     }
 
-    // Build all 6 synthesis modules
+    // Build all 7 synthesis modules
     this._setupSpatialModule();
     this._setupChaosModule();
     this._setupPACModule();
     this._setupFractalModule();
     this._setupSubBassModule();
     this._setupGanzfeldModule();
+    this._setupASMRModule();
   }
 
   async start() {
@@ -1515,6 +1524,238 @@ class ConsciousnessAudioEngine {
   }
 
   /**
+   * MODULE 7: 3D Binaural ASMR & Shamanic Ritual Trance
+   * Intimate peripersonal micro-triggers (whisper, silk crackle, bamboo taps)
+   * + 4.5 Hz Shamanic Theta Drum & Tibetan Overtone Singing (110 Hz Megalith)
+   */
+  _setupASMRModule() {
+    const asmrBus = this.ctx.createGain();
+    asmrBus.gain.value = this.params.asmr.enabled ? this.params.asmr.gain * 0.60 : 0.0001;
+    asmrBus.connect(this.dryBus);
+
+    const asmrReverbSend = this.ctx.createGain();
+    asmrReverbSend.gain.value = 0.0;
+    asmrReverbSend.connect(this.reverbSendGain);
+
+    // Intimate Near-Field Stereo Panner (simulates sounds orbiting within 5-15 cm of the ear canal)
+    const asmrPanner = this.ctx.createStereoPanner();
+    asmrPanner.pan.value = 0.0;
+    asmrPanner.connect(asmrBus);
+    asmrPanner.connect(asmrReverbSend);
+
+    // 1. Whisper Engine: continuous pink noise through dual formant filters & air band
+    const rate = this.ctx.sampleRate;
+    const noiseLen = rate * 4;
+    const noiseBuf = this.ctx.createBuffer(1, noiseLen, rate);
+    const data = noiseBuf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < noiseLen; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
+      b6 = white * 0.115926;
+    }
+
+    const whisperSource = this.ctx.createBufferSource();
+    whisperSource.buffer = noiseBuf;
+    whisperSource.loop = true;
+
+    const whisperF1 = this.ctx.createBiquadFilter();
+    whisperF1.type = 'bandpass';
+    whisperF1.frequency.value = 850;
+    whisperF1.Q.value = 4.2;
+
+    const whisperF2 = this.ctx.createBiquadFilter();
+    whisperF2.type = 'bandpass';
+    whisperF2.frequency.value = 2400;
+    whisperF2.Q.value = 4.8;
+
+    const whisperAirFilter = this.ctx.createBiquadFilter();
+    whisperAirFilter.type = 'highpass';
+    whisperAirFilter.frequency.value = 5500;
+    whisperAirFilter.Q.value = 1.2;
+
+    const whisperGain = this.ctx.createGain();
+    whisperGain.gain.value = 0.0;
+
+    whisperSource.connect(whisperF1);
+    whisperSource.connect(whisperF2);
+    whisperSource.connect(whisperAirFilter);
+    whisperF1.connect(whisperGain);
+    whisperF2.connect(whisperGain);
+    whisperAirFilter.connect(whisperGain);
+    whisperGain.connect(asmrPanner);
+    whisperSource.start();
+
+    // 2. Throat Singing Drone & Resonant Overtone Filter
+    const throatDrone = this.ctx.createOscillator();
+    throatDrone.type = 'sawtooth';
+    throatDrone.frequency.value = 110.0; // 110 Hz Megalithic chamber resonance
+
+    const throatSub = this.ctx.createOscillator();
+    throatSub.type = 'triangle';
+    throatSub.frequency.value = 55.0; // Deep sub-harmonic
+
+    const throatFilter = this.ctx.createBiquadFilter();
+    throatFilter.type = 'bandpass';
+    throatFilter.frequency.value = 660; // Start at 6th harmonic (660 Hz)
+    throatFilter.Q.value = 42.0; // Razor-sharp Q isolates single whistling overtone!
+
+    const throatGain = this.ctx.createGain();
+    throatGain.gain.value = 0.0;
+
+    const throatSubGain = this.ctx.createGain();
+    throatSubGain.gain.value = 0.35;
+
+    throatDrone.connect(throatFilter);
+    throatDrone.connect(throatSubGain);
+    throatSub.connect(throatSubGain);
+    throatFilter.connect(throatGain);
+    throatSubGain.connect(throatGain);
+    throatGain.connect(asmrPanner);
+
+    throatDrone.start();
+    throatSub.start();
+
+    this.nodes.asmr = {
+      bus: asmrBus,
+      reverbSend: asmrReverbSend,
+      panner: asmrPanner,
+      whisperGain,
+      whisperAirFilter,
+      throatGain,
+      throatDrone,
+      throatFilter,
+      nextEventTime: 0,
+      nextDrumTime: 0,
+      throatHarmonicIndex: 0,
+      nextThroatStepTime: 0,
+      tapEar: false
+    };
+  }
+
+  _triggerShamanicHit(now, resonance) {
+    if (!this.ctx || !this.nodes.asmr) return;
+    const bus = this.nodes.asmr.panner;
+
+    // 1. Shamanic Skin-Frame Drum
+    const drumOsc = this.ctx.createOscillator();
+    const drumGain = this.ctx.createGain();
+    const drumFilter = this.ctx.createBiquadFilter();
+
+    drumOsc.type = 'sine';
+    drumOsc.frequency.setValueAtTime(68, now);
+    drumOsc.frequency.exponentialRampToValueAtTime(42, now + 0.12);
+
+    drumFilter.type = 'lowpass';
+    drumFilter.frequency.setValueAtTime(220 + resonance * 180, now);
+
+    drumGain.gain.setValueAtTime(0.85, now);
+    drumGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    drumOsc.connect(drumFilter);
+    drumFilter.connect(drumGain);
+    drumGain.connect(bus);
+
+    drumOsc.start(now);
+    drumOsc.stop(now + 0.20);
+
+    // 2. Off-beat Seed-Pod Rattle (crisp organic shaker burst)
+    const rattleDelay = 0.075 + (Math.random() - 0.5) * 0.015;
+    const rattleTime = now + rattleDelay;
+    const rattleBuf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.04), this.ctx.sampleRate);
+    const d = rattleBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.008));
+    }
+    const rattleSource = this.ctx.createBufferSource();
+    rattleSource.buffer = rattleBuf;
+
+    const rattleFilter = this.ctx.createBiquadFilter();
+    rattleFilter.type = 'highpass';
+    rattleFilter.frequency.value = 3500 + resonance * 2500;
+
+    const rattleGain = this.ctx.createGain();
+    rattleGain.gain.value = 0.24 + resonance * 0.16;
+
+    rattleSource.connect(rattleFilter);
+    rattleFilter.connect(rattleGain);
+    rattleGain.connect(bus);
+
+    rattleSource.start(rattleTime);
+    rattleSource.stop(rattleTime + 0.045);
+  }
+
+  _triggerASMRCrackle(now, resonance) {
+    if (!this.ctx || !this.nodes.asmr) return;
+    const bus = this.nodes.asmr.panner;
+
+    const count = 2 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < count; k++) {
+      const t = now + k * (0.005 + Math.random() * 0.012);
+      const len = Math.floor(this.ctx.sampleRate * 0.008);
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+      }
+
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 3800 + Math.random() * 4500 * resonance;
+      f.Q.value = 6.0;
+
+      const g = this.ctx.createGain();
+      g.gain.value = 0.35 + Math.random() * 0.35;
+
+      src.connect(f);
+      f.connect(g);
+      g.connect(bus);
+
+      src.start(t);
+      src.stop(t + 0.012);
+    }
+  }
+
+  _triggerASMRTapping(now, resonance) {
+    if (!this.ctx || !this.nodes.asmr) return;
+    const bus = this.nodes.asmr.panner;
+
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const f = this.ctx.createBiquadFilter();
+
+    const freqs = [720, 940, 1260, 1540];
+    const tapFreq = freqs[Math.floor(Math.random() * freqs.length)];
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(tapFreq * 1.5, now);
+    osc.frequency.exponentialRampToValueAtTime(tapFreq, now + 0.015);
+
+    f.type = 'bandpass';
+    f.frequency.value = tapFreq;
+    f.Q.value = 18 + resonance * 14;
+
+    g.gain.setValueAtTime(0.65, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+    osc.connect(f);
+    f.connect(g);
+    g.connect(bus);
+
+    osc.start(now);
+    osc.stop(now + 0.05);
+  }
+
+  /**
    * 60 Hz Real-Time Frame Update for Continuous Modulation, 3D HRTF Orbits & Chaos Scheduling
    */
   tick() {
@@ -1818,7 +2059,83 @@ class ConsciousnessAudioEngine {
       }
     }
 
-    // 8. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
+    // 8. Update MODULE 7: 3D Binaural ASMR & Shamanic Ritual Trance
+    if (this.nodes.asmr) {
+      if (!this.params.asmr.enabled) {
+        if (!this.nodes.asmr._isMuted) {
+          this.nodes.asmr.bus.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr._isMuted = true;
+        }
+      } else {
+        this.nodes.asmr._isMuted = false;
+        const targetBus = this.params.asmr.gain * 0.60;
+        this.nodes.asmr.bus.gain.setTargetAtTime(targetBus, now, 0.05);
+
+        const pal = this.params.asmr.palette;
+        const prox = this.params.asmr.proximity;
+        const res = this.params.asmr.resonance;
+
+        // Dynamic 3D Peripersonal Orbit: shifts from ear to ear at close proximity
+        const orbitSpeed = pal === 'whisper' ? 0.18 : 0.35;
+        const panVal = Math.sin(elapsed * orbitSpeed) * (1.0 - prox * 0.35);
+        this.nodes.asmr.panner.pan.setTargetAtTime(panVal, now, 0.06);
+
+        // Near-field sounds are intimately dry; reverb increases with distance
+        const revSendLevel = prox * 0.35 * this._reverbSendLevel(this.params.reverbMix);
+        this.nodes.asmr.reverbSend.gain.setTargetAtTime(revSendLevel, now, 0.08);
+
+        // Archetype-specific sound updates:
+        if (pal === 'whisper') {
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.04);
+          const breathNorm = 0.5 + 0.5 * this.telemetry.breathValue;
+          const wLvl = 0.35 + 0.65 * Math.pow(breathNorm, 1.3);
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(wLvl, now, 0.04);
+          const fAir = 4500 + res * 4500;
+          this.nodes.asmr.whisperAirFilter.frequency.setTargetAtTime(fAir, now, 0.05);
+        } else if (pal === 'throat') {
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0.75, now, 0.04);
+          // Overtone singing harmonic step scheduler
+          if (now >= this.nodes.asmr.nextThroatStepTime) {
+            const harmonics = [4, 5, 6, 7, 8, 9, 10, 12];
+            const baseDrone = 110.0;
+            const h = harmonics[this.nodes.asmr.throatHarmonicIndex % harmonics.length];
+            const overtoneFreq = baseDrone * h;
+            this.nodes.asmr.throatFilter.frequency.setTargetAtTime(overtoneFreq, now, 0.08);
+            this.nodes.asmr.throatFilter.Q.setTargetAtTime(32 + res * 36, now, 0.08);
+            this.nodes.asmr.throatHarmonicIndex = (this.nodes.asmr.throatHarmonicIndex + 1 + Math.floor(Math.random() * 2)) % harmonics.length;
+            this.nodes.asmr.nextThroatStepTime = now + (1.2 + Math.random() * 1.5);
+          }
+        } else if (pal === 'shamanic') {
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.04);
+          // 4.5 Hz Shamanic Drum Cadence (~270 BPM, Theta ASSR)
+          const drumPeriod = 1.0 / 4.5;
+          if (now >= this.nodes.asmr.nextDrumTime) {
+            this._triggerShamanicHit(now, res);
+            this.nodes.asmr.nextDrumTime = now + drumPeriod;
+          }
+        } else {
+          // 'crackle' or 'tapping'
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.04);
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.04);
+          if (now >= this.nodes.asmr.nextEventTime) {
+            if (pal === 'crackle') {
+              this._triggerASMRCrackle(now, res);
+            } else {
+              this._triggerASMRTapping(now, res);
+            }
+            const rate = Math.max(0.5, this.params.asmr.rate);
+            const dt = (1.0 / rate) * (0.6 + Math.random() * 0.8);
+            this.nodes.asmr.nextEventTime = now + dt;
+          }
+        }
+      }
+    }
+
+    // 9. Cathedral Shimmer: slowly breathing choir resonators in the reverb tail
     if (this.shimmerVoices && !isBg && this.params.reverbMix > 0.02) {
       this.shimmerVoices.forEach((v) => {
         const a = 0.5 + 0.5 * Math.sin(elapsed * v.rate * Math.PI * 2 + v.phase);
@@ -1853,7 +2170,8 @@ class ConsciousnessAudioEngine {
            !this.params.pac.enabled &&
            !this.params.fractal.enabled &&
            !this.params.sub.enabled &&
-           !this.params.ganzfeld.enabled;
+           !this.params.ganzfeld.enabled &&
+           !this.params.asmr.enabled;
   }
 
   updateModule(mod, key, val) {
@@ -1986,6 +2304,19 @@ class ConsciousnessAudioEngine {
         g.sweepGain.gain.setTargetAtTime(this._cavernWet(val), now, 0.1);
         const q = this._cavernQ(val);
         [g.cavernL1, g.cavernL2, g.cavernR1, g.cavernR2].forEach((f) => f.Q.setTargetAtTime(q, now, 0.1));
+      }
+    } else if (mod === 'asmr') {
+      const targetBus = this.params.asmr.enabled ? this.params.asmr.gain * 0.60 : 0;
+      if (this.nodes.asmr && this.nodes.asmr.bus) {
+        this.nodes.asmr.bus.gain.setTargetAtTime(targetBus, now, 0.05);
+      }
+      if (key === 'palette' && this.nodes.asmr) {
+        if (val !== 'whisper' && this.nodes.asmr.whisperGain) {
+          this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.03);
+        }
+        if (val !== 'throat' && this.nodes.asmr.throatGain) {
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.03);
+        }
       }
     }
   }
