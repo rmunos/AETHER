@@ -1086,17 +1086,19 @@ class ConsciousnessAudioEngine {
     const bus = binBus; // backward compatibility handle
 
     // 1. Multi-Harmonic Binaural Carrier Pairs (1x Fundamental, 2x Octave, 3x Perfect 5th, 4x Double Octave)
-    // Left ear receives strictly (k*carrier - theta/2) at constant amplitude.
-    // Right ear receives strictly (k*carrier + theta/2) at constant amplitude.
-    // Zero monaural amplitude modulation: the distance between harmonics in a SINGLE ear is carrierFreq (e.g. 136 Hz, pure pitch).
-    // In one ear alone: a steady, motionless, rich harmonic drone (zero beating, zero rhythm).
-    // In both ears: every harmonic pair beats at the exact same phase delta f = theta!
+    // Left ear receives a pure integer harmonic series of its own fundamental: fL_k = k * (carrier - theta/2).
+    // Right ear receives a pure integer harmonic series of its own fundamental: fR_k = k * (carrier + theta/2).
+    // Because every partial in the Left ear is an exact integer multiple of fL_0 (and likewise in Right for fR_0),
+    // listening to a single ear alone produces a 100% phase-locked, steady harmonic tone with ZERO monaural beating!
     const carrierFreq = this.params.pac.baseFreq || 136.0;
     const halfTheta = (this.params.pac.theta || 6.0) / 2;
     const harmonicsAmt = this.params.pac.harmonics !== undefined ? this.params.pac.harmonics : 0.45;
 
     const harmRatios = [1.0, 2.0, 3.0, 4.0];
     const harmBaseGains = [1.0, 0.42, 0.22, 0.10]; // Fundamental is 1.0 (loud, crystal-clear carrier)
+
+    const fL0 = Math.max(20, carrierFreq - halfTheta);
+    const fR0 = Math.max(20, carrierFreq + halfTheta);
 
     const binOscsL = [];
     const binOscsR = [];
@@ -1113,8 +1115,8 @@ class ConsciousnessAudioEngine {
       oscL.type = 'sine';
       oscR.type = 'sine';
 
-      const fL = Math.max(20, carrierFreq * r - halfTheta);
-      const fR = Math.max(20, carrierFreq * r + halfTheta);
+      const fL = fL0 * r;
+      const fR = fR0 * r;
       oscL.frequency.value = fL;
       oscR.frequency.value = fR;
 
@@ -1152,17 +1154,20 @@ class ConsciousnessAudioEngine {
     binBusL.connect(binFilterL);
     binBusR.connect(binFilterR);
 
-    // ChannelMergerNode ensures absolute 100.00% physical stereo channel separation:
-    // Left ear receives strictly Channel 0 with 0.000% leakage into Channel 1.
-    // Right ear receives strictly Channel 1 with 0.000% leakage into Channel 0.
-    const binMerger = this.ctx.createChannelMerger(2);
-    binFilterL.connect(binMerger, 0, 0); // Strictly Left
-    binFilterR.connect(binMerger, 0, 1); // Strictly Right
+    // Hard-panned StereoPannerNodes (-1.0 Left, +1.0 Right) guarantee 100% stereo channel isolation
+    // while outputting a true 2-channel stereo signal into binGain -> binBus -> dryBus.
+    const binPanL = this.ctx.createStereoPanner();
+    const binPanR = this.ctx.createStereoPanner();
+    binPanL.pan.value = -1.0; // Strictly 100% Left ear
+    binPanR.pan.value = 1.0;  // Strictly 100% Right ear
 
     const binGain = this.ctx.createGain();
     binGain.gain.value = 0.85;
 
-    binMerger.connect(binGain);
+    binFilterL.connect(binPanL);
+    binFilterR.connect(binPanR);
+    binPanL.connect(binGain);
+    binPanR.connect(binGain);
     binGain.connect(binBus);
 
     // 2. PAC Silk Crystalline Shimmer (Nested onto Theta peaks)
@@ -1312,13 +1317,14 @@ class ConsciousnessAudioEngine {
 
   /**
    * MODULE 5: Infrasound & Somatic Sub-Bass (Vestibular & Vagal)
-   * Pure low somatic tone (24-50 Hz) for bone & otolith resonance.
-   * 100% pure sine waves with steep 24 dB/oct dual low-pass filtering capped strictly at <= 85 Hz.
-   * Zero high frequencies, zero mid frequencies, zero distortion.
+  /**
+   * MODULE 5: Infrasound & Vestibular Sub-Bass
+   * Pure low somatic tone (24-50 Hz) + Missing-Fundamental Psychoacoustic Harmonics (2*f0, 3*f0)
+   * so the deep sub-bass pulse is both physically felt and clearly audible on all headphones & speakers.
    */
   _setupSubBassModule() {
     const bus = this.ctx.createGain();
-    bus.gain.value = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0.0001;
+    bus.gain.value = this.params.sub.enabled ? this.params.sub.gain * 0.65 : 0.0001;
     bus.connect(this.dryBus);
 
     const f0 = this.params.sub.freq;
@@ -1326,52 +1332,62 @@ class ConsciousnessAudioEngine {
 
     // Pure low-frequency sine oscillators:
     // 1. Fundamental f0 (24-45 Hz deep somatic/vestibular tone)
-    // 2. 2nd Harmonic 2*f0 (gentle octave low-bass reinforcement)
+    // 2. 2nd Harmonic 2*f0 (octave bass reinforcement, 48-90 Hz)
+    // 3. 3rd Harmonic 3*f0 (missing-fundamental warmth, 72-135 Hz, audible on all transducers)
     const subOsc1 = this.ctx.createOscillator();
     const subOsc2 = this.ctx.createOscillator();
+    const subOsc3 = this.ctx.createOscillator();
 
     subOsc1.type = 'sine';
     subOsc2.type = 'sine';
+    subOsc3.type = 'sine';
 
     subOsc1.frequency.value = f0;
     subOsc2.frequency.value = f0 * 2;
+    subOsc3.frequency.value = f0 * 3;
 
     const gain1 = this.ctx.createGain();
     const gain2 = this.ctx.createGain();
+    const gain3 = this.ctx.createGain();
 
     // Cascaded 2-pole lowpass filters (24 dB/octave attenuation)
-    // Strictly capped at <= 85 Hz to ensure ABSOLUTELY ZERO mid or high frequencies
+    // Passes the fundamental + 2nd & 3rd missing-fundamental harmonics smoothly while blocking any harshness
     const lp1 = this.ctx.createBiquadFilter();
     lp1.type = 'lowpass';
-    lp1.frequency.value = Math.min(85, f0 * 2.2);
+    lp1.frequency.value = Math.min(220, f0 * (3.2 + warmth * 2.5));
     lp1.Q.value = 0.707;
 
     const lp2 = this.ctx.createBiquadFilter();
     lp2.type = 'lowpass';
-    lp2.frequency.value = Math.min(85, f0 * 2.2);
+    lp2.frequency.value = Math.min(220, f0 * (3.2 + warmth * 2.5));
     lp2.Q.value = 0.707;
 
     const pulseGain = this.ctx.createGain();
-    pulseGain.gain.value = 0.8;
+    pulseGain.gain.value = 0.85;
 
     subOsc1.connect(gain1);
     subOsc2.connect(gain2);
+    subOsc3.connect(gain3);
 
     gain1.connect(lp1);
     gain2.connect(lp1);
+    gain3.connect(lp1);
     lp1.connect(lp2);
     lp2.connect(pulseGain);
     pulseGain.connect(bus);
 
     subOsc1.start();
     subOsc2.start();
+    subOsc3.start();
 
     this.nodes.sub = {
       bus,
       subOsc1,
       subOsc2,
+      subOsc3,
       gain1,
       gain2,
+      gain3,
       lp1,
       lp2,
       pulseGain
@@ -1380,7 +1396,7 @@ class ConsciousnessAudioEngine {
     this._updateSubWarmth(warmth);
   }
 
-  // Smooth, deep missing-fundamental warmth strictly confined to low frequencies (< 85 Hz)
+  // Smooth, deep missing-fundamental warmth audible on both subwoofers and standard headphones
   _updateSubWarmth(w) {
     if (!this.nodes.sub || !this.ctx) return;
     const now = this.ctx.currentTime;
@@ -1388,15 +1404,18 @@ class ConsciousnessAudioEngine {
     const f0 = this.params.sub.freq;
 
     // Fundamental remains solid low sub-bass
-    const g1 = 0.85 * (1.0 - w * 0.15);
-    // 2nd harmonic (octave) adds subtle warm body strictly in low bass (< 80 Hz)
-    const g2 = w * 0.22;
+    const g1 = 0.85;
+    // 2nd harmonic (octave, ~68 Hz) & 3rd harmonic (~102 Hz) reconstruct the missing fundamental in the cochlea
+    const g2 = 0.35 + w * 0.55;
+    const g3 = 0.15 + w * 0.45;
 
     n.gain1.gain.setTargetAtTime(g1, now, 0.05);
     n.gain2.gain.setTargetAtTime(g2, now, 0.05);
+    if (n.gain3) {
+      n.gain3.gain.setTargetAtTime(g3, now, 0.05);
+    }
 
-    // Cascaded filter strictly caps anything above 85 Hz
-    const cutoff = Math.min(85, f0 * (1.8 + w * 0.4));
+    const cutoff = Math.min(220, f0 * (3.2 + w * 2.5));
     n.lp1.frequency.setTargetAtTime(cutoff, now, 0.05);
     n.lp2.frequency.setTargetAtTime(cutoff, now, 0.05);
   }
@@ -1530,7 +1549,7 @@ class ConsciousnessAudioEngine {
    */
   _setupASMRModule() {
     const asmrBus = this.ctx.createGain();
-    asmrBus.gain.value = this.params.asmr.enabled ? this.params.asmr.gain * 0.60 : 0.0001;
+    asmrBus.gain.value = this.params.asmr.enabled ? this.params.asmr.gain * 0.85 : 0.0001;
     asmrBus.connect(this.dryBus);
 
     const asmrReverbSend = this.ctx.createGain();
@@ -1543,7 +1562,7 @@ class ConsciousnessAudioEngine {
     asmrPanner.connect(asmrBus);
     asmrPanner.connect(asmrReverbSend);
 
-    // 1. Whisper Engine: continuous pink noise through dual formant filters & air band
+    // 1. Whisper Engine: rich binaural breath noise through dual vocal formants & crisp sibilant air band
     const rate = this.ctx.sampleRate;
     const noiseLen = rate * 4;
     const noiseBuf = this.ctx.createBuffer(1, noiseLen, rate);
@@ -1557,7 +1576,7 @@ class ConsciousnessAudioEngine {
       b3 = 0.86650 * b3 + white * 0.3104856;
       b4 = 0.55000 * b4 + white * 0.5329522;
       b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.16;
       b6 = white * 0.115926;
     }
 
@@ -1567,17 +1586,17 @@ class ConsciousnessAudioEngine {
 
     const whisperF1 = this.ctx.createBiquadFilter();
     whisperF1.type = 'bandpass';
-    whisperF1.frequency.value = 850;
-    whisperF1.Q.value = 4.2;
+    whisperF1.frequency.value = 750;
+    whisperF1.Q.value = 2.0;
 
     const whisperF2 = this.ctx.createBiquadFilter();
     whisperF2.type = 'bandpass';
-    whisperF2.frequency.value = 2400;
-    whisperF2.Q.value = 4.8;
+    whisperF2.frequency.value = 2150;
+    whisperF2.Q.value = 2.4;
 
     const whisperAirFilter = this.ctx.createBiquadFilter();
-    whisperAirFilter.type = 'highpass';
-    whisperAirFilter.frequency.value = 5500;
+    whisperAirFilter.type = 'bandpass';
+    whisperAirFilter.frequency.value = 4800;
     whisperAirFilter.Q.value = 1.2;
 
     const whisperGain = this.ctx.createGain();
@@ -1592,45 +1611,76 @@ class ConsciousnessAudioEngine {
     whisperGain.connect(asmrPanner);
     whisperSource.start();
 
-    // 2. Throat Singing Drone & Resonant Overtone Filter
+    // 2. Throat Singing Drone & Resonant Overtone Whistle (110 Hz Megalithic Chamber Resonance)
     const throatDrone = this.ctx.createOscillator();
     throatDrone.type = 'sawtooth';
-    throatDrone.frequency.value = 110.0; // 110 Hz Megalithic chamber resonance
+    throatDrone.frequency.value = 110.0; // 110 Hz Megalithic chamber fundamental
 
     const throatSub = this.ctx.createOscillator();
     throatSub.type = 'triangle';
-    throatSub.frequency.value = 55.0; // Deep sub-harmonic
+    throatSub.frequency.value = 55.0; // Deep sub-octave chest resonance
 
+    // Warm low-pass on the chest drone so raw sawtooth buzz doesn't mask the overtone flute
+    const throatBodyLP = this.ctx.createBiquadFilter();
+    throatBodyLP.type = 'lowpass';
+    throatBodyLP.frequency.value = 240.0;
+    throatBodyLP.Q.value = 1.4;
+
+    const throatSubGain = this.ctx.createGain();
+    throatSubGain.gain.value = 0.42;
+
+    // Formant cavity filter + harmonic-locked pure whistle oscillator for crystal-clear Khöömei overtones
     const throatFilter = this.ctx.createBiquadFilter();
     throatFilter.type = 'bandpass';
     throatFilter.frequency.value = 660; // Start at 6th harmonic (660 Hz)
-    throatFilter.Q.value = 42.0; // Razor-sharp Q isolates single whistling overtone!
+    throatFilter.Q.value = 18.0;
+
+    const throatOvertoneGain = this.ctx.createGain();
+    throatOvertoneGain.gain.value = 3.5; // Compensates narrow bandpass insertion loss
+
+    const throatWhistleOsc = this.ctx.createOscillator();
+    throatWhistleOsc.type = 'sine';
+    throatWhistleOsc.frequency.value = 660;
+
+    const throatWhistleGain = this.ctx.createGain();
+    throatWhistleGain.gain.value = 0.22;
 
     const throatGain = this.ctx.createGain();
     throatGain.gain.value = 0.0;
 
-    const throatSubGain = this.ctx.createGain();
-    throatSubGain.gain.value = 0.35;
-
     throatDrone.connect(throatFilter);
-    throatDrone.connect(throatSubGain);
-    throatSub.connect(throatSubGain);
-    throatFilter.connect(throatGain);
+    throatFilter.connect(throatOvertoneGain);
+    throatOvertoneGain.connect(throatGain);
+
+    throatWhistleOsc.connect(throatWhistleGain);
+    throatWhistleGain.connect(throatGain);
+
+    throatDrone.connect(throatBodyLP);
+    throatSub.connect(throatBodyLP);
+    throatBodyLP.connect(throatSubGain);
     throatSubGain.connect(throatGain);
+
     throatGain.connect(asmrPanner);
 
     throatDrone.start();
     throatSub.start();
+    throatWhistleOsc.start();
 
     this.nodes.asmr = {
       bus: asmrBus,
       reverbSend: asmrReverbSend,
       panner: asmrPanner,
+      noiseBuf,
+      whisperF1,
+      whisperF2,
       whisperGain,
       whisperAirFilter,
       throatGain,
       throatDrone,
       throatFilter,
+      throatOvertoneGain,
+      throatWhistleOsc,
+      throatWhistleGain,
       nextEventTime: 0,
       nextDrumTime: 0,
       throatHarmonicIndex: 0,
@@ -1643,66 +1693,114 @@ class ConsciousnessAudioEngine {
     if (!this.ctx || !this.nodes.asmr) return;
     const bus = this.nodes.asmr.panner;
 
-    // 1. Shamanic Skin-Frame Drum
+    // 1. Shamanic Skin-Frame Drum (Fundamental + 2x Warm Drumhead Body so it is clearly audible on all speakers)
     const drumOsc = this.ctx.createOscillator();
+    const drumBodyOsc = this.ctx.createOscillator();
     const drumGain = this.ctx.createGain();
+    const drumBodyGain = this.ctx.createGain();
     const drumFilter = this.ctx.createBiquadFilter();
 
     drumOsc.type = 'sine';
-    drumOsc.frequency.setValueAtTime(68, now);
-    drumOsc.frequency.exponentialRampToValueAtTime(42, now + 0.12);
+    drumOsc.frequency.setValueAtTime(92, now);
+    drumOsc.frequency.exponentialRampToValueAtTime(46, now + 0.14);
+
+    drumBodyOsc.type = 'triangle';
+    drumBodyOsc.frequency.setValueAtTime(184, now);
+    drumBodyOsc.frequency.exponentialRampToValueAtTime(92, now + 0.11);
 
     drumFilter.type = 'lowpass';
-    drumFilter.frequency.setValueAtTime(220 + resonance * 180, now);
+    drumFilter.frequency.setValueAtTime(280 + resonance * 260, now);
 
-    drumGain.gain.setValueAtTime(0.85, now);
-    drumGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    drumGain.gain.setValueAtTime(0.95, now);
+    drumGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+
+    drumBodyGain.gain.setValueAtTime(0.45, now);
+    drumBodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
     drumOsc.connect(drumFilter);
+    drumBodyOsc.connect(drumBodyGain);
+    drumBodyGain.connect(drumFilter);
     drumFilter.connect(drumGain);
     drumGain.connect(bus);
 
     drumOsc.start(now);
+    drumBodyOsc.start(now);
     drumOsc.stop(now + 0.20);
+    drumBodyOsc.stop(now + 0.14);
 
     // 2. Off-beat Seed-Pod Rattle (crisp organic shaker burst)
-    const rattleDelay = 0.075 + (Math.random() - 0.5) * 0.015;
+    const rattleDelay = 0.08 + (Math.random() - 0.5) * 0.015;
     const rattleTime = now + rattleDelay;
-    const rattleBuf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.04), this.ctx.sampleRate);
+    const rattleBuf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.05), this.ctx.sampleRate);
     const d = rattleBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) {
-      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.008));
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.012));
     }
     const rattleSource = this.ctx.createBufferSource();
     rattleSource.buffer = rattleBuf;
 
     const rattleFilter = this.ctx.createBiquadFilter();
-    rattleFilter.type = 'highpass';
-    rattleFilter.frequency.value = 3500 + resonance * 2500;
+    rattleFilter.type = 'bandpass';
+    rattleFilter.frequency.value = 3200 + resonance * 2800;
+    rattleFilter.Q.value = 1.4;
 
     const rattleGain = this.ctx.createGain();
-    rattleGain.gain.value = 0.24 + resonance * 0.16;
+    rattleGain.gain.value = 0.45 + resonance * 0.30;
 
     rattleSource.connect(rattleFilter);
     rattleFilter.connect(rattleGain);
     rattleGain.connect(bus);
 
     rattleSource.start(rattleTime);
-    rattleSource.stop(rattleTime + 0.045);
+    rattleSource.stop(rattleTime + 0.055);
   }
 
   _triggerASMRCrackle(now, resonance) {
     if (!this.ctx || !this.nodes.asmr) return;
-    const bus = this.nodes.asmr.panner;
+    const bus = this.nodes.asmr.bus;
+    const prox = this.params.asmr.proximity;
 
-    const count = 2 + Math.floor(Math.random() * 3);
+    // 1. Soft Binaural Silk Brush Stroke (60-110 ms tactile noise grain panned close to Left or Right ear)
+    const earPan = (Math.random() < 0.5 ? -1 : 1) * (0.45 + Math.random() * 0.5) * (1.0 - prox * 0.35);
+    const grainPanner = this.ctx.createStereoPanner();
+    grainPanner.pan.value = earPan;
+    grainPanner.connect(bus);
+    grainPanner.connect(this.nodes.asmr.reverbSend);
+
+    const brushDur = 0.065 + Math.random() * 0.055;
+    const brushLen = Math.floor(this.ctx.sampleRate * brushDur);
+    const brushBuf = this.ctx.createBuffer(1, brushLen, this.ctx.sampleRate);
+    const bd = brushBuf.getChannelData(0);
+    for (let i = 0; i < brushLen; i++) {
+      const env = Math.sin((i / brushLen) * Math.PI);
+      bd[i] = (Math.random() * 2 - 1) * env;
+    }
+    const brushSrc = this.ctx.createBufferSource();
+    brushSrc.buffer = brushBuf;
+
+    const brushFilter = this.ctx.createBiquadFilter();
+    brushFilter.type = 'bandpass';
+    brushFilter.frequency.value = 1800 + resonance * 2600 + Math.random() * 900;
+    brushFilter.Q.value = 1.6;
+
+    const brushGain = this.ctx.createGain();
+    brushGain.gain.value = 0.32 + resonance * 0.25;
+
+    brushSrc.connect(brushFilter);
+    brushFilter.connect(brushGain);
+    brushGain.connect(grainPanner);
+    brushSrc.start(now);
+    brushSrc.stop(now + brushDur + 0.01);
+
+    // 2. Crisp Micro-Crackle Impulses (3 to 5 delicate close-mic pops)
+    const count = 3 + Math.floor(Math.random() * 3);
     for (let k = 0; k < count; k++) {
-      const t = now + k * (0.005 + Math.random() * 0.012);
-      const len = Math.floor(this.ctx.sampleRate * 0.008);
+      const t = now + k * (0.012 + Math.random() * 0.022);
+      const len = Math.floor(this.ctx.sampleRate * 0.012);
       const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) {
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.8);
       }
 
       const src = this.ctx.createBufferSource();
@@ -1710,49 +1808,72 @@ class ConsciousnessAudioEngine {
 
       const f = this.ctx.createBiquadFilter();
       f.type = 'bandpass';
-      f.frequency.value = 3800 + Math.random() * 4500 * resonance;
-      f.Q.value = 6.0;
+      f.frequency.value = 2400 + Math.random() * 3800 * (0.4 + resonance * 0.6);
+      f.Q.value = 2.0;
 
       const g = this.ctx.createGain();
-      g.gain.value = 0.35 + Math.random() * 0.35;
+      g.gain.value = 0.55 + Math.random() * 0.35;
 
       src.connect(f);
       f.connect(g);
-      g.connect(bus);
+      g.connect(grainPanner);
 
       src.start(t);
-      src.stop(t + 0.012);
+      src.stop(t + 0.015);
     }
   }
 
   _triggerASMRTapping(now, resonance) {
     if (!this.ctx || !this.nodes.asmr) return;
-    const bus = this.nodes.asmr.panner;
+    const bus = this.nodes.asmr.bus;
+    const prox = this.params.asmr.proximity;
 
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    const f = this.ctx.createBiquadFilter();
+    // Alternate or lightly randomize Left/Right ear for crisp 3D binaural hollow bamboo/wood tapping
+    this.nodes.asmr.tapEar = !this.nodes.asmr.tapEar;
+    const earSign = this.nodes.asmr.tapEar ? -1 : 1;
+    const tapPanner = this.ctx.createStereoPanner();
+    tapPanner.pan.value = earSign * (0.82 - prox * 0.35);
+    tapPanner.connect(bus);
+    tapPanner.connect(this.nodes.asmr.reverbSend);
 
-    const freqs = [720, 940, 1260, 1540];
-    const tapFreq = freqs[Math.floor(Math.random() * freqs.length)];
+    // Double-tap motif 35% of the time for natural organic finger-tapping cadence
+    const tapOffsets = Math.random() < 0.35 ? [0, 0.065 + Math.random() * 0.025] : [0];
+    const freqs = [480, 640, 820, 1080, 1320];
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(tapFreq * 1.5, now);
-    osc.frequency.exponentialRampToValueAtTime(tapFreq, now + 0.015);
+    tapOffsets.forEach((offset, idx) => {
+      const t0 = now + offset;
+      const vel = idx === 0 ? 1.0 : 0.68;
+      const tapFreq = freqs[Math.floor(Math.random() * freqs.length)] * (0.9 + resonance * 0.25);
 
-    f.type = 'bandpass';
-    f.frequency.value = tapFreq;
-    f.Q.value = 18 + resonance * 14;
+      // Mode 1: Hollow Bamboo Fundamental Resonator
+      const osc1 = this.ctx.createOscillator();
+      const g1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(tapFreq * 1.18, t0);
+      osc1.frequency.exponentialRampToValueAtTime(tapFreq, t0 + 0.012);
 
-    g.gain.setValueAtTime(0.65, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+      g1.gain.setValueAtTime(0.55 * vel, t0);
+      g1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.065);
 
-    osc.connect(f);
-    f.connect(g);
-    g.connect(bus);
+      osc1.connect(g1);
+      g1.connect(tapPanner);
+      osc1.start(t0);
+      osc1.stop(t0 + 0.07);
 
-    osc.start(now);
-    osc.stop(now + 0.05);
+      // Mode 2: Woody Inharmonic Cavity Mode (2.32x ratio)
+      const osc2 = this.ctx.createOscillator();
+      const g2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(tapFreq * 2.32, t0);
+
+      g2.gain.setValueAtTime(0.28 * vel * (0.5 + resonance * 0.5), t0);
+      g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.028);
+
+      osc2.connect(g2);
+      g2.connect(tapPanner);
+      osc2.start(t0);
+      osc2.stop(t0 + 0.032);
+    });
   }
 
   /**
@@ -2089,14 +2210,21 @@ class ConsciousnessAudioEngine {
         // Archetype-specific sound updates:
         if (pal === 'whisper') {
           this.nodes.asmr.throatGain.gain.setTargetAtTime(0, now, 0.04);
+          // Morph vowel formants slowly + syllabic cadence so it sounds like an intimate binaural whisper
+          const syllableMod = 0.55 + 0.45 * Math.sin(elapsed * 2.2) * Math.cos(elapsed * 3.7);
           const breathNorm = 0.5 + 0.5 * this.telemetry.breathValue;
-          const wLvl = 0.35 + 0.65 * Math.pow(breathNorm, 1.3);
+          const wLvl = (0.55 + 0.85 * Math.pow(breathNorm, 1.1)) * syllableMod;
           this.nodes.asmr.whisperGain.gain.setTargetAtTime(wLvl, now, 0.04);
-          const fAir = 4500 + res * 4500;
+          const [f1, f2] = this._vowelFormants(elapsed * 0.42);
+          if (this.nodes.asmr.whisperF1) {
+            this.nodes.asmr.whisperF1.frequency.setTargetAtTime(f1 * 1.25, now, 0.06);
+            this.nodes.asmr.whisperF2.frequency.setTargetAtTime(f2 * 1.15, now, 0.06);
+          }
+          const fAir = 3200 + res * 3800;
           this.nodes.asmr.whisperAirFilter.frequency.setTargetAtTime(fAir, now, 0.05);
         } else if (pal === 'throat') {
           this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.04);
-          this.nodes.asmr.throatGain.gain.setTargetAtTime(0.75, now, 0.04);
+          this.nodes.asmr.throatGain.gain.setTargetAtTime(0.85, now, 0.04);
           // Overtone singing harmonic step scheduler
           if (now >= this.nodes.asmr.nextThroatStepTime) {
             const harmonics = [4, 5, 6, 7, 8, 9, 10, 12];
@@ -2104,7 +2232,11 @@ class ConsciousnessAudioEngine {
             const h = harmonics[this.nodes.asmr.throatHarmonicIndex % harmonics.length];
             const overtoneFreq = baseDrone * h;
             this.nodes.asmr.throatFilter.frequency.setTargetAtTime(overtoneFreq, now, 0.08);
-            this.nodes.asmr.throatFilter.Q.setTargetAtTime(32 + res * 36, now, 0.08);
+            this.nodes.asmr.throatFilter.Q.setTargetAtTime(14 + res * 22, now, 0.08);
+            if (this.nodes.asmr.throatWhistleOsc) {
+              this.nodes.asmr.throatWhistleOsc.frequency.setTargetAtTime(overtoneFreq, now, 0.08);
+              this.nodes.asmr.throatWhistleGain.gain.setTargetAtTime(0.14 + res * 0.22, now, 0.08);
+            }
             this.nodes.asmr.throatHarmonicIndex = (this.nodes.asmr.throatHarmonicIndex + 1 + Math.floor(Math.random() * 2)) % harmonics.length;
             this.nodes.asmr.nextThroatStepTime = now + (1.2 + Math.random() * 1.5);
           }
@@ -2242,22 +2374,31 @@ class ConsciousnessAudioEngine {
       if (this.nodes.pac.pacBus) {
         this.nodes.pac.pacBus.gain.setTargetAtTime(targetPacBus, now, 0.05);
       }
+      if (this.params.pac.enabled && this.nodes.pac.binGain) {
+        this.nodes.pac.binGain.gain.setTargetAtTime(0.85, now, 0.04);
+      }
       if (this.nodes.pac.bus && this.nodes.pac.bus !== this.nodes.pac.binBus) {
         this.nodes.pac.bus.gain.setTargetAtTime(targetBinBus, now, 0.05);
       }
       if (key === 'baseFreq' || key === 'theta') {
         const c = this.params.pac.baseFreq || 136.0;
         const half = (this.params.pac.theta || 6.0) / 2;
+        const fL0 = Math.max(20, c - half);
+        const fR0 = Math.max(20, c + half);
         const harmRatios = [1.0, 2.0, 3.0, 4.0];
         this.nodes.pac.carrierFreq = c;
         if (this.nodes.pac.binOscsL) {
           for (let k = 0; k < harmRatios.length; k++) {
             const r = harmRatios[k];
-            const fL = Math.max(20, c * r - half);
-            const fR = Math.max(20, c * r + half);
+            const fL = fL0 * r;
+            const fR = fR0 * r;
             this.nodes.pac.binOscsL[k].frequency.setTargetAtTime(fL, now, 0.05);
             this.nodes.pac.binOscsR[k].frequency.setTargetAtTime(fR, now, 0.05);
           }
+        }
+        if (this.nodes.pac.binFilterL) {
+          this.nodes.pac.binFilterL.frequency.setTargetAtTime(Math.min(8000, c * 6.0), now, 0.05);
+          this.nodes.pac.binFilterR.frequency.setTargetAtTime(Math.min(8000, c * 6.0), now, 0.05);
         }
         if (this.nodes.pac.pacCarrier1) {
           this.nodes.pac.pacCarrier1.frequency.setTargetAtTime(c * 2.0, now, 0.05);
@@ -2283,12 +2424,18 @@ class ConsciousnessAudioEngine {
       const targetBus = this.params.fractal.enabled ? this.params.fractal.gain * 0.42 : 0;
       this.nodes.fractal.bus.gain.setTargetAtTime(targetBus, now, 0.05);
     } else if (mod === 'sub') {
-      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.45 : 0;
+      const targetBus = this.params.sub.enabled ? this.params.sub.gain * 0.65 : 0;
       this.nodes.sub.bus.gain.setTargetAtTime(targetBus, now, 0.05);
+      if (this.params.sub.enabled && this.nodes.sub.pulseGain) {
+        this.nodes.sub.pulseGain.gain.setTargetAtTime(0.85, now, 0.04);
+      }
       if (key === 'freq') {
         const f0 = val;
         this.nodes.sub.subOsc1.frequency.setTargetAtTime(f0, now, 0.08);
         this.nodes.sub.subOsc2.frequency.setTargetAtTime(f0 * 2, now, 0.08);
+        if (this.nodes.sub.subOsc3) {
+          this.nodes.sub.subOsc3.frequency.setTargetAtTime(f0 * 3, now, 0.08);
+        }
         this._updateSubWarmth(this.params.sub.warmth);
       } else if (key === 'warmth') {
         this._updateSubWarmth(val);
@@ -2306,11 +2453,14 @@ class ConsciousnessAudioEngine {
         [g.cavernL1, g.cavernL2, g.cavernR1, g.cavernR2].forEach((f) => f.Q.setTargetAtTime(q, now, 0.1));
       }
     } else if (mod === 'asmr') {
-      const targetBus = this.params.asmr.enabled ? this.params.asmr.gain * 0.60 : 0;
+      const targetBus = this.params.asmr.enabled ? this.params.asmr.gain * 0.85 : 0;
       if (this.nodes.asmr && this.nodes.asmr.bus) {
         this.nodes.asmr.bus.gain.setTargetAtTime(targetBus, now, 0.05);
       }
       if (key === 'palette' && this.nodes.asmr) {
+        this.nodes.asmr.nextEventTime = 0;
+        this.nodes.asmr.nextDrumTime = 0;
+        this.nodes.asmr.nextThroatStepTime = 0;
         if (val !== 'whisper' && this.nodes.asmr.whisperGain) {
           this.nodes.asmr.whisperGain.gain.setTargetAtTime(0, now, 0.03);
         }

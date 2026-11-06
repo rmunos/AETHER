@@ -558,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
     engine.setReverbMix(v);
   });
 
-  // Helper to bind slider & toggle controls
+  // Helper to bind slider, toggle & select controls
   function bindSlider(id, mod, key, formatter) {
     const el = document.getElementById(id);
     const valEl = document.getElementById(`${id}Val`);
@@ -566,6 +566,9 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', (e) => {
       const v = parseFloat(e.target.value);
       if (valEl) valEl.textContent = formatter(v);
+      if (engine.params[mod] && !engine.params[mod].enabled) {
+        setModuleActiveUIAndEngine(mod, true);
+      }
       engine.updateModule(mod, key, v);
       updateTargetStateBadge();
     });
@@ -581,6 +584,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (card) {
         card.classList.toggle('active-module', checked);
       }
+      updateTargetStateBadge();
+    });
+  }
+
+  function bindSelect(id, mod, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (engine.params[mod] && !engine.params[mod].enabled) {
+        setModuleActiveUIAndEngine(mod, true);
+      }
+      engine.updateModule(mod, key, val);
       updateTargetStateBadge();
     });
   }
@@ -1017,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const snapshot = {
         name: 'CUSTOM USER CONFIG',
         mechTitle: 'Custom Hand-Tuned Configuration',
-        mechText: 'Your personal saved configuration across all 6 psychoacoustic synthesis modules.',
+        mechText: 'Your personal saved configuration across all 7 psychoacoustic synthesis modules.',
         masterGain: engine.params.masterGain,
         reverbMix: engine.params.reverbMix,
         spatial: { ...engine.params.spatial, manualPos: null },
@@ -1025,7 +1041,8 @@ document.addEventListener('DOMContentLoaded', () => {
         pac: { ...engine.params.pac },
         fractal: { ...engine.params.fractal },
         sub: { ...engine.params.sub },
-        ganzfeld: { ...engine.params.ganzfeld }
+        ganzfeld: { ...engine.params.ganzfeld },
+        asmr: { ...engine.params.asmr }
       };
       try {
         localStorage.setItem(CUSTOM_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
