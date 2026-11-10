@@ -38,8 +38,8 @@ class ConsciousnessAudioEngine {
         baseFreq: 110,          // 36..320 Hz base fundamental pitch
         gain: 0.85,
         speed: 0.16,
-        pulse: 0.70,            // Continuous Moving Source Level (0 = Drops/Triggers Only, 1 = Full Continuous 8D Moving Source)
-        rate: 3.2,              // 0..10 events/s for 3D Water Drops & ASMR Triggers emitted from moving sources
+        pulse: 0.50,            // Drops <-> Moving Harmonic Pad Crossfader (0 = 100% Drops Only, 0.5 = Balanced Both, 1 = 100% Moving Harmonic Pad Only)
+        rate: 3.2,              // 0.2..10 events/s for 3D Water Drops & ASMR Triggers emitted from moving sources
         auricle: 0.90,          // 0..1 Ear Auricle (Pinna) Notch, Blauert Bands, Cranial Head-Shadow & ITD/ILD Depth
         elevation: 0.85,        // 0..1 3D Vertical Elevation Range (0 = Flat Horizontal, 1 = Full -75° Floor <-> +85° Zenith)
         collapse: 0.0,          // 0 = completely off, 1 = full in-cranial phase core
@@ -48,10 +48,10 @@ class ConsciousnessAudioEngine {
         manualPos: null         // {x, y, z} when user drags on 3D canvas
       },
       chaos: {
-        enabled: true,
+        enabled: false,
         palette: 'hybrid',      // 'hybrid' | 'metallic' | 'liquid' | 'plucked' | 'subglitch' | 'breath'
         rhythm: 'avalanche',    // 'avalanche' | 'lorenz' | 'polyrhythm' | 'elastic' | 'stochastic'
-        scale: 'chromatic12',   // 'chromatic12' | 'dorian' | 'lydian' | 'pentatonic' | 'phrygian'
+        scale: 'pentatonic',    // 'chromatic12' | 'dorian' | 'lydian' | 'pentatonic' | 'phrygian'
         gain: 0.65,
         r: 3.74,
         rate: 3.8,
@@ -59,7 +59,7 @@ class ConsciousnessAudioEngine {
         morph: 0.72
       },
       pac: {
-        enabled: true,
+        enabled: false,
         gain: 0.55,
         baseFreq: 110.0,        // 55..432 Hz selectable base carrier frequency (aligned in harmonic unison with 110 Hz spatial root)
         harmonics: 0.45,        // 0 = pure fundamental sine, 1 = rich singing bowl / tanpura drone
@@ -76,14 +76,14 @@ class ConsciousnessAudioEngine {
         center: 220
       },
       sub: {
-        enabled: true,
+        enabled: false,
         gain: 0.50,
         freq: 34.0,
         pulse: 1.6,
         warmth: 0.45
       },
       ganzfeld: {
-        enabled: true,
+        enabled: false,
         gain: 0.30,
         color: 0.62,
         sweep: 0.55
@@ -411,13 +411,13 @@ class ConsciousnessAudioEngine {
 
       osc.type = 'sine';
       osc.frequency.value = freq;
-      toneGain.gain.value = 0.48;
+      toneGain.gain.value = 0.50;
 
-      bodyOsc.type = 'triangle';
-      bodyOsc.frequency.value = freq * 1.5; // Pure 3:2 Perfect Fifth harmonic
+      bodyOsc.type = 'sine';
+      bodyOsc.frequency.value = freq * 1.5; // Pure 3:2 Perfect Fifth sine harmonic
       bodyFilter.type = 'lowpass';
       bodyFilter.frequency.value = Math.min(2400, freq * 3.5);
-      bodyGain.gain.value = 0.22;
+      bodyGain.gain.value = 0.26;
 
       // Pure 2:1 Octave harmonic partial (warm, consonant harmonic shimmer — no inharmonic alarm ratios)
       overtoneOsc.type = 'sine';
@@ -717,15 +717,16 @@ class ConsciousnessAudioEngine {
       v.bodyOsc.frequency.setTargetAtTime(f * 1.5, now, 0.06);
 
       if (palette === 'water_bowl') {
-        // Warm Harmonic Singing Bowl Pad (Pure 1x Fundamental + 1.5x Perfect Fifth + 2.0x Octave + gentle liquid air)
-        v.toneGain.gain.setTargetAtTime(0.52, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.24, now, 0.06);
+        // Pure Crystal & Tibetan Singing Bowl Pad (Pure Sine 1x Fundamental + 1.5x Fifth + 2.0x Octave + whisper-soft pinna air)
+        v.bodyOsc.type = 'sine';
+        v.toneGain.gain.setTargetAtTime(0.54, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.28, now, 0.06);
         v.bodyFilter.frequency.setTargetAtTime(Math.min(2200, f * 3.2), now, 0.06);
         v.overtoneOsc.type = 'sine';
         v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
         v.overtoneGain.gain.setTargetAtTime(0.20, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.14, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.15, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.04, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.05, now, 0.06);
       } else if (palette === 'water_drops') {
         // Flowing 3D Cave Stream + Pure Water Droplets (gentle harmonic sub hum + liquid stream)
         v.toneGain.gain.setTargetAtTime(0.28, now, 0.06);
@@ -868,8 +869,9 @@ class ConsciousnessAudioEngine {
         subDropOsc.stop(t2 + 0.042);
       }
 
-      // 4. In 'water_bowl' mode, droplets also gently excite a lush Just-Intonation Harmonic Singing Bowl chord
-      if (palette === 'water_bowl' && Math.random() < 0.48) {
+      // 4. In 'water_bowl' mode, when harmonic pad is blended in (pulse > 0.15), droplets also gently excite a Just-Intonation Singing Bowl chord
+      const currentMix = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.50;
+      if (palette === 'water_bowl' && currentMix > 0.15 && Math.random() < 0.48) {
         const harmRatios = [1.0, 1.25, 1.5, 2.0, 3.0];
         const ratio = harmRatios[Math.floor(Math.random() * harmRatios.length)];
         const bowlFreq = Math.max(110, Math.min(1320, v.freq * ratio));
@@ -2786,7 +2788,13 @@ class ConsciousnessAudioEngine {
         // Ensure at least 2 voices when using 5m Split & Merge so Left & Right duplication is always active
         const count = isBifurcationMode ? Math.max(2, rawCount) : rawCount;
         const palette = this.params.spatial.palette || 'water_bowl';
-        const continuousLevel = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.70;
+        // Crossfade Balance (`pulse` in 0..1):
+        //  0.00 = 100% Pure 3D Water Drops / ASMR Triggers Only (0% Continuous Moving Harmonic Pad)
+        //  0.50 = Balanced 3D Water Drops + Moving Harmonic Pad
+        //  1.00 = 100% Pure Moving Harmonic Pad Only (0% Water Drops / Triggers)
+        const mix = Math.max(0, Math.min(1, this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.50));
+        const continuousLevel = mix <= 0.02 ? 0.0 : Math.sin(mix * Math.PI * 0.5);
+        const dropLevel = mix >= 0.98 ? 0.0 : Math.cos(mix * Math.PI * 0.5) * 1.40;
         const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
         const auricle = this.params.spatial.auricle !== undefined ? this.params.spatial.auricle : 0.90;
         const elevRange = this.params.spatial.elevation !== undefined ? this.params.spatial.elevation : 0.85;
@@ -2806,8 +2814,8 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.nextOvertoneStepTime = now + (1.1 + Math.random() * 1.3);
         }
 
-        // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources!
-        if (triggerRate > 0.05) {
+        // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources (only when dropLevel > 0)!
+        if (triggerRate > 0.05 && dropLevel > 0.01) {
           const isMergedBifurcation =
             isBifurcationMode &&
             this.telemetry.spatialVoices[0] &&
@@ -2976,9 +2984,12 @@ class ConsciousnessAudioEngine {
             v.formantF2.frequency.setTargetAtTime(f2 * fScale, now, 0.06);
           }
 
-          // Syllabic / liquid ripple modulation on the continuous moving carrier
+          // Syllabic / liquid / singing-bowl shimmer modulation on the continuous moving carrier
           let contMod = continuousLevel;
-          if (palette === 'whisper') {
+          if (palette === 'water_bowl' || palette === 'rich8d') {
+            const bowlShimmer = 0.88 + 0.12 * Math.sin(elapsed * 1.15 + i * 1.5);
+            contMod = continuousLevel * bowlShimmer;
+          } else if (palette === 'whisper') {
             const syllable = 0.60 + 0.40 * Math.sin(elapsed * 2.4 + i) * Math.cos(elapsed * 3.9 - i);
             contMod = continuousLevel * syllable;
           } else if (palette === 'water_drops') {
@@ -2986,8 +2997,9 @@ class ConsciousnessAudioEngine {
             contMod = continuousLevel * streamRipple;
           }
           v.pulseGain.gain.setTargetAtTime(contMod, now, spatTc);
+          v.triggerInput.gain.setTargetAtTime(dropLevel, now, spatTc);
 
-          const activeEnergy = Math.max(0.25, contMod + (triggerRate > 0 ? 0.35 : 0));
+          const activeEnergy = Math.max(0.25, contMod + (dropLevel > 0 ? 0.35 : 0));
           const tv = this.telemetry.spatialVoices[i];
           tv.x = x;
           tv.y = y;

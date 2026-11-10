@@ -211,12 +211,12 @@
               <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.16" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Continuous Moving Source Level</span><span class="mono-val" id="spatialPulseVal">70% (Moving + Drops)</span></div>
-              <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.70" />
+              <div class="control-label"><span>Drops 💧 ↔ Harmonic Pad 🎶 Balance</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Pad)</span></div>
+              <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.50" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Water Drop / ASMR Trigger Rate</span><span class="mono-val" id="spatialRateVal">3.2 /s</span></div>
-              <input type="range" id="spatialRate" min="0" max="10" step="0.2" value="3.2" />
+              <div class="control-label"><span>Water Drop / ASMR Trigger Speed</span><span class="mono-val" id="spatialRateVal">3.2 /s</span></div>
+              <input type="range" id="spatialRate" min="0.2" max="10" step="0.2" value="3.2" />
             </div>
             <div class="control-row">
               <div class="control-label"><span>Ear Auricle (Pinna) &amp; Cranial Shadow</span><span class="mono-val" id="spatialAuricleVal">90% (8D Hyper-Real)</span></div>
@@ -490,7 +490,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=4.2"></script>
-  <script src="app.js?v=4.2"></script>
+  <script src="audio-engine.js?v=4.3"></script>
+  <script src="app.js?v=4.3"></script>
 </body>
 </html>

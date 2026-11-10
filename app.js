@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         baseFreq: 110,
         gain: 0.85,
         speed: 0.16,
-        pulse: 0.72,
+        pulse: 0.50,
         rate: 3.2,
         auricle: 0.92,
         elevation: 0.85,
@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
         tuning: 'octaves'
       },
       chaos: { enabled: false, scale: 'pentatonic', gain: 0.22, r: 3.68, rate: 2.0, morph: 0.75 },
-      pac: { enabled: true, baseFreq: 110, gain: 0.38, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
+      pac: { enabled: false, baseFreq: 110, gain: 0.38, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.60, center: 220 },
-      sub: { enabled: true, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
-      ganzfeld: { enabled: true, gain: 0.20, color: 0.65, sweep: 0.60 },
+      sub: { enabled: false, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
+      ganzfeld: { enabled: false, gain: 0.20, color: 0.65, sweep: 0.60 },
       asmr: { enabled: false }
     },
     dmnQuieting: {
@@ -647,7 +647,11 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSlider('spatialGain', 'spatial', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`);
   bindSlider('spatialPulse', 'spatial', 'pulse', (v) =>
-    v <= 0.02 ? '0% (Drops Only)' : v >= 0.98 ? '100% (Full Moving)' : `${Math.round(v * 100)}% (Moving + Drops)`
+    v <= 0.02
+      ? '0% (100% Drops Only 💧)'
+      : v >= 0.98
+      ? '100% (100% Harmonic Pad 🎶)'
+      : `${Math.round(v * 100)}% (Drops 💧 + Pad 🎶)`
   );
   bindSlider('spatialRate', 'spatial', 'rate', (v) => (v <= 0.05 ? '0 /s (Continuous)' : `${v.toFixed(1)} /s`));
   bindSlider('spatialAuricle', 'spatial', 'auricle', (v) => {
@@ -956,10 +960,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p.spatial.pulse !== undefined) {
         const pTxt =
           p.spatial.pulse <= 0.02
-            ? '0% (Drops Only)'
+            ? '0% (100% Drops Only 💧)'
             : p.spatial.pulse >= 0.98
-            ? '100% (Full Moving)'
-            : `${Math.round(p.spatial.pulse * 100)}% (Moving + Drops)`;
+            ? '100% (100% Harmonic Pad 🎶)'
+            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Pad 🎶)`;
         syncControl('spatialPulse', p.spatial.pulse, pTxt);
       }
       if (p.spatial.rate !== undefined) {
