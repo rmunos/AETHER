@@ -955,8 +955,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const tag = p.spatial.baseFreq < 65 ? 'Sub' : p.spatial.baseFreq < 130 ? 'Low' : 'Mid';
         syncControl('spatialBaseFreq', p.spatial.baseFreq, `${Math.round(p.spatial.baseFreq)} Hz (${tag})`);
       }
-      syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
-      syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz`);
+      if (p.spatial.gain !== undefined) syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
+      if (p.spatial.speed !== undefined) syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz`);
       if (p.spatial.pulse !== undefined) {
         const pTxt =
           p.spatial.pulse <= 0.02
@@ -981,13 +981,13 @@ document.addEventListener('DOMContentLoaded', () => {
             : `${Math.round(elVal * 100)}% (-${Math.round(75 * elVal)}° ↔ +${Math.round(85 * elVal)}°)`;
         syncControl('spatialElevation', elVal, elTxt);
       }
-      syncControl('spatialCollapse', p.spatial.collapse, `${Math.round(p.spatial.collapse * 100)}%`);
-      syncControl('spatialAsymmetry', p.spatial.asymmetry, `${Math.round(p.spatial.asymmetry * 100)}%`);
+      if (p.spatial.collapse !== undefined) syncControl('spatialCollapse', p.spatial.collapse, `${Math.round(p.spatial.collapse * 100)}%`);
+      if (p.spatial.asymmetry !== undefined) syncControl('spatialAsymmetry', p.spatial.asymmetry, `${Math.round(p.spatial.asymmetry * 100)}%`);
       if (p.spatial.tuning && document.getElementById('spatialTuning')) {
         document.getElementById('spatialTuning').value = p.spatial.tuning;
       }
       Object.entries(p.spatial).forEach(([k, v]) => {
-        if (k !== 'manualPos') engine.updateModule('spatial', k, v);
+        if (k !== 'manualPos' && v !== undefined) engine.updateModule('spatial', k, v);
       });
     }
 
@@ -1003,23 +1003,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (document.getElementById('chaosScale') && p.chaos.scale) {
         document.getElementById('chaosScale').value = p.chaos.scale;
       }
-      syncControl('chaosGain', p.chaos.gain, `${Math.round(p.chaos.gain * 100)}%`);
-      const rLabel = p.chaos.r < 3.45 ? 'Periodic' : p.chaos.r < 3.83 ? 'Edge' : 'Chaotic';
-      syncControl('chaosR', p.chaos.r, `${p.chaos.r.toFixed(2)} (${rLabel})`);
-      syncControl('chaosRate', p.chaos.rate, `${p.chaos.rate.toFixed(1)} /s`);
+      if (p.chaos.gain !== undefined) syncControl('chaosGain', p.chaos.gain, `${Math.round(p.chaos.gain * 100)}%`);
+      if (p.chaos.r !== undefined) {
+        const rLabel = p.chaos.r < 3.45 ? 'Periodic' : p.chaos.r < 3.83 ? 'Edge' : 'Chaotic';
+        syncControl('chaosR', p.chaos.r, `${p.chaos.r.toFixed(2)} (${rLabel})`);
+      }
+      if (p.chaos.rate !== undefined) syncControl('chaosRate', p.chaos.rate, `${p.chaos.rate.toFixed(1)} /s`);
       if (p.chaos.register !== undefined) {
         const regLabel = p.chaos.register < 0.28 ? 'Sub/Low' : p.chaos.register < 0.68 ? 'Wide' : 'High';
         syncControl('chaosRegister', p.chaos.register, `${Math.round(p.chaos.register * 100)}% (${regLabel})`);
       }
-      syncControl('chaosMorph', p.chaos.morph, `${Math.round(p.chaos.morph * 100)}%`);
-      Object.entries(p.chaos).forEach(([k, v]) => engine.updateModule('chaos', k, v));
+      if (p.chaos.morph !== undefined) syncControl('chaosMorph', p.chaos.morph, `${Math.round(p.chaos.morph * 100)}%`);
+      Object.entries(p.chaos).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('chaos', k, v);
+      });
     }
 
     // 3. PAC
     if (p.pac) {
       syncToggle('pacEnabled', 'pac', p.pac.enabled);
-      const band = p.pac.theta < 4 ? 'Delta' : p.pac.theta < 8 ? 'Theta' : 'Alpha';
-      syncControl('pacGain', p.pac.gain, `${Math.round(p.pac.gain * 100)}%`);
+      if (p.pac.gain !== undefined) syncControl('pacGain', p.pac.gain, `${Math.round(p.pac.gain * 100)}%`);
       if (p.pac.baseFreq !== undefined) {
         const bTag = p.pac.baseFreq < 90 ? 'Sub' : p.pac.baseFreq < 180 ? 'Low' : 'Mid';
         syncControl('pacBaseFreq', p.pac.baseFreq, `${Math.round(p.pac.baseFreq)} Hz (${bTag})`);
@@ -1028,40 +1031,51 @@ document.addEventListener('DOMContentLoaded', () => {
         const hTag = p.pac.harmonics < 0.15 ? 'Pure Sine' : p.pac.harmonics < 0.55 ? 'Warm Tone' : 'Rich Choral';
         syncControl('pacHarmonics', p.pac.harmonics, `${Math.round(p.pac.harmonics * 100)}% (${hTag})`);
       }
-      syncControl('pacTheta', p.pac.theta, `${p.pac.theta.toFixed(1)} Hz (${band})`);
-      syncControl('pacGamma', p.pac.gamma, `${Math.round(p.pac.gamma)} Hz`);
-      syncControl('pacDepth', p.pac.depth, `${Math.round(p.pac.depth * 100)}%`);
-      syncControl('pacBreath', p.pac.breath, `${Math.round(p.pac.breath * 100)}%`);
-      Object.entries(p.pac).forEach(([k, v]) => engine.updateModule('pac', k, v));
+      if (p.pac.theta !== undefined) {
+        const band = p.pac.theta < 4 ? 'Delta' : p.pac.theta < 8 ? 'Theta' : 'Alpha';
+        syncControl('pacTheta', p.pac.theta, `${p.pac.theta.toFixed(1)} Hz (${band})`);
+      }
+      if (p.pac.gamma !== undefined) syncControl('pacGamma', p.pac.gamma, `${Math.round(p.pac.gamma)} Hz`);
+      if (p.pac.depth !== undefined) syncControl('pacDepth', p.pac.depth, `${Math.round(p.pac.depth * 100)}%`);
+      if (p.pac.breath !== undefined) syncControl('pacBreath', p.pac.breath, `${Math.round(p.pac.breath * 100)}%`);
+      Object.entries(p.pac).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('pac', k, v);
+      });
     }
 
     // 4. Fractal
     if (p.fractal) {
       syncToggle('fractalEnabled', 'fractal', p.fractal.enabled);
-      syncControl('fractalGain', p.fractal.gain, `${Math.round(p.fractal.gain * 100)}%`);
-      syncControl('fractalSpeed', p.fractal.speed, `${p.fractal.speed >= 0 ? '+' : ''}${p.fractal.speed.toFixed(2)} oct/s`);
-      syncControl('fractalDepth', p.fractal.depth, `${Math.round(p.fractal.depth * 100)}%`);
-      syncControl('fractalCenter', p.fractal.center, `${Math.round(p.fractal.center)} Hz`);
-      Object.entries(p.fractal).forEach(([k, v]) => engine.updateModule('fractal', k, v));
+      if (p.fractal.gain !== undefined) syncControl('fractalGain', p.fractal.gain, `${Math.round(p.fractal.gain * 100)}%`);
+      if (p.fractal.speed !== undefined) syncControl('fractalSpeed', p.fractal.speed, `${p.fractal.speed >= 0 ? '+' : ''}${p.fractal.speed.toFixed(2)} oct/s`);
+      if (p.fractal.depth !== undefined) syncControl('fractalDepth', p.fractal.depth, `${Math.round(p.fractal.depth * 100)}%`);
+      if (p.fractal.center !== undefined) syncControl('fractalCenter', p.fractal.center, `${Math.round(p.fractal.center)} Hz`);
+      Object.entries(p.fractal).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('fractal', k, v);
+      });
     }
 
     // 5. Sub
     if (p.sub) {
       syncToggle('subEnabled', 'sub', p.sub.enabled);
-      syncControl('subGain', p.sub.gain, `${Math.round(p.sub.gain * 100)}%`);
-      syncControl('subFreq', p.sub.freq, `${p.sub.freq.toFixed(1)} Hz`);
-      syncControl('subPulse', p.sub.pulse, `${p.sub.pulse.toFixed(1)} Hz`);
-      syncControl('subWarmth', p.sub.warmth, `${Math.round(p.sub.warmth * 100)}%`);
-      Object.entries(p.sub).forEach(([k, v]) => engine.updateModule('sub', k, v));
+      if (p.sub.gain !== undefined) syncControl('subGain', p.sub.gain, `${Math.round(p.sub.gain * 100)}%`);
+      if (p.sub.freq !== undefined) syncControl('subFreq', p.sub.freq, `${p.sub.freq.toFixed(1)} Hz`);
+      if (p.sub.pulse !== undefined) syncControl('subPulse', p.sub.pulse, `${p.sub.pulse.toFixed(1)} Hz`);
+      if (p.sub.warmth !== undefined) syncControl('subWarmth', p.sub.warmth, `${Math.round(p.sub.warmth * 100)}%`);
+      Object.entries(p.sub).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('sub', k, v);
+      });
     }
 
     // 6. Ganzfeld
     if (p.ganzfeld) {
       syncToggle('ganzfeldEnabled', 'ganzfeld', p.ganzfeld.enabled);
-      syncControl('ganzfeldGain', p.ganzfeld.gain, `${Math.round(p.ganzfeld.gain * 100)}%`);
-      syncControl('ganzfeldColor', p.ganzfeld.color, `${Math.round(p.ganzfeld.color * 100)}% Brown`);
-      syncControl('ganzfeldSweep', p.ganzfeld.sweep, `${Math.round(p.ganzfeld.sweep * 100)}%`);
-      Object.entries(p.ganzfeld).forEach(([k, v]) => engine.updateModule('ganzfeld', k, v));
+      if (p.ganzfeld.gain !== undefined) syncControl('ganzfeldGain', p.ganzfeld.gain, `${Math.round(p.ganzfeld.gain * 100)}%`);
+      if (p.ganzfeld.color !== undefined) syncControl('ganzfeldColor', p.ganzfeld.color, `${Math.round(p.ganzfeld.color * 100)}% Brown`);
+      if (p.ganzfeld.sweep !== undefined) syncControl('ganzfeldSweep', p.ganzfeld.sweep, `${Math.round(p.ganzfeld.sweep * 100)}%`);
+      Object.entries(p.ganzfeld).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('ganzfeld', k, v);
+      });
     }
 
     // 7. ASMR & Ritual Trance
@@ -1071,11 +1085,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const palInput = document.getElementById('asmrPalette');
         if (palInput) palInput.value = p.asmr.palette;
       }
-      syncControl('asmrGain', p.asmr.gain, `${Math.round(p.asmr.gain * 100)}%`);
-      syncControl('asmrProximity', p.asmr.proximity, `${p.asmr.proximity < 0.2 ? 'Intimate (5cm)' : p.asmr.proximity < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
-      syncControl('asmrRate', p.asmr.rate, `${p.asmr.rate.toFixed(1)} /s`);
-      syncControl('asmrResonance', p.asmr.resonance, `${Math.round(p.asmr.resonance * 100)}%`);
-      Object.entries(p.asmr).forEach(([k, v]) => engine.updateModule('asmr', k, v));
+      if (p.asmr.gain !== undefined) syncControl('asmrGain', p.asmr.gain, `${Math.round(p.asmr.gain * 100)}%`);
+      if (p.asmr.proximity !== undefined) {
+        syncControl('asmrProximity', p.asmr.proximity, `${p.asmr.proximity < 0.2 ? 'Intimate (5cm)' : p.asmr.proximity < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
+      }
+      if (p.asmr.rate !== undefined) syncControl('asmrRate', p.asmr.rate, `${p.asmr.rate.toFixed(1)} /s`);
+      if (p.asmr.resonance !== undefined) syncControl('asmrResonance', p.asmr.resonance, `${Math.round(p.asmr.resonance * 100)}%`);
+      Object.entries(p.asmr).forEach(([k, v]) => {
+        if (v !== undefined) engine.updateModule('asmr', k, v);
+      });
     }
 
     if (startIfStopped && !engine.isRunning) {
