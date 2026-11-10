@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         palette: 'water_bowl',
         trajectory: 'bifurcation_random',
         count: 2,
-        baseFreq: 110,
+        baseFreq: 174,
         gain: 0.85,
         speed: 0.16,
         pulse: 0.50,
@@ -650,8 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
     v <= 0.02
       ? '0% (100% Drops Only 💧)'
       : v >= 0.98
-      ? '100% (100% Harmonic Pad 🎶)'
-      : `${Math.round(v * 100)}% (Drops 💧 + Pad 🎶)`
+      ? '100% (100% Harmonics 🎶)'
+      : `${Math.round(v * 100)}% (Drops 💧 + Harmonics 🎶)`
   );
   bindSlider('spatialRate', 'spatial', 'rate', (v) => (v <= 0.05 ? '0 /s (Continuous)' : `${v.toFixed(1)} /s`));
   bindSlider('spatialAuricle', 'spatial', 'auricle', (v) => {
@@ -962,8 +962,8 @@ document.addEventListener('DOMContentLoaded', () => {
           p.spatial.pulse <= 0.02
             ? '0% (100% Drops Only 💧)'
             : p.spatial.pulse >= 0.98
-            ? '100% (100% Harmonic Pad 🎶)'
-            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Pad 🎶)`;
+            ? '100% (100% Harmonics 🎶)'
+            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Harmonics 🎶)`;
         syncControl('spatialPulse', p.spatial.pulse, pTxt);
       }
       if (p.spatial.rate !== undefined) {
@@ -1112,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   checkSavedConfigAvailable();
+  applyPreset('egoDissolution', false);
 
   if (saveConfigBtn) {
     saveConfigBtn.addEventListener('click', () => {

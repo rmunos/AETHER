@@ -211,7 +211,7 @@
               <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.16" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Drops 💧 ↔ Harmonic Pad 🎶 Balance</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Pad)</span></div>
+              <div class="control-label"><span>Drops 💧 ↔ Harmonic Sound 🎶 Balance</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Harmonics)</span></div>
               <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.50" />
             </div>
             <div class="control-row">
@@ -252,7 +252,7 @@
         </article>
 
         <!-- MODULE 2: Predictive-Coding Edge of Chaos -->
-        <article class="module-card active-module" data-module="chaos">
+        <article class="module-card" data-module="chaos">
           <div class="module-header">
             <div>
               <span class="module-tag tag-violet">02 // DEFAULT MODE NETWORK</span>
@@ -261,7 +261,7 @@
             <div class="header-actions">
               <button type="button" id="soloChaosBtn" class="btn-solo" title="Mute all other modules to isolate Edge of Chaos sounds &amp; rhythms">SOLO CHAOS</button>
               <label class="toggle-switch">
-                <input type="checkbox" id="chaosEnabled" checked />
+                <input type="checkbox" id="chaosEnabled" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -324,7 +324,7 @@
         </article>
 
         <!-- MODULE 3: Cross-Frequency PAC Audio -->
-        <article class="module-card active-module" data-module="pac">
+        <article class="module-card" data-module="pac">
           <div class="module-header">
             <div>
               <span class="module-tag tag-amber">03 // THALAMOCORTICAL BINDING</span>
@@ -333,7 +333,7 @@
             <div class="header-actions">
               <button type="button" id="soloPacBtn" class="btn-solo" title="Mute all other modules to isolate Cross-Frequency PAC &amp; Binaural Phase">SOLO PAC</button>
               <label class="toggle-switch">
-                <input type="checkbox" id="pacEnabled" checked />
+                <input type="checkbox" id="pacEnabled" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -410,7 +410,7 @@
         </article>
 
         <!-- MODULE 5: Infrasound & Somatic Sub-Bass -->
-        <article class="module-card active-module" data-module="sub">
+        <article class="module-card" data-module="sub">
           <div class="module-header">
             <div>
               <span class="module-tag tag-rose">05 // VESTIBULAR &amp; VAGAL</span>
@@ -419,7 +419,7 @@
             <div class="header-actions">
               <button type="button" id="soloSubBtn" class="btn-solo" title="Mute all other modules to isolate Infrasound &amp; Sub-Bass">SOLO SUB</button>
               <label class="toggle-switch">
-                <input type="checkbox" id="subEnabled" checked />
+                <input type="checkbox" id="subEnabled" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -447,7 +447,7 @@
         </article>
 
         <!-- MODULE 6: Auditory Ganzfeld & Stochastic Resonance -->
-        <article class="module-card active-module" data-module="ganzfeld">
+        <article class="module-card" data-module="ganzfeld">
           <div class="module-header">
             <div>
               <span class="module-tag tag-sky">06 // STOCHASTIC RESONANCE</span>
@@ -456,7 +456,7 @@
             <div class="header-actions">
               <button type="button" id="soloGanzfeldBtn" class="btn-solo" title="Mute all other modules to isolate the Auditory Ganzfeld">SOLO GANZFELD</button>
               <label class="toggle-switch">
-                <input type="checkbox" id="ganzfeldEnabled" checked />
+                <input type="checkbox" id="ganzfeldEnabled" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -490,7 +490,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=4.3"></script>
-  <script src="app.js?v=4.3"></script>
+  <script src="audio-engine.js?v=4.4"></script>
+  <script src="app.js?v=4.4"></script>
 </body>
 </html>
