@@ -184,11 +184,13 @@
             <div class="control-row">
               <div class="control-label"><span>3D / 8D Trajectory Geometry</span></div>
               <select id="spatialTrajectory" class="select-input">
-                <option value="orbit8d" selected>8D Classic Sweep (360° Smooth Orbit + Pinna Elevation)</option>
+                <option value="orbit8d" selected>8D Spherical Orbit (Left/Right + Front/Back + Up/Down Elevation)</option>
+                <option value="zenith_arch">Over-the-Head Zenith Dome Arch (Floor ▼ ↔ Overhead Crown ▲)</option>
+                <option value="helix3d">3D Vertical Helix / DNA Spiral (Climbing Floor ▼ ↔ Sky Zenith ▲)</option>
                 <option value="infinity">Figure-8 / Infinity (∞ Passing Through Head)</option>
                 <option value="peripersonal">Intimate Peripersonal Halo (5–20 cm Ear-to-Ear ASMR)</option>
                 <option value="radial">Far-Horizon Excursion (Close Ear ↔ 10m Distance)</option>
-                <option value="mixed">Mixed Geometries (8D Orbit + ∞ + Far Excursion)</option>
+                <option value="mixed">Mixed Geometries (8D Sphere + Zenith Arch + ∞)</option>
                 <option value="circle">360° Circular Halo (Around Perimeter of Head)</option>
                 <option value="spiral">Breathing Spiral (Far Horizon ↔ Center of Head)</option>
                 <option value="torus">Counter-Rotating 3D Toroidal Knot</option>
@@ -219,7 +221,11 @@
               <input type="range" id="spatialAuricle" min="0" max="1" step="0.01" value="0.90" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Proximity &amp; 3D Elevation Range</span><span class="mono-val" id="spatialAsymmetryVal">80%</span></div>
+              <div class="control-label"><span>3D Vertical Elevation (Floor ▼ ↔ Zenith ▲)</span><span class="mono-val" id="spatialElevationVal">85% (-75° ↔ +85°)</span></div>
+              <input type="range" id="spatialElevation" min="0" max="1" step="0.01" value="0.85" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Horizontal Distance &amp; Horizon Span</span><span class="mono-val" id="spatialAsymmetryVal">80%</span></div>
               <input type="range" id="spatialAsymmetry" min="0" max="1" step="0.01" value="0.80" />
             </div>
             <div class="control-row">
@@ -482,7 +488,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=3.8"></script>
-  <script src="app.js?v=3.8"></script>
+  <script src="audio-engine.js?v=3.9"></script>
+  <script src="app.js?v=3.9"></script>
 </body>
 </html>

@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.72,
         rate: 3.2,
         auricle: 0.92,
+        elevation: 0.85,
         collapse: 0.0,
         asymmetry: 0.82,
         tuning: 'octaves'
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.50,
         rate: 3.5,
         auricle: 0.88,
+        elevation: 0.85,
         collapse: 0.0,
         asymmetry: 0.75,
         tuning: 'quartal'
@@ -105,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.85,
         rate: 1.4,
         auricle: 0.90,
+        elevation: 0.85,
         collapse: 0.0,
         asymmetry: 0.70,
         tuning: 'just'
@@ -125,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spatial: {
         enabled: true,
         palette: 'rich8d',
-        trajectory: 'radial',
+        trajectory: 'helix3d',
         count: 3,
         baseFreq: 108,
         gain: 0.58,
@@ -133,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.80,
         rate: 1.6,
         auricle: 0.90,
+        elevation: 0.92,
         collapse: 0.0,
         asymmetry: 0.85,
         tuning: 'overtone'
@@ -161,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.75,
         rate: 2.0,
         auricle: 0.88,
+        elevation: 0.85,
         collapse: 0.0,
         asymmetry: 0.75,
         tuning: 'octaves'
@@ -181,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spatial: {
         enabled: true,
         palette: 'whisper',
-        trajectory: 'radial',
+        trajectory: 'zenith_arch',
         count: 2,
         baseFreq: 80,
         gain: 0.55,
@@ -189,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.80,
         rate: 1.8,
         auricle: 0.90,
+        elevation: 0.90,
         collapse: 0.0,
         asymmetry: 0.80,
         tuning: 'quartal'
@@ -217,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.82,
         rate: 4.5,
         auricle: 0.94,
+        elevation: 0.88,
         collapse: 0.0,
         asymmetry: 0.78,
         tuning: 'just'
@@ -245,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pulse: 0.76,
         rate: 4.4,
         auricle: 0.96,
+        elevation: 0.80,
         collapse: 0.0,
         asymmetry: 0.65,
         tuning: 'golden'
@@ -646,6 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const label = v > 0.75 ? '8D Hyper-Real' : v > 0.35 ? 'Balanced' : 'Subtle';
     return `${Math.round(v * 100)}% (${label})`;
   });
+  bindSlider('spatialElevation', 'spatial', 'elevation', (v) =>
+    v <= 0.02 ? '0% (Flat 2D)' : `${Math.round(v * 100)}% (-${Math.round(75 * v)}° ↔ +${Math.round(85 * v)}°)`
+  );
   bindSlider('spatialCollapse', 'spatial', 'collapse', (v) => `${Math.round(v * 100)}%`);
   bindSlider('spatialAsymmetry', 'spatial', 'asymmetry', (v) => `${Math.round(v * 100)}%`);
 
@@ -744,18 +755,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Interactive 3D Canvas Drag-to-Localize (Grab & move 3D sound source around head)
+  // Interactive 3D Canvas Drag-to-Localize (Grab & move 3D sound source around head + Vertical Elevation Gauge)
   let isDraggingSpatial = false;
   function updateManual3DFromEvent(e) {
     const rect = canvas.getBoundingClientRect();
-    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1; // -1 (Left) .. +1 (Right)
-    const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1; // -1 (Front/Top) .. +1 (Back/Bottom)
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    // Check if dragging inside the right-side Vertical Elevation Gauge (last 72px of canvas)
+    if (px >= rect.width - 72) {
+      const gaugeTop = 44;
+      const gaugeBottom = rect.height - 48;
+      const normY = Math.max(-1, Math.min(1, 1 - ((py - gaugeTop) / Math.max(1, gaugeBottom - gaugeTop)) * 2));
+      // Spherical elevation angle phi (-75 deg floor to +85 deg zenith)
+      const phi = normY * 1.38;
+      const r = 1.05;
+      const horiz = r * Math.cos(phi);
+      const y = r * Math.sin(phi);
+      // Slight frontal-lateral offset so pinna elevation notch & Blauert zenith peak are maximally clear
+      const x = horiz * 0.65;
+      const z = -horiz * 0.76;
+      engine.updateModule('spatial', 'manualPos', { x, y, z });
+      const deg = Math.round((phi * 180) / Math.PI);
+      hudLeft.textContent = `3D Elevation: ${deg >= 0 ? '+' : ''}${deg}° (${deg > 18 ? '▲ Overhead Zenith' : deg < -18 ? '▼ Below Chin/Floor' : 'Ear Level'})`;
+      return;
+    }
+
+    const nx = (px / (rect.width - 64)) * 2 - 1; // -1 (Left) .. +1 (Right)
+    const ny = (py / rect.height) * 2 - 1;       // -1 (Front/Top) .. +1 (Back/Bottom)
     const x = nx * 1.45;
     const z = ny * 1.45; // -Z is Front (top of radar), +Z is Behind Head (bottom of radar)
     const dist = Math.sqrt(x * x + z * z);
-    const y = Math.cos(dist * Math.PI * 0.7) * 0.65;
+    const elevScale = engine.params.spatial.elevation !== undefined ? engine.params.spatial.elevation : 0.85;
+    const y = Math.cos(dist * Math.PI * 0.7) * 0.75 * elevScale;
     engine.updateModule('spatial', 'manualPos', { x, y, z });
-    hudLeft.textContent = `3D Drag: X:${x.toFixed(2)}m Z:${z < 0 ? 'Front' : 'Back'}(${z.toFixed(2)}m)`;
+    const deg = Math.round((Math.atan2(y, Math.max(0.05, dist)) * 180) / Math.PI);
+    hudLeft.textContent = `3D Drag: X:${x.toFixed(2)}m Z:${z < 0 ? 'Front' : 'Back'}(${z.toFixed(2)}m) Elev:${deg >= 0 ? '+' : ''}${deg}°`;
   }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -934,6 +968,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p.spatial.auricle !== undefined) {
         const aLabel = p.spatial.auricle > 0.75 ? '8D Hyper-Real' : p.spatial.auricle > 0.35 ? 'Balanced' : 'Subtle';
         syncControl('spatialAuricle', p.spatial.auricle, `${Math.round(p.spatial.auricle * 100)}% (${aLabel})`);
+      }
+      if (p.spatial.elevation !== undefined) {
+        const elVal = p.spatial.elevation;
+        const elTxt =
+          elVal <= 0.02
+            ? '0% (Flat 2D)'
+            : `${Math.round(elVal * 100)}% (-${Math.round(75 * elVal)}° ↔ +${Math.round(85 * elVal)}°)`;
+        syncControl('spatialElevation', elVal, elTxt);
       }
       syncControl('spatialCollapse', p.spatial.collapse, `${Math.round(p.spatial.collapse * 100)}%`);
       syncControl('spatialAsymmetry', p.spatial.asymmetry, `${Math.round(p.spatial.asymmetry * 100)}%`);
@@ -1211,12 +1253,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * VISUALIZER 1: 3D HRTF Trajectories (Figure-8 ∞, Far-Horizon Ray, Halo) + 0.1 Hz Breath Ring
+   * VISUALIZER 1: 3D HRTF Trajectories (Horizontal Radar + Right-Side Vertical Elevation Gauge)
    */
   function drawSpatialVisualizer(w, h, breathVal, nowMs) {
-    const cx = w * 0.5;
+    const cx = (w - 58) * 0.5;
     const cy = h * 0.5;
-    const scale = Math.min(w, h) * 0.21;
+    const scale = Math.min(w - 64, h) * 0.21;
 
     ctx2d.save();
 
@@ -1229,7 +1271,39 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx2d.textAlign = 'left';
     ctx2d.fillText('◀ LEFT EAR', 14, cy + 4);
     ctx2d.textAlign = 'right';
-    ctx2d.fillText('RIGHT EAR ▶', w - 14, cy + 4);
+    ctx2d.fillText('RIGHT EAR ▶', w - 74, cy + 4);
+    ctx2d.textAlign = 'left';
+
+    // Vertical Elevation Side-Profile Gauge (Right side of canvas: ▲ +85° ZENITH <-> 0° EAR <-> ▼ -75° FLOOR)
+    const gaugeX = w - 34;
+    const gaugeTop = 44;
+    const gaugeBottom = h - 48;
+    const gaugeMidY = (gaugeTop + gaugeBottom) * 0.5;
+    const gaugeHalfH = (gaugeBottom - gaugeTop) * 0.5;
+
+    ctx2d.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+    ctx2d.lineWidth = 1.5;
+    ctx2d.beginPath();
+    ctx2d.moveTo(gaugeX, gaugeTop);
+    ctx2d.lineTo(gaugeX, gaugeBottom);
+    ctx2d.stroke();
+
+    // Tick marks for +85° Zenith, 0° Ear Level, -75° Floor
+    [gaugeTop, gaugeMidY, gaugeBottom].forEach((ty) => {
+      ctx2d.beginPath();
+      ctx2d.moveTo(gaugeX - 7, ty);
+      ctx2d.lineTo(gaugeX + 7, ty);
+      ctx2d.stroke();
+    });
+
+    ctx2d.fillStyle = 'rgba(148, 163, 184, 0.58)';
+    ctx2d.font = '9px "JetBrains Mono", monospace';
+    ctx2d.textAlign = 'center';
+    ctx2d.fillText('▲+85°', gaugeX, gaugeTop - 16);
+    ctx2d.fillText('SKY', gaugeX, gaugeTop - 6);
+    ctx2d.fillText('0° EAR', gaugeX - 20, gaugeMidY + 3);
+    ctx2d.fillText('▼-75°', gaugeX, gaugeBottom + 12);
+    ctx2d.fillText('FLOOR', gaugeX, gaugeBottom + 22);
     ctx2d.textAlign = 'left';
 
     // 1. 0.1 Hz Coherent Breathing Guide Ring
@@ -1303,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails
+    // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
     const activeCount = engine.params.spatial.count || 2;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
 
@@ -1323,7 +1397,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
       const hue = palette[v.index % palette.length];
 
-      // Draw Geometric Trail (shows 8D Orbit, Figure-8 ∞ through head, Far-Horizon ray, or Halo)
+      // Draw Geometric Trail (shows 8D Orbit, Zenith Arch, 3D Helix, Figure-8 ∞, or Far-Horizon ray)
       if (v.trail && v.trail.length > 2) {
         ctx2d.beginPath();
         for (let t = 0; t < v.trail.length; t++) {
@@ -1336,9 +1410,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx2d.stroke();
       }
 
-      const { px, py } = project3DToRadar(v.x, v.y, v.z, cx, cy, scale);
+      const { px, py, horizDist } = project3DToRadar(v.x, v.y, v.z, cx, cy, scale);
       const dist = v.dist || Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-      // Sources shrink slightly when they travel very far out (up to 11m)
+      // True spherical elevation angle phi in degrees (-90° floor to +90° zenith)
+      const elevRad = Math.atan2(v.y || 0, Math.max(0.02, horizDist));
+      const elevDeg = Math.round((elevRad * 180) / Math.PI);
+
+      // Sources shrink slightly when they travel very far out (up to 11m), and swell slightly overhead
       const distScale = 1 / (1 + Math.max(0, dist - 1.2) * 0.14);
       const radius = Math.max(4.5, (8 + energy * 4) * distScale);
 
@@ -1350,7 +1428,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.lineWidth = 1.2;
       ctx2d.stroke();
 
-      // Glowing source orb
+      // Glowing source orb on radar
       const grad = ctx2d.createRadialGradient(px, py, 1, px, py, radius * 2.6);
       grad.addColorStop(0, `rgba(${hue}, 0.98)`);
       grad.addColorStop(0.45, `rgba(${hue}, 0.42)`);
@@ -1361,20 +1439,38 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.arc(px, py, radius * 2.6, 0, Math.PI * 2);
       ctx2d.fill();
 
-      // Label with Source #, Pinna Cue, Distance & Position
+      // Plot live marker on the Right-Side Vertical Elevation Gauge
+      const elevNormGauge = Math.max(-1, Math.min(1, elevRad / 1.48));
+      const gy = gaugeMidY - elevNormGauge * gaugeHalfH;
+      ctx2d.fillStyle = `rgba(${hue}, 0.95)`;
+      ctx2d.beginPath();
+      ctx2d.arc(gaugeX, gy, 5.2, 0, Math.PI * 2);
+      ctx2d.fill();
+      ctx2d.fillStyle = 'rgba(241, 245, 249, 0.88)';
+      ctx2d.font = '9px "JetBrains Mono", monospace';
+      ctx2d.textAlign = 'right';
+      ctx2d.fillText(`S${v.index + 1} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
+      ctx2d.textAlign = 'left';
+
+      // Label with Source #, Horizontal Pinna Cue & Vertical Elevation Angle
       ctx2d.fillStyle = 'rgba(241, 245, 249, 0.92)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
-      const locTag = dist < 0.28
+      const horizTag = dist < 0.28
         ? 'NEAR-EAR'
         : v.z > 0.25
-        ? 'BACK 1.1kHz'
+        ? 'BACK'
         : v.z < -0.25
-        ? 'FRONT 3.7kHz'
+        ? 'FRONT'
         : v.x < 0
-        ? 'LEFT PINNA'
-        : 'RIGHT PINNA';
+        ? 'LEFT'
+        : 'RIGHT';
+      const elevTag = elevDeg > 18
+        ? `▲+${elevDeg}° SKY`
+        : elevDeg < -18
+        ? `▼${elevDeg}° FLOOR`
+        : `${elevDeg >= 0 ? '+' : ''}${elevDeg}° EAR`;
       ctx2d.fillText(
-        `S${v.index + 1}: ${Math.round(v.freq)}Hz (${dist.toFixed(1)}m ${locTag})`,
+        `S${v.index + 1}: ${horizTag} · ${elevTag}`,
         px + radius + 5,
         py + 3
       );

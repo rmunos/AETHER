@@ -41,6 +41,7 @@ class ConsciousnessAudioEngine {
         pulse: 0.70,            // Continuous Moving Source Level (0 = Drops/Triggers Only, 1 = Full Continuous 8D Moving Source)
         rate: 3.2,              // 0..10 events/s for 3D Water Drops & ASMR Triggers emitted from moving sources
         auricle: 0.90,          // 0..1 Ear Auricle (Pinna) Notch, Blauert Bands, Cranial Head-Shadow & ITD/ILD Depth
+        elevation: 0.85,        // 0..1 3D Vertical Elevation Range (0 = Flat Horizontal, 1 = Full -75° Floor <-> +85° Zenith)
         collapse: 0.0,          // 0 = completely off, 1 = full in-cranial phase core
         asymmetry: 0.80,
         tuning: 'octaves',
@@ -459,29 +460,42 @@ class ConsciousnessAudioEngine {
       const preAuricle = this.ctx.createGain();
       preAuricle.gain.value = 1.0;
 
-      // B. Anthropometric Ear Auricle (Pinna) 4-Stage Spectral Filter Chain
-      // 1. Blauert Front/Back Directional Band Filter (3650 Hz Front vs 1050 Hz Behind Neck)
+      // B. Anthropometric Ear Auricle (Pinna) & Vertical Elevation 6-Stage Spectral Filter Chain
+      // 1. Torso / Chest Cavity vs. Overhead Weightlessness Low-Shelf (320 Hz: +6 dB Below Chin vs -5.5 dB Above Crown)
+      const torsoFilter = this.ctx.createBiquadFilter();
+      torsoFilter.type = 'lowshelf';
+      torsoFilter.frequency.value = 320;
+      torsoFilter.gain.value = 0.0;
+
+      // 2. Blauert Front/Back Directional Band Filter (3650 Hz Front vs 1050 Hz Behind Neck)
       const blauertFilter = this.ctx.createBiquadFilter();
       blauertFilter.type = 'peaking';
       blauertFilter.frequency.value = 3650;
       blauertFilter.Q.value = 1.5;
       blauertFilter.gain.value = 4.0;
 
-      // 2. Concha Cavity Funnel Resonance (4500 Hz boost when facing front/side)
+      // 3. Concha Cavity Funnel Resonance (4500 Hz boost when facing front/side)
       const conchaFilter = this.ctx.createBiquadFilter();
       conchaFilter.type = 'peaking';
       conchaFilter.frequency.value = 4500;
       conchaFilter.Q.value = 1.8;
       conchaFilter.gain.value = 3.5;
 
-      // 3. Pinna Antihelix Spectral Notch (sweeps 5.1 kHz - 11.5 kHz with 3D Elevation y & Azimuth x)
+      // 4. Pinna Antihelix Spectral Notch (sweeps 4.25 kHz Below Chin -> 6.8 kHz Ear Level -> 11.2 kHz Overhead Zenith)
       const elevFilter = this.ctx.createBiquadFilter();
       elevFilter.type = 'peaking';
-      elevFilter.frequency.value = 7600;
-      elevFilter.Q.value = 4.2;
-      elevFilter.gain.value = -11.0;
+      elevFilter.frequency.value = 6800;
+      elevFilter.Q.value = 4.6;
+      elevFilter.gain.value = -12.0;
 
-      // 4. Pinna Rim Rear Cartilage Shadow & Distance Air Absorption Low-Pass
+      // 5. Blauert Overhead Zenith Peak Filter (8600 Hz scapha/antihelix resonance when source is Above Head +Y)
+      const zenithFilter = this.ctx.createBiquadFilter();
+      zenithFilter.type = 'peaking';
+      zenithFilter.frequency.value = 8600;
+      zenithFilter.Q.value = 2.2;
+      zenithFilter.gain.value = 0.0;
+
+      // 6. Pinna Rim Rear Cartilage Shadow & Distance Air Absorption Low-Pass
       const shadowFilter = this.ctx.createBiquadFilter();
       shadowFilter.type = 'lowpass';
       shadowFilter.frequency.value = 12000;
@@ -554,11 +568,13 @@ class ConsciousnessAudioEngine {
       pulseGain.connect(preAuricle);
       triggerInput.connect(preAuricle);
 
-      // Connect Auricle Filter Chain
-      preAuricle.connect(blauertFilter);
+      // Connect Auricle & Vertical Elevation Filter Chain
+      preAuricle.connect(torsoFilter);
+      torsoFilter.connect(blauertFilter);
       blauertFilter.connect(conchaFilter);
       conchaFilter.connect(elevFilter);
-      elevFilter.connect(shadowFilter);
+      elevFilter.connect(zenithFilter);
+      zenithFilter.connect(shadowFilter);
       shadowFilter.connect(voiceGain);
 
       // Connect Binaural Cranial Shadow + ITD Branch (Left & Right Ears)
@@ -600,9 +616,11 @@ class ConsciousnessAudioEngine {
         pulseGain,
         triggerInput,
         preAuricle,
+        torsoFilter,
         blauertFilter,
         conchaFilter,
         elevFilter,
+        zenithFilter,
         shadowFilter,
         voiceGain,
         itdDelayL,
@@ -1055,39 +1073,65 @@ class ConsciousnessAudioEngine {
   }
 
   /**
-   * Computes 3D (x, y, z) coordinates for source `i` according to selected 3D / 8D geometry
+   * Computes 3D (x, y, z) spherical coordinates for source `i` according to selected 3D / 8D geometry
+   * Includes full vertical elevation (-75° Below Chin/Floor <-> +85° Overhead Crown/Zenith)
    */
-  _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode) {
+  _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode, elevRange = 0.85) {
     let geom = trajectoryMode;
     if (trajectoryMode === 'mixed') {
-      const modes = ['orbit8d', 'infinity', 'radial', 'peripersonal'];
+      const modes = ['orbit8d', 'zenith_arch', 'helix3d', 'infinity'];
       geom = modes[i % modes.length];
     }
 
     const phaseOffset = (i * Math.PI * 2) / Math.max(1, count);
     const theta = elapsed * speed * Math.PI * 2 + phaseOffset;
+    const elevScale = Math.max(0, Math.min(1, elevRange));
 
     let x = 0, y = 0, z = -1;
 
     if (geom === 'orbit8d') {
-      // 8D Classic Sweep: Wide, ultra-clear Left <-> Front <-> Right <-> Behind-Neck 360° orbit
-      // with sinusoidal 3D elevation sweep so the Pinna Notch & Cranial Head-Shadow sweep dramatically!
+      // 8D Spherical Orbit: Full 360° horizontal sweep coupled with true Spherical Elevation (phi in [-70°, +78°])
+      // As phi rises toward +78° (Zenith), cos(phi) pulls x,z inward so the sound physically arches OVER the top of the skull!
       const dir = i % 2 === 0 ? 1 : -1;
-      const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
-      const r = 0.45 + 0.85 * asym * (0.78 + 0.22 * Math.cos(a * 2));
-      x = r * Math.sin(a);
-      z = -r * Math.cos(a);
-      y = Math.sin(a * 2 + i * 0.7) * (0.35 + 0.55 * asym);
+      const az = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
+      const elevWave = Math.sin(az * 1.5 + i * 1.1); // Incommensurate 3:2 spherical weave
+      const phi = elevWave * (1.32 * elevScale); // Up to +-76 degrees vertical angle!
+      const r = 0.50 + 0.85 * asym * (0.82 + 0.18 * Math.cos(az * 2));
+      const horizR = r * Math.cos(phi);
+      x = horizR * Math.sin(az);
+      z = -horizR * Math.cos(az);
+      y = r * Math.sin(phi);
+    } else if (geom === 'zenith_arch') {
+      // Over-the-Head Zenith Dome Arch: Sweeps from Left Ear -> Straight Over Crown (+85° Zenith) -> Right Ear -> Under Chin (-75° Floor)
+      // while slowly rotating the arch plane around the listener!
+      const dir = i % 2 === 0 ? 1 : -1;
+      const archAngle = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
+      const planeAz = elapsed * speed * 0.28 * Math.PI * 2 + (i * Math.PI) / Math.max(1, count);
+      const r = 0.55 + 0.75 * asym;
+      const lateral = r * Math.cos(archAngle);
+      x = lateral * Math.cos(planeAz);
+      z = -lateral * Math.sin(planeAz);
+      y = r * Math.sin(archAngle) * (0.25 + 0.90 * elevScale);
+    } else if (geom === 'helix3d') {
+      // 3D Vertical Helix / DNA Spiral: Climbs smoothly from Floor (-75°) up to Sky Zenith (+82°) and back while orbiting 360°
+      const dir = i % 2 === 0 ? 1 : -1;
+      const az = elapsed * speed * Math.PI * 2 * 1.6 * dir + phaseOffset;
+      const climbWave = Math.sin(elapsed * speed * Math.PI * 2 * 0.45 + i * 1.4);
+      const phi = climbWave * (1.38 * elevScale); // -79° to +79°
+      const r = 0.55 + 0.75 * asym;
+      const horizR = r * Math.cos(phi);
+      x = horizR * Math.sin(az);
+      z = -horizR * Math.cos(az);
+      y = r * Math.sin(phi);
     } else if (geom === 'peripersonal') {
-      // Intimate Peripersonal ASMR Halo: orbits 12cm - 32cm from the head, lingering close to Left & Right ear canals
+      // Intimate Peripersonal ASMR Halo: orbits 12cm - 32cm from the head, lingering close to Left & Right ear canals + vertical ear-to-crown sweep
       const dir = i % 2 === 0 ? 1 : -1;
       const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
       const s = Math.sin(a);
-      // Lingers near the ears (|x| ~ 0.18-0.28m) for maximum near-field ILD & whisper/crackle intimacy
       const r = 0.16 + 0.22 * asym;
       x = Math.sign(s) * Math.pow(Math.abs(s), 0.72) * r;
       z = -Math.cos(a) * r * 0.85;
-      y = Math.sin(a * 2) * 0.18 * asym;
+      y = Math.sin(a * 1.5 + i) * 0.26 * elevScale;
     } else if (geom === 'infinity') {
       // Figure-8 / Lemniscate (∞) passing directly through the center of the head (0,0,0)!
       const lobeRadius = 1.0 + 1.15 * asym;
@@ -1097,7 +1141,7 @@ class ConsciousnessAudioEngine {
       const axisAngle = (i * Math.PI) / Math.max(1, count);
       x = u * Math.cos(axisAngle) - v * Math.sin(axisAngle);
       z = -u * Math.sin(axisAngle) - v * Math.cos(axisAngle);
-      y = Math.sin(theta) * Math.cos(theta) * 0.85 * asym * (i % 2 === 0 ? 1 : -1);
+      y = Math.sin(theta) * Math.cos(theta) * 1.25 * elevScale * (i % 2 === 0 ? 1 : -1);
     } else if (geom === 'radial') {
       // Far-Horizon Excursion: starts near the ear/head, travels VERY FAR OUT (up to 11m) in one direction, and returns!
       const rayAngle = (i * Math.PI * 2) / Math.max(1, count) + elapsed * 0.05 * (i % 2 === 0 ? 1 : -1);
@@ -1107,7 +1151,7 @@ class ConsciousnessAudioEngine {
 
       x = r * Math.sin(rayAngle);
       z = -r * Math.cos(rayAngle);
-      y = (r * 0.18) * Math.sin(rayAngle + i) * asym;
+      y = (r * 0.32) * Math.sin(theta + i) * elevScale;
     } else if (geom === 'circle') {
       // Pure 360° Circular Halo around perimeter of the head
       const dir = i % 2 === 0 ? 1 : -1;
@@ -1115,7 +1159,7 @@ class ConsciousnessAudioEngine {
       const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
       x = r * Math.sin(a);
       z = -r * Math.cos(a);
-      y = Math.sin(a + i) * 0.45 * asym;
+      y = Math.sin(a + i) * 0.75 * elevScale;
     } else if (geom === 'spiral') {
       // Breathing Spiral: spirals inward from far horizon straight through center of skull and back out
       const breathCycle = 0.5 - 0.5 * Math.cos(theta * 0.35);
@@ -1123,7 +1167,7 @@ class ConsciousnessAudioEngine {
       const fastAngle = theta * 2.0;
       x = r * Math.sin(fastAngle);
       z = -r * Math.cos(fastAngle);
-      y = Math.cos(theta * 0.35) * 0.7 * asym;
+      y = Math.cos(theta * 0.35) * 1.15 * elevScale;
     } else {
       // 'torus': Counter-rotating 3D toroidal knot
       const dir = i % 2 === 0 ? 1 : -1 * (0.5 + asym * 0.7);
@@ -1132,7 +1176,7 @@ class ConsciousnessAudioEngine {
       const r = 0.4 + (0.6 + 0.9 * asym) * (0.5 + 0.5 * Math.cos(elevAngle));
       x = r * Math.sin(angle);
       z = -r * Math.cos(angle);
-      y = Math.sin(elevAngle) * (0.4 + 0.85 * asym);
+      y = Math.sin(elevAngle) * (0.5 + 0.95 * elevScale);
     }
 
     return { x, y, z, geomType: geom };
@@ -2492,6 +2536,7 @@ class ConsciousnessAudioEngine {
         const continuousLevel = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.70;
         const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
         const auricle = this.params.spatial.auricle !== undefined ? this.params.spatial.auricle : 0.90;
+        const elevRange = this.params.spatial.elevation !== undefined ? this.params.spatial.elevation : 0.85;
         const manualPos = this.params.spatial.manualPos;
         const voices = this.nodes.spatial.voices;
         const spatTc = isBg ? 0.065 : 0.025;
@@ -2548,7 +2593,7 @@ class ConsciousnessAudioEngine {
             z = manualPos.z;
             geomType = 'manual';
           } else {
-            const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory);
+            const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory, elevRange);
             x = pos.x;
             y = pos.y;
             z = pos.z;
@@ -2569,7 +2614,7 @@ class ConsciousnessAudioEngine {
           // Normalized directional cosines:
           // sinTheta in [-1..+1]: -1 = hard Left ear, +1 = hard Right ear
           // frontness in [-1..+1]: +1 = directly in front of face (-Z), -1 = directly behind neck (+Z)
-          // elevNorm in [-1..+1]: +1 = above head (+Y), -1 = below chin (-Y)
+          // elevNorm in [-1..+1]: +1 = directly above crown (+Y, +90°), -1 = directly below chin/floor (-Y, -90°)
           const sinTheta = Math.max(-1, Math.min(1, x / safeDist));
           const frontness = Math.max(-1, Math.min(1, -z / safeDist));
           const elevNorm = Math.max(-1, Math.min(1, y / safeDist));
@@ -2590,19 +2635,31 @@ class ConsciousnessAudioEngine {
           const conchaDb = (frontness >= -0.2 ? (frontness + 0.4) * 4.5 : frontness * 4.0) * auricle;
           v.conchaFilter.gain.setTargetAtTime(conchaDb, now, spatTc);
 
-          // 3. Anthropometric Auricle (Pinna) Antihelix Spectral Notch (5.1 kHz .. 11.6 kHz):
-          // Sweeps monotonically with 3D elevation (y) and lateral angle (|x|)
-          const notchFreq = Math.max(4800, Math.min(12000, 7600 * Math.pow(2, 0.56 * elevNorm) + 850 * Math.abs(sinTheta)));
+          // 3. Anthropometric Vertical Elevation Cues (3-stage Pinna Notch + Zenith Peak + Torso/Chest Shelf):
+          // (a) Pinna Antihelix Notch sweeps from 4,250 Hz (-90° Below Chin) -> 6,800 Hz (0° Ear Level) -> 11,100 Hz (+90° Zenith)
+          const notchFreq = Math.max(4100, Math.min(11800, 6800 * Math.pow(2, 0.68 * elevNorm) + 600 * Math.abs(sinTheta)));
           v.elevFilter.frequency.setTargetAtTime(notchFreq, now, spatTc);
-          v.elevFilter.Q.setTargetAtTime(3.6 + 2.4 * auricle, now, spatTc);
-          v.elevFilter.gain.setTargetAtTime(-12.5 * auricle, now, spatTc);
+          v.elevFilter.Q.setTargetAtTime(4.0 + 2.5 * auricle, now, spatTc);
+          v.elevFilter.gain.setTargetAtTime(-13.5 * auricle, now, spatTc);
 
-          // 4. Pinna Rim Rear Cartilage Shadow & Air Absorption Low-Pass:
-          // Wide open in front (up to 14.5 kHz); shadowed by pinna cartilage behind the skull (down to 1650 Hz)
+          // (b) Blauert Overhead Zenith Peak (8.6 kHz scapha resonance blooms up to +9.5 dB when source is Above Crown y > 0)
+          const zenithDb = (elevNorm >= 0 ? elevNorm * 9.5 : elevNorm * 4.5) * auricle;
+          v.zenithFilter.gain.setTargetAtTime(zenithDb, now, spatTc);
+
+          // (c) Torso / Chest Cavity vs. Overhead Weightlessness (320 Hz low-shelf: +6.5 dB Below Chin vs -5.5 dB Above Crown)
+          const torsoDb = (-elevNorm * 6.0) * auricle;
+          v.torsoFilter.gain.setTargetAtTime(torsoDb, now, spatTc);
+
+          // Sweep the high-frequency Auricle Velvet Air band (4.5 kHz .. 9.2 kHz) with elevation so the Pinna Notch & Zenith Peak are always vivid
+          v.noiseBand.frequency.setTargetAtTime(6400 + elevNorm * 2400, now, spatTc);
+
+          // 4. Pinna Rim Rear Cartilage Shadow & Vertical Shoulder Shadow Low-Pass:
+          // Wide open in front & overhead (up to 15.5 kHz); shadowed behind neck or below torso
+          const elevOpen = 1.0 + 0.22 * elevNorm;
           const baseShadow = frontness >= 0
-            ? 5500 + frontness * 9000
-            : 5500 * Math.pow(0.28 + 0.45 * (1 - auricle), -frontness);
-          v.shadowFilter.frequency.setTargetAtTime(Math.max(650, baseShadow * distAirDamp), now, spatTc);
+            ? (5800 + frontness * 9200) * elevOpen
+            : 5500 * Math.pow(0.28 + 0.45 * (1 - auricle), -frontness) * elevOpen;
+          v.shadowFilter.frequency.setTargetAtTime(Math.max(650, Math.min(16500, baseShadow * distAirDamp)), now, spatTc);
 
           // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..680 us) + Radial Doppler Delay:
           const absSin = Math.abs(sinTheta);
