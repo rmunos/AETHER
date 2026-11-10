@@ -116,11 +116,11 @@ class ConsciousnessAudioEngine {
     };
 
     this.tuningRatios = {
-      octaves: [1, 1.5, 2, 2.5, 3, 4, 5, 6],
-      just: [1, 9 / 8, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 15 / 8, 2],
-      golden: [1, 1.27202, 1.61803, 2.05817, 2.61803, 3.33019, 4.23607, 5.38836],
-      overtone: [1, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75],
-      quartal: [1, 4 / 3, 3 / 2, 16 / 9, 9 / 4, 8 / 3, 3.0, 16 / 5]
+      octaves: [1, 1, 2, 2, 3, 3, 4, 4],
+      just: [1, 5 / 4, 3 / 2, 2, 5 / 2, 3, 4, 6],
+      golden: [1, 3 / 2, 2, 3, 4, 6, 8, 12],
+      overtone: [1, 2, 3, 4, 5, 6, 7, 8],
+      quartal: [1, 4 / 3, 3 / 2, 2, 8 / 3, 3, 4, 6]
     };
 
     this.nodes = {};
@@ -397,22 +397,43 @@ class ConsciousnessAudioEngine {
     const ratios = this.tuningRatios[this.params.spatial.tuning] || this.tuningRatios.octaves;
     const voices = [];
 
-    // Create a soft, warm Singing Bowl PeriodicWave (gentle 1f, 2f, 3f, 4f partials only — zero buzzy high harmonics!)
+    // 1. Warm Pure Integer Harmonic Wave (exact integer harmonics 1f, 2f, 3f, 4f, 5f, 6f, 8f)
+    // 2. High Pinna-Localization Pure Integer Harmonic Wave (harmonics 6f..48f across 1-8.5 kHz for razor-sharp 3D ITD & Ear-Auricle localization)
     let warmHarmonicWave = null;
+    let pinnaHarmonicWave = null;
     if (typeof this.ctx.createPeriodicWave === 'function') {
-      const real = new Float32Array(8);
-      const imag = new Float32Array(8);
-      imag[1] = 1.00;  // 1f Pure Fundamental
-      imag[2] = 0.28;  // 2f Soft Octave warmth
-      imag[3] = 0.12;  // 3f Soft Perfect Fifth
-      imag[4] = 0.05;  // 4f Whisper Double Octave
+      const real = new Float32Array(9);
+      const imag = new Float32Array(9);
+      imag[1] = 1.00;  // 1f Fundamental
+      imag[2] = 0.52;  // 2f Octave
+      imag[3] = 0.30;  // 3f Twelfth (Perfect 5th)
+      imag[4] = 0.18;  // 4f Double Octave
+      imag[5] = 0.10;  // 5f Pure Major Third
+      imag[6] = 0.06;  // 6f Perfect Fifth
+      imag[8] = 0.03;  // 8f Triple Octave
       warmHarmonicWave = this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+
+      const pReal = new Float32Array(49);
+      const pImag = new Float32Array(49);
+      pImag[6] = 0.35;   // ~1.04 kHz (Posterior Blauert Back-of-Neck cue)
+      pImag[8] = 0.30;   // ~1.39 kHz
+      pImag[10] = 0.26;  // ~1.74 kHz
+      pImag[12] = 0.22;  // ~2.09 kHz
+      pImag[16] = 0.20;  // ~2.78 kHz
+      pImag[20] = 0.18;  // ~3.48 kHz (Frontal Blauert Front-of-Face cue)
+      pImag[24] = 0.16;  // ~4.18 kHz (Below-Chin Notch & Concha Funnel cue)
+      pImag[28] = 0.14;  // ~4.87 kHz (Concha Cavity resonance)
+      pImag[32] = 0.12;  // ~5.57 kHz
+      pImag[36] = 0.10;  // ~6.26 kHz (Ear-level Pinna Antihelix Notch)
+      pImag[42] = 0.08;  // ~7.31 kHz
+      pImag[48] = 0.07;  // ~8.35 kHz (Blauert Overhead Zenith +85° Sky cue)
+      pinnaHarmonicWave = this.ctx.createPeriodicWave(pReal, pImag, { disableNormalization: false });
     }
 
     for (let i = 0; i < 8; i++) {
       const freq = baseFreq * ratios[i];
 
-      // A. Continuous Moving Source Generators (Pure Sine Singing Bowl & Crystal Harp Choir — ZERO white noise or buzzy organ!)
+      // A. Continuous Generators kept at 0.0 on harmonic modes (replaced by Pure Integer Harmonic 3D Acoustic Pulses!)
       const osc = this.ctx.createOscillator();
       const bodyOsc = this.ctx.createOscillator();
       const overtoneOsc = this.ctx.createOscillator();
@@ -423,18 +444,17 @@ class ConsciousnessAudioEngine {
 
       osc.type = 'sine';
       osc.frequency.value = freq;
-      toneGain.gain.value = 0.28;
+      toneGain.gain.value = 0.0;
 
       bodyOsc.type = 'sine';
-      bodyOsc.frequency.value = freq * 1.5; // Pure 3:2 Perfect Fifth sine harmonic
+      bodyOsc.frequency.value = freq * 2.0; // Pure 2:1 Octave
       bodyFilter.type = 'lowpass';
       bodyFilter.frequency.value = Math.min(2600, freq * 4.5);
-      bodyGain.gain.value = 0.16;
+      bodyGain.gain.value = 0.0;
 
-      // Pure 2:1 Octave sine shimmer
       overtoneOsc.type = 'sine';
-      overtoneOsc.frequency.value = Math.min(4800, freq * 2.0);
-      overtoneGain.gain.value = 0.10;
+      overtoneOsc.frequency.value = Math.min(4800, freq * 3.0);
+      overtoneGain.gain.value = 0.0;
 
       // Broadband Texture (Strictly 0.0 on Singing Bowl / Water Drop / Harmonic modes so there is ZERO white noise or wind!)
       const noiseSrc = this.ctx.createBufferSource();
@@ -699,6 +719,7 @@ class ConsciousnessAudioEngine {
       clickBuf,
       voices,
       warmHarmonicWave,
+      pinnaHarmonicWave,
       coreOscL,
       coreOscR,
       coreGainL,
@@ -714,7 +735,9 @@ class ConsciousnessAudioEngine {
   }
 
   /**
-   * Configures continuous moving voice timbres for the selected 8D Sound & ASMR Palette
+   * Configures voice timbres for the selected 8D Sound & ASMR Palette
+   * On harmonic modes ('water_bowl', 'water_drops', 'rich8d', 'tapping'), the continuous droning oscillators are
+   * completely silenced (0.0) and replaced by Pure Integer Harmonic 3D Acoustic Pulses (`_triggerPureHarmonic3DOnVoice`)!
    */
   _applySpatialPaletteVoicing(palette) {
     if (!this.nodes.spatial || !this.ctx) return;
@@ -729,122 +752,114 @@ class ConsciousnessAudioEngine {
       v.osc.type = 'sine';
       v.bodyOsc.type = 'sine';
       v.osc.frequency.setTargetAtTime(f, now, 0.06);
-      v.bodyOsc.frequency.setTargetAtTime(f * 1.5, now, 0.06);
+      v.bodyOsc.frequency.setTargetAtTime(f * 2.0, now, 0.06);
 
-      if (palette === 'water_bowl') {
-        // Pure Crystal & Tibetan Singing Bowl Harmonic Choir (Pure Sines + Plucked Singing Bowl Chimes, ZERO white noise!)
-        v.toneGain.gain.setTargetAtTime(0.28, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.16, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(2600, f * 4.5), now, 0.06);
-        v.overtoneOsc.type = 'sine';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.10, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.0, now, 0.04);
-        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.04);
-      } else if (palette === 'water_drops') {
-        // Pure Harmonic Crystal Sanctuary + Water Droplets (ZERO white noise/wind!)
-        v.toneGain.gain.setTargetAtTime(0.24, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.14, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(2400, f * 4.0), now, 0.06);
-        v.overtoneOsc.type = 'sine';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.09, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.0, now, 0.04);
-        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.04);
+      if (palette === 'water_bowl' || palette === 'water_drops' || palette === 'tapping' || palette === 'rich8d') {
+        // Silence continuous droning oscillators — replaced by Pure Integer Harmonic 3D Acoustic Pulses!
+        v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.03);
       } else if (palette === 'crackle') {
-        // Continuous Binaural Silk Brush + Soft Warm Harmonic Halo
-        v.toneGain.gain.setTargetAtTime(0.24, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.12, now, 0.06);
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.12, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.14, now, 0.06);
+        // Soft Binaural Silk Brush
+        v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantGain.gain.setTargetAtTime(0.10, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.12, now, 0.06);
       } else if (palette === 'whisper') {
-        // Continuous 8D Whispered Vocal Formants & Breath Halo
-        v.toneGain.gain.setTargetAtTime(0.20, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.10, now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.06, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.28, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.16, now, 0.06);
-      } else if (palette === 'tapping') {
-        // Warm Hollow Marimba / Bamboo Harmonic Chord + Crisp 3D Taps (ZERO white noise!)
-        v.toneGain.gain.setTargetAtTime(0.26, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.15, now, 0.06);
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.10, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.0, now, 0.04);
-        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.04);
+        // Soft 8D Whispered Vocal Formants
+        v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantGain.gain.setTargetAtTime(0.24, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.14, now, 0.06);
       } else if (palette === 'shamanic') {
-        // Tibetan / Tuvan Overtone Singing Drone + Pure Harmonic Fifth & Overtone (ZERO white noise!)
-        v.toneGain.gain.setTargetAtTime(0.30, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.18, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(2600, f * 4.5), now, 0.06);
+        // Pure Integer Harmonic Overtone Drone (zero white noise)
+        v.toneGain.gain.setTargetAtTime(0.18, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.10, now, 0.06);
         v.overtoneOsc.type = 'sine';
         v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 3.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.14, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.0, now, 0.04);
-        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.04);
-      } else {
-        // 'rich8d': Full-Spectrum 8D Celestial Harmonic Choir & Crystal Harp (ZERO white noise!)
-        v.toneGain.gain.setTargetAtTime(0.32, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.18, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(2800, f * 5.0), now, 0.06);
-        v.overtoneOsc.type = 'sine';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.12, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.0, now, 0.04);
-        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.04);
+        v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.noiseGain.gain.setTargetAtTime(0.0, now, 0.03);
       }
     });
   }
 
   /**
-   * Gently plucks a warm, noise-free Just-Intonation Crystal Harp / Singing Bowl harmonic note directly into `v.pulseGain`
-   * using pure sine harmonics (1f Root + 1.5f Perfect Fifth + 2f Octave) with a soft singing bloom and long decay.
+   * Emits a 100% Pure Integer Harmonic 3D Acoustic Pluck / Bell Note (`n * f0` for integer `n = 1, 2, 3, 4, 5, 6, 8..48`)
+   * directly into `v.preAuricle` so it passes through the full 6-stage Ear Auricle + Elevation + Cranial Shadow + ITD + HRTF chain!
+   * - Because every partial is an exact integer multiple of `f0` (Moving Source Base Pitch), it sounds 100% pure & consonant.
+   * - Because each pulse has a crisp 4ms acoustic pluck onset + upper integer harmonics spanning 1-8.5 kHz that decay over 95ms
+   *   into a warm 500ms fundamental tail, the human ear locks onto its 3D Left/Right ITD, Front/Back Blauert bands, and
+   *   Up/Down Pinna Elevation Notch with maximum 3D precision!
    */
-  _triggerHarmonicChimeOnVoice(v, now) {
-    if (!this.ctx || !v || !v.pulseGain) return;
-    const base = v.freq || 174;
-    // Pure Just-Intonation Major9 / Pentatonic ratios: Root (1), Major 2nd (9/8), Major 3rd (5/4), Perfect 5th (3/2), Major 6th (5/3), Octave (2), Major 9th (9/4), Major 10th (5/2)
-    const chordRatios = [1.0, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2.0, 9 / 4, 5 / 2];
-    const r = chordRatios[(v.index * 3 + Math.floor(Math.random() * chordRatios.length)) % chordRatios.length];
-    const f1 = Math.min(1800, base * r);
-    const f2 = Math.min(2700, f1 * 1.5); // Pure 3:2 Fifth sine partial
-    const f3 = Math.min(3600, f1 * 2.0); // Pure 2:1 Octave sine partial (gives crisp 3D ear-auricle localization without noise)
+  _triggerPureHarmonic3DOnVoice(v, now, level = 1.0) {
+    if (!this.ctx || !v || !v.preAuricle) return;
+    const f0 = Math.max(40, Math.min(880, v.freq || this.params.spatial.baseFreq || 174));
+    const dest = v.preAuricle;
 
-    const osc1 = this.ctx.createOscillator();
-    const osc2 = this.ctx.createOscillator();
-    const osc3 = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    const g2 = this.ctx.createGain();
-    const g3 = this.ctx.createGain();
+    // Record visual ripple at the exact 3D position of Voice v for the 3D radar canvas
+    const tv = this.telemetry.spatialVoices[v.index];
+    if (tv) {
+      this.telemetry.spatialRipples.push({
+        x: tv.x,
+        y: tv.y,
+        z: tv.z,
+        time: now,
+        voiceIndex: v.index,
+        palette: 'harmonic'
+      });
+      if (this.telemetry.spatialRipples.length > 28) {
+        this.telemetry.spatialRipples.shift();
+      }
+    }
 
-    osc1.type = 'sine';
-    osc2.type = 'sine';
-    osc3.type = 'sine';
-    osc1.frequency.setValueAtTime(f1, now);
-    osc2.frequency.setValueAtTime(f2, now);
-    osc3.frequency.setValueAtTime(f3, now);
-    g2.gain.value = 0.28;
-    g3.gain.value = 0.14;
+    // Layer 1: Warm Pure Integer Harmonic Body (1f, 2f, 3f, 4f, 5f, 6f, 8f)
+    const bodyOsc = this.ctx.createOscillator();
+    const bodyEnv = this.ctx.createGain();
+    if (this.nodes.spatial.warmHarmonicWave && typeof bodyOsc.setPeriodicWave === 'function') {
+      bodyOsc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+    } else {
+      bodyOsc.type = 'sine';
+    }
+    bodyOsc.frequency.setValueAtTime(f0, now);
 
-    const dur = 1.75;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.linearRampToValueAtTime(0.32, now + 0.045); // Soft, warm singing-bowl/crystal-harp bloom (zero click)
-    g.gain.exponentialRampToValueAtTime(0.0005, now + dur);
+    const bodyDur = 0.52;
+    const bodyPeak = 0.62 * level;
+    bodyEnv.gain.setValueAtTime(0.0001, now);
+    bodyEnv.gain.linearRampToValueAtTime(bodyPeak, now + 0.005); // Crisp, click-free 5ms acoustic onset for ITD lock
+    bodyEnv.gain.exponentialRampToValueAtTime(0.0005, now + bodyDur);
 
-    osc1.connect(g);
-    osc2.connect(g2);
-    osc3.connect(g3);
-    g2.connect(g);
-    g3.connect(g);
-    g.connect(v.pulseGain);
-    osc1.start(now);
-    osc2.start(now);
-    osc3.start(now);
-    osc1.stop(now + dur + 0.02);
-    osc2.stop(now + dur + 0.02);
-    osc3.stop(now + dur + 0.02);
+    bodyOsc.connect(bodyEnv);
+    bodyEnv.connect(dest);
+    bodyOsc.start(now);
+    bodyOsc.stop(now + bodyDur + 0.015);
+
+    // Layer 2: Upper Integer Harmonic Pinna-Localization Pluck (6f..48f across 1-8.5 kHz, 95ms natural string/bell pluck decay)
+    // Gives the Ear Auricle (Blauert 1.05/3.65 kHz, Concha 4.5 kHz, Pinna Notch 4.2-11 kHz, Zenith 8.6 kHz) full pure-harmonic energy!
+    const pinnaOsc = this.ctx.createOscillator();
+    const pinnaEnv = this.ctx.createGain();
+    if (this.nodes.spatial.pinnaHarmonicWave && typeof pinnaOsc.setPeriodicWave === 'function') {
+      pinnaOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+      pinnaOsc.frequency.setValueAtTime(f0, now);
+    } else {
+      pinnaOsc.type = 'sine';
+      pinnaOsc.frequency.setValueAtTime(Math.min(4800, f0 * 8.0), now);
+    }
+
+    const pinnaDur = 0.095;
+    const pinnaPeak = 0.36 * level;
+    pinnaEnv.gain.setValueAtTime(0.0001, now);
+    pinnaEnv.gain.linearRampToValueAtTime(pinnaPeak, now + 0.003); // 3ms pluck transient
+    pinnaEnv.gain.exponentialRampToValueAtTime(0.0005, now + pinnaDur);
+
+    pinnaOsc.connect(pinnaEnv);
+    pinnaEnv.connect(dest);
+    pinnaOsc.start(now);
+    pinnaOsc.stop(now + pinnaDur + 0.01);
   }
 
   /**
@@ -930,36 +945,6 @@ class ConsciousnessAudioEngine {
         subDropGain.connect(dest);
         subDropOsc.start(t2);
         subDropOsc.stop(t2 + 0.042);
-      }
-
-      // 4. In 'water_bowl' mode, when harmonic pad is blended in (pulse > 0.15), droplets also gently excite a Just-Intonation Singing Bowl chord
-      const currentMix = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.50;
-      if (palette === 'water_bowl' && currentMix > 0.15 && Math.random() < 0.48) {
-        const harmRatios = [1.0, 1.25, 1.5, 2.0, 3.0];
-        const ratio = harmRatios[Math.floor(Math.random() * harmRatios.length)];
-        const bowlFreq = Math.max(110, Math.min(1320, v.freq * ratio));
-        const bowlOsc = this.ctx.createOscillator();
-        const bowlFifth = this.ctx.createOscillator();
-        const bowlGain = this.ctx.createGain();
-        bowlOsc.type = 'sine';
-        bowlOsc.frequency.setValueAtTime(bowlFreq, now);
-        bowlFifth.type = 'sine';
-        bowlFifth.frequency.setValueAtTime(bowlFreq * 1.5, now);
-
-        const fifthGain = this.ctx.createGain();
-        fifthGain.gain.value = 0.35;
-
-        bowlGain.gain.setValueAtTime(0.001, now);
-        bowlGain.gain.linearRampToValueAtTime(0.22, now + 0.025);
-        bowlGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
-        bowlOsc.connect(bowlGain);
-        bowlFifth.connect(fifthGain);
-        fifthGain.connect(bowlGain);
-        bowlGain.connect(dest);
-        bowlOsc.start(now);
-        bowlFifth.start(now);
-        bowlOsc.stop(now + 0.88);
-        bowlFifth.stop(now + 0.88);
       }
     } else if (palette === 'crackle') {
       // 1. Tactile Binaural Silk Brush Stroke
@@ -2877,41 +2862,42 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.nextOvertoneStepTime = now + (1.1 + Math.random() * 1.3);
         }
 
-        // Schedule gentle Plucked Crystal Harp / Singing Bowl Harmonic Notes on the moving 3D sources when Harmonic Sound is active!
-        if (continuousLevel > 0.05 && now >= (this.nodes.spatial.nextHarmonicChimeTime || 0)) {
-          const isMergedBifurcation =
-            isBifurcationMode &&
-            this.telemetry.spatialVoices[0] &&
-            this.telemetry.spatialVoices[0].splitFactor !== undefined &&
-            this.telemetry.spatialVoices[0].splitFactor < 0.15;
-          const hIdx = isMergedBifurcation ? 0 : (this.nodes.spatial.lastTriggeredVoice || 0) % count;
-          this._triggerHarmonicChimeOnVoice(voices[hIdx], now);
-          this.nodes.spatial.nextHarmonicChimeTime = now + 0.55 + Math.random() * 0.45;
-        }
+        // Schedule 3D Spatialized Water Drops & Pure Integer Harmonic 3D Acoustic Pulses on the active moving 3D sources!
+        const effectiveRate = Math.max(0.4, triggerRate || 3.2);
+        const curSplit =
+          isBifurcationMode && this.telemetry.spatialVoices[0] && this.telemetry.spatialVoices[0].splitFactor !== undefined
+            ? this.telemetry.spatialVoices[0].splitFactor
+            : 1.0;
+        const isMergedBifurcation = isBifurcationMode && curSplit < 0.12;
 
-        // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources (only when dropLevel > 0)!
-        if (triggerRate > 0.05 && dropLevel > 0.01) {
-          const isMergedBifurcation =
-            isBifurcationMode &&
-            this.telemetry.spatialVoices[0] &&
-            this.telemetry.spatialVoices[0].splitFactor !== undefined &&
-            this.telemetry.spatialVoices[0].splitFactor < 0.15;
-
-          if (palette === 'shamanic') {
-            const drumPeriod = 1.0 / Math.max(1.0, triggerRate);
-            if (now >= this.nodes.spatial.nextShamanicTime) {
-              const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
-              this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
-              this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
-              this.nodes.spatial.nextShamanicTime = now + drumPeriod;
-            }
-          } else if (now >= this.nodes.spatial.nextTriggerTime) {
+        if (palette === 'shamanic' && dropLevel > 0.01) {
+          const drumPeriod = 1.0 / Math.max(1.0, effectiveRate);
+          if (now >= this.nodes.spatial.nextShamanicTime) {
             const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
             this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
             this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
-            const dt = (1.0 / triggerRate) * (0.55 + Math.random() * 0.90);
-            this.nodes.spatial.nextTriggerTime = now + dt;
+            if (continuousLevel > 0.02) {
+              this._triggerPureHarmonic3DOnVoice(voices[vIdx], now, continuousLevel);
+            }
+            this.nodes.spatial.nextShamanicTime = now + drumPeriod;
           }
+        } else if (now >= this.nodes.spatial.nextTriggerTime) {
+          const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
+          this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
+
+          if (dropLevel > 0.01) {
+            this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
+          }
+          if (continuousLevel > 0.01) {
+            // Pure Integer Harmonic 3D Pluck (slight 18ms offset when blended with water drop so both transients are crystal clear)
+            const hOffset = dropLevel > 0.05 ? 0.018 : 0.0;
+            this._triggerPureHarmonic3DOnVoice(voices[vIdx], now + hOffset, continuousLevel);
+          }
+
+          // When split into 2 branches (Left & Right), step cleanly between Left & Right so both 3D trajectories are distinctly localized
+          const splitCadenceBoost = isBifurcationMode && !isMergedBifurcation ? (1.0 + 0.75 * curSplit) : 1.0;
+          const dt = (1.0 / (effectiveRate * splitCadenceBoost)) * (0.78 + Math.random() * 0.44);
+          this.nodes.spatial.nextTriggerTime = now + dt;
         }
 
         for (let i = 0; i < voices.length; i++) {
@@ -2942,12 +2928,11 @@ class ConsciousnessAudioEngine {
             stageLabel = pos.stageLabel || '';
           }
 
-          // Keep each voice locked to its pure consonant harmonic frequencies (1.0x Fundamental + 1.5x Perfect Fifth + 2.0x Octave)
-          // with zero pitch-gliding siren! In 5m Split & Merge mode, the merge/split is purely spatial & balanced in gain.
+          // Keep each voice locked to its pure consonant integer harmonic frequencies (1.0x Fundamental, 2.0x Octave)
           v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
-          v.bodyOsc.frequency.setTargetAtTime(v.freq * 1.5, now, spatTc);
+          v.bodyOsc.frequency.setTargetAtTime(v.freq * 2.0, now, spatTc);
           if (isBifurcationMode) {
-            const mergeGainScale = 0.56 + 0.44 * splitFactor;
+            const mergeGainScale = 0.68 + 0.32 * splitFactor;
             v.voiceGain.gain.setTargetAtTime(v.weight * mergeGainScale, now, 0.04);
           } else {
             v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
