@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spatial: {
         enabled: true,
         palette: 'water_bowl',
-        trajectory: 'orbit8d',
+        trajectory: 'bifurcation5m',
         count: 2,
         baseFreq: 110,
         gain: 0.85,
@@ -1378,12 +1378,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
-    const activeCount = engine.params.spatial.count || 2;
+    const rawCount = engine.params.spatial.count || 2;
+    const isBifurcation = engine.params.spatial.trajectory === 'bifurcation5m';
+    const activeCount = isBifurcation ? Math.max(2, rawCount) : rawCount;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
+
+    // Show live 6-Stage Choreography Banner when in 'bifurcation5m' mode
+    if (isBifurcation && voices[0] && voices[0].stageLabel) {
+      ctx2d.fillStyle = 'rgba(56, 189, 248, 0.88)';
+      ctx2d.font = '10px "JetBrains Mono", monospace';
+      ctx2d.textAlign = 'center';
+      ctx2d.fillText(`5m SPLIT & MERGE // ${voices[0].stageLabel}`, cx, 36);
+      ctx2d.textAlign = 'left';
+    }
 
     voices.forEach((v) => {
       const energy = v.activeEnergy !== undefined ? v.activeEnergy : 1.0;
       if (energy < 0.01) return;
+
+      // When paired voices are merged into ONE sound in 'bifurcation5m', skip drawing the duplicate odd voice label/orb overlap
+      const isMergedOdd = isBifurcation && (v.index % 2 === 1) && v.splitFactor !== undefined && v.splitFactor < 0.06;
 
       const palette = [
         '56, 189, 248',  // Cyan
@@ -1397,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
       const hue = palette[v.index % palette.length];
 
-      // Draw Geometric Trail (shows 8D Orbit, Zenith Arch, 3D Helix, Figure-8 ∞, or Far-Horizon ray)
+      // Draw Geometric Trail (shows 8D Orbit, 5m Split & Merge, Zenith Arch, 3D Helix, Figure-8 ∞, or Far-Horizon ray)
       if (v.trail && v.trail.length > 2) {
         ctx2d.beginPath();
         for (let t = 0; t < v.trail.length; t++) {
@@ -1409,6 +1423,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx2d.lineWidth = 2.0;
         ctx2d.stroke();
       }
+
+      if (isMergedOdd) return;
 
       const { px, py, horizDist } = project3DToRadar(v.x, v.y, v.z, cx, cy, scale);
       const dist = v.dist || Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -1449,17 +1465,18 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.fillStyle = 'rgba(241, 245, 249, 0.88)';
       ctx2d.font = '9px "JetBrains Mono", monospace';
       ctx2d.textAlign = 'right';
-      ctx2d.fillText(`S${v.index + 1} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
+      const gaugeTag = isBifurcation && v.splitFactor < 0.06 ? 'MERGED' : `S${v.index + 1}`;
+      ctx2d.fillText(`${gaugeTag} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
       ctx2d.textAlign = 'left';
 
-      // Label with Source #, Horizontal Pinna Cue & Vertical Elevation Angle
+      // Label with Source #, Distance, Horizontal Pinna Cue & Vertical Elevation Angle
       ctx2d.fillStyle = 'rgba(241, 245, 249, 0.92)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
       const horizTag = dist < 0.28
-        ? 'NEAR-EAR'
-        : v.z > 0.25
+        ? 'IN-HEAD'
+        : v.z > 0.25 && Math.abs(v.x) < 0.35
         ? 'BACK'
-        : v.z < -0.25
+        : v.z < -0.25 && Math.abs(v.x) < 0.35
         ? 'FRONT'
         : v.x < 0
         ? 'LEFT'
@@ -1468,9 +1485,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `▲+${elevDeg}° SKY`
         : elevDeg < -18
         ? `▼${elevDeg}° FLOOR`
-        : `${elevDeg >= 0 ? '+' : ''}${elevDeg}° EAR`;
+        : `${dist.toFixed(1)}m`;
+      const srcPrefix = isBifurcation && v.splitFactor < 0.06 ? 'MERGED' : `S${v.index + 1}`;
       ctx2d.fillText(
-        `S${v.index + 1}: ${horizTag} · ${elevTag}`,
+        `${srcPrefix}: ${horizTag} · ${elevTag}`,
         px + radius + 5,
         py + 3
       );

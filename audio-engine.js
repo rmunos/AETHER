@@ -33,7 +33,7 @@ class ConsciousnessAudioEngine {
       spatial: {
         enabled: true,
         palette: 'water_bowl',  // 'water_bowl' | 'water_drops' | 'crackle' | 'whisper' | 'tapping' | 'rich8d' | 'shamanic'
-        trajectory: 'orbit8d',  // 'orbit8d' | 'infinity' | 'peripersonal' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
+        trajectory: 'bifurcation5m', // 'bifurcation5m' | 'orbit8d' | 'zenith_arch' | 'helix3d' | 'infinity' | 'peripersonal' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
         count: 2,               // 1..8 active moving 3D sources
         baseFreq: 110,          // 36..320 Hz base fundamental pitch
         gain: 0.85,
@@ -532,9 +532,9 @@ class ConsciousnessAudioEngine {
       const panner = this.ctx.createPanner();
       panner.panningModel = 'HRTF';
       panner.distanceModel = 'inverse';
-      panner.refDistance = 0.45;
+      panner.refDistance = 0.75;
       panner.maxDistance = 25;
-      panner.rolloffFactor = 1.35;
+      panner.rolloffFactor = 0.48;
 
       const hrtfGain = this.ctx.createGain();
       hrtfGain.gain.value = 0.45;
@@ -1088,8 +1088,76 @@ class ConsciousnessAudioEngine {
     const elevScale = Math.max(0, Math.min(1, elevRange));
 
     let x = 0, y = 0, z = -1;
+    let splitFactor = 1.0;
+    let stageLabel = '';
 
-    if (geom === 'orbit8d') {
+    if (geom === 'bifurcation5m') {
+      // 6-Stage Choreographed 5m Split & Merge Journey:
+      //  Stage 0 (0..1): Start inside Head (0,0,0) as ONE merged sound -> move straight in Front (-Z) until 5m away (0,0,-5)
+      //  Stage 1 (1..2): Duplicate into 2 sounds -> turn on a 5m circle arc (one Right +X, one Left -X) to full Right (+5,0,0) & full Left (-5,0,0)
+      //  Stage 2 (2..3): Go UP on a 5m vertical circle arc until they meet at Top of Head / Zenith 5m away (0,+5,0)
+      //  Stage 3 (3..4): Merge into ONE sound at Top of Head -> go DOWN behind the head until 5m Behind Head (0,0,+5)
+      //  Stage 4 (4..5): Duplicate behind head -> turn on a 5m circle arc (one Right +X, one Left -X) to full Right (+5,0,0) & full Left (-5,0,0)
+      //  Stage 5 (5..6): Move closer to the head in a straight line from +-5m until they merge inside the Head (0,0,0), then repeat!
+      const R = 5.0;
+      const side = i % 2 === 0 ? 1 : -1; // Even voices = Right (+X), Odd voices = Left (-X)
+      const pairIdx = Math.floor(i / 2);
+      const totalPairs = Math.max(1, Math.floor(count / 2));
+      const pairOffset = totalPairs > 1 ? (pairIdx / totalPairs) * 0.35 : 0;
+      const totalPhase = ((elapsed * speed * 0.90) + pairOffset) % 6.0;
+      const stage = Math.floor(totalPhase);
+      const u = totalPhase - stage; // 0..1 progress within current stage
+      const halfPi = Math.PI * 0.5;
+      const effElev = Math.max(0.25, elevScale);
+
+      if (stage === 0) {
+        // 1/6: Start from head (0,0,0) -> move straight forward in front of head to 5m (0,0,-5) as ONE sound
+        x = 0;
+        y = 0;
+        z = -R * u;
+        splitFactor = 0.0;
+        stageLabel = '1/6 HEAD → 5m FRONT (MERGED)';
+      } else if (stage === 1) {
+        // 2/6: Duplicate at 5m Front -> turn Right & Left on a 5m circle arc to full Right (+5,0,0) & full Left (-5,0,0)
+        const a = u * halfPi;
+        x = side * R * Math.sin(a);
+        y = 0;
+        z = -R * Math.cos(a);
+        splitFactor = Math.min(1.0, u * 4.0);
+        stageLabel = '2/6 DUPLICATE → 5m ARC L/R';
+      } else if (stage === 2) {
+        // 3/6: Go UP from full Right/Left 5m -> meet at Top of Head (Zenith) 5m away (0, +5, 0)
+        const phi = u * halfPi;
+        x = side * R * Math.cos(phi);
+        y = R * Math.sin(phi) * effElev;
+        z = 0;
+        splitFactor = Math.cos(phi);
+        stageLabel = '3/6 ASCEND L/R → MEET TOP ▲ (5m)';
+      } else if (stage === 3) {
+        // 4/6: Merge at Top of Head 5m -> go DOWN behind the head to 5m Behind Head (0, 0, +5)
+        const psi = u * halfPi;
+        x = 0;
+        y = R * Math.cos(psi) * effElev;
+        z = R * Math.sin(psi);
+        splitFactor = 0.0;
+        stageLabel = '4/6 MERGE TOP → DESCEND BACK ▼ (5m)';
+      } else if (stage === 4) {
+        // 5/6: Duplicate at 5m Behind Head -> turn Right & Left on a 5m circle arc to full Right (+5,0,0) & full Left (-5,0,0)
+        const a = u * halfPi;
+        x = side * R * Math.sin(a);
+        y = 0;
+        z = R * Math.cos(a);
+        splitFactor = Math.min(1.0, u * 4.0);
+        stageLabel = '5/6 DUPLICATE BACK → 5m ARC L/R';
+      } else {
+        // 6/6: Move closer to the head in a straight line from +-5m Right/Left -> merge inside the Head (0,0,0)
+        x = side * R * (1.0 - u);
+        y = 0;
+        z = 0;
+        splitFactor = 1.0 - u;
+        stageLabel = '6/6 STRAIGHT LINE → MERGE IN HEAD';
+      }
+    } else if (geom === 'orbit8d') {
       // 8D Spherical Orbit: Full 360° horizontal sweep coupled with true Spherical Elevation (phi in [-70°, +78°])
       // As phi rises toward +78° (Zenith), cos(phi) pulls x,z inward so the sound physically arches OVER the top of the skull!
       const dir = i % 2 === 0 ? 1 : -1;
@@ -1179,7 +1247,7 @@ class ConsciousnessAudioEngine {
       y = Math.sin(elevAngle) * (0.5 + 0.95 * elevScale);
     }
 
-    return { x, y, z, geomType: geom };
+    return { x, y, z, geomType: geom, splitFactor, stageLabel };
   }
 
   /**
@@ -2530,8 +2598,10 @@ class ConsciousnessAudioEngine {
         this.nodes.spatial._isMuted = false;
         const speed = this.params.spatial.speed;
         const asym = this.params.spatial.asymmetry;
-        const count = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
-        const trajectory = this.params.spatial.trajectory || 'orbit8d';
+        const rawCount = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
+        const trajectory = this.params.spatial.trajectory || 'bifurcation5m';
+        // Ensure at least 2 voices when using 'bifurcation5m' so Left & Right duplication is always active
+        const count = trajectory === 'bifurcation5m' ? Math.max(2, rawCount) : rawCount;
         const palette = this.params.spatial.palette || 'water_bowl';
         const continuousLevel = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.70;
         const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
@@ -2555,16 +2625,22 @@ class ConsciousnessAudioEngine {
 
         // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources!
         if (triggerRate > 0.05) {
+          const isMergedBifurcation =
+            trajectory === 'bifurcation5m' &&
+            this.telemetry.spatialVoices[0] &&
+            this.telemetry.spatialVoices[0].splitFactor !== undefined &&
+            this.telemetry.spatialVoices[0].splitFactor < 0.15;
+
           if (palette === 'shamanic') {
             const drumPeriod = 1.0 / Math.max(1.0, triggerRate);
             if (now >= this.nodes.spatial.nextShamanicTime) {
-              const vIdx = this.nodes.spatial.lastTriggeredVoice % count;
+              const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
               this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
               this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
               this.nodes.spatial.nextShamanicTime = now + drumPeriod;
             }
           } else if (now >= this.nodes.spatial.nextTriggerTime) {
-            const vIdx = this.nodes.spatial.lastTriggeredVoice % count;
+            const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
             this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
             this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
             const dt = (1.0 / triggerRate) * (0.55 + Math.random() * 0.90);
@@ -2584,9 +2660,7 @@ class ConsciousnessAudioEngine {
             continue;
           }
 
-          v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
-
-          let x, y, z, geomType;
+          let x, y, z, geomType, splitFactor = 1.0, stageLabel = '';
           if (manualPos && i === 0) {
             x = manualPos.x;
             y = manualPos.y;
@@ -2598,6 +2672,23 @@ class ConsciousnessAudioEngine {
             y = pos.y;
             z = pos.z;
             geomType = pos.geomType;
+            splitFactor = pos.splitFactor !== undefined ? pos.splitFactor : 1.0;
+            stageLabel = pos.stageLabel || '';
+          }
+
+          // When merged in 'bifurcation5m' (splitFactor -> 0), fuse paired voices (0 & 1) into ONE single unified pitch & energy!
+          // When duplicated (splitFactor -> 1), they separate into independent Left & Right voices and harmonic intervals.
+          if (trajectory === 'bifurcation5m') {
+            const pairBaseVoice = voices[Math.floor(i / 2) * 2] || voices[0];
+            const targetFreq = pairBaseVoice.freq + (v.freq - pairBaseVoice.freq) * splitFactor;
+            v.osc.frequency.setTargetAtTime(targetFreq, now, spatTc);
+            v.bodyOsc.frequency.setTargetAtTime(targetFreq * 2.756, now, spatTc);
+            const mergeGainScale = 0.54 + 0.46 * splitFactor;
+            v.voiceGain.gain.setTargetAtTime(v.weight * mergeGainScale, now, 0.04);
+          } else {
+            v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
+            v.bodyOsc.frequency.setTargetAtTime(v.freq * 2.756, now, spatTc);
+            v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
           }
 
           if (v.panner.positionX) {
@@ -2618,7 +2709,7 @@ class ConsciousnessAudioEngine {
           const sinTheta = Math.max(-1, Math.min(1, x / safeDist));
           const frontness = Math.max(-1, Math.min(1, -z / safeDist));
           const elevNorm = Math.max(-1, Math.min(1, y / safeDist));
-          const distAirDamp = 1 / (1 + Math.max(0, dist - 0.5) * 0.22);
+          const distAirDamp = 1 / (1 + Math.max(0, dist - 0.5) * 0.14);
 
           // 1. Blauert Front vs. Back Directional Band Filter:
           // Front (z < 0): boosts 3650 Hz frontal presence band.
@@ -2686,7 +2777,7 @@ class ConsciousnessAudioEngine {
           // True distance from source (x,y,z) to Left Ear (-0.09,0,0) and Right Ear (+0.09,0,0)
           const dL = Math.sqrt((x + 0.09) * (x + 0.09) + y * y + z * z + 0.012);
           const dR = Math.sqrt((x - 0.09) * (x - 0.09) + y * y + z * z + 0.012);
-          const distAtten = 1 / (1 + 0.32 * Math.pow(Math.max(0, dist - 0.25), 1.2));
+          const distAtten = 1 / (1 + 0.16 * Math.pow(Math.max(0, dist - 0.20), 0.92));
           const panAngle = (sinTheta + 1) * (Math.PI * 0.25); // 0 (Left) .. PI/2 (Right)
           const nearRatioL = Math.min(1.65, 0.45 / dL);
           const nearRatioR = Math.min(1.65, 0.45 / dR);
@@ -2719,6 +2810,8 @@ class ConsciousnessAudioEngine {
           tv.z = z;
           tv.dist = dist;
           tv.geomType = geomType;
+          tv.splitFactor = splitFactor;
+          tv.stageLabel = stageLabel;
           tv.activeEnergy = activeEnergy;
 
           // Store trail point for 3D geometric path visualization (skip in background to save CPU)
