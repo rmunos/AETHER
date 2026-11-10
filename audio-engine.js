@@ -33,7 +33,7 @@ class ConsciousnessAudioEngine {
       spatial: {
         enabled: true,
         palette: 'water_bowl',  // 'water_bowl' | 'water_drops' | 'crackle' | 'whisper' | 'tapping' | 'rich8d' | 'shamanic'
-        trajectory: 'bifurcation5m', // 'bifurcation5m' | 'orbit8d' | 'zenith_arch' | 'helix3d' | 'infinity' | 'peripersonal' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
+        trajectory: 'bifurcation_random', // 'bifurcation_random' | 'bifurcation5m' | 'orbit8d' | 'zenith_arch' | 'helix3d' | 'infinity' | 'peripersonal' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
         count: 2,               // 1..8 active moving 3D sources
         baseFreq: 110,          // 36..320 Hz base fundamental pitch
         gain: 0.85,
@@ -1073,13 +1073,31 @@ class ConsciousnessAudioEngine {
   }
 
   /**
+   * Returns a synchronized random variation index (0..5) for each 6-stage cycle of 'bifurcation_random'
+   * Never repeats the same variation twice in a row, and keeps all paired voices (Right & Left) 100% locked.
+   */
+  _getBifurcationVariation(cycleIdx) {
+    if (!this._bifurcationSeed) {
+      this._bifurcationSeed = Math.floor(Math.random() * 100000) + 1337;
+    }
+    let prev = Math.floor(this._bifurcationSeed) % 6;
+    if (cycleIdx <= 0) return prev;
+    for (let c = 1; c <= cycleIdx; c++) {
+      const h = Math.abs(Math.sin(c * 12.9898 + this._bifurcationSeed * 78.233) * 43758.5453);
+      const step = 1 + (Math.floor(h) % 5); // 1..5 offset guarantees next variation != prev
+      prev = (prev + step) % 6;
+    }
+    return prev;
+  }
+
+  /**
    * Computes 3D (x, y, z) spherical coordinates for source `i` according to selected 3D / 8D geometry
    * Includes full vertical elevation (-75° Below Chin/Floor <-> +85° Overhead Crown/Zenith)
    */
   _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode, elevRange = 0.85) {
     let geom = trajectoryMode;
     if (trajectoryMode === 'mixed') {
-      const modes = ['orbit8d', 'zenith_arch', 'helix3d', 'infinity'];
+      const modes = ['bifurcation_random', 'orbit8d', 'zenith_arch', 'helix3d'];
       geom = modes[i % modes.length];
     }
 
@@ -1091,71 +1109,219 @@ class ConsciousnessAudioEngine {
     let splitFactor = 1.0;
     let stageLabel = '';
 
-    if (geom === 'bifurcation5m') {
-      // 6-Stage Choreographed 5m Split & Merge Journey:
-      //  Stage 0 (0..1): Start inside Head (0,0,0) as ONE merged sound -> move straight in Front (-Z) until 5m away (0,0,-5)
-      //  Stage 1 (1..2): Duplicate into 2 sounds -> turn on a 5m circle arc (one Right +X, one Left -X) to full Right (+5,0,0) & full Left (-5,0,0)
-      //  Stage 2 (2..3): Go UP on a 5m vertical circle arc until they meet at Top of Head / Zenith 5m away (0,+5,0)
-      //  Stage 3 (3..4): Merge into ONE sound at Top of Head -> go DOWN behind the head until 5m Behind Head (0,0,+5)
-      //  Stage 4 (4..5): Duplicate behind head -> turn on a 5m circle arc (one Right +X, one Left -X) to full Right (+5,0,0) & full Left (-5,0,0)
-      //  Stage 5 (5..6): Move closer to the head in a straight line from +-5m until they merge inside the Head (0,0,0), then repeat!
+    if (geom === 'bifurcation5m' || geom === 'bifurcation_random') {
+      // 6-Stage Choreographed 5m Split & Merge Journeys (Classic + 6 Random Evolving Variations):
+      // Every variation starts inside the Head (0,0,0), travels out to 5m, duplicates into two symmetric branches
+      // along 5m spherical arcs (Left/Right, Top Zenith ▲, Floor ▼, Front, Back), merges at a 5m pole,
+      // duplicates again, and returns in a straight line to merge inside the Head (0,0,0)!
       const R = 5.0;
-      const side = i % 2 === 0 ? 1 : -1; // Even voices = Right (+X), Odd voices = Left (-X)
+      const side = i % 2 === 0 ? 1 : -1; // +1 = Right / Upper branch, -1 = Left / Lower branch
       const pairIdx = Math.floor(i / 2);
       const totalPairs = Math.max(1, Math.floor(count / 2));
       const pairOffset = totalPairs > 1 ? (pairIdx / totalPairs) * 0.35 : 0;
-      const totalPhase = ((elapsed * speed * 0.90) + pairOffset) % 6.0;
+      const continuousStage = (elapsed * speed * 0.90) + pairOffset;
+      const cycleIdx = Math.floor(continuousStage / 6.0);
+      const totalPhase = continuousStage % 6.0;
       const stage = Math.floor(totalPhase);
       const u = totalPhase - stage; // 0..1 progress within current stage
       const halfPi = Math.PI * 0.5;
       const effElev = Math.max(0.25, elevScale);
 
-      if (stage === 0) {
-        // 1/6: Start from head (0,0,0) -> move straight forward in front of head to 5m (0,0,-5) as ONE sound
-        x = 0;
-        y = 0;
-        z = -R * u;
-        splitFactor = 0.0;
-        stageLabel = '1/6 HEAD → 5m FRONT (MERGED)';
-      } else if (stage === 1) {
-        // 2/6: Duplicate at 5m Front -> turn Right & Left on a 5m circle arc to full Right (+5,0,0) & full Left (-5,0,0)
-        const a = u * halfPi;
-        x = side * R * Math.sin(a);
-        y = 0;
-        z = -R * Math.cos(a);
-        splitFactor = Math.min(1.0, u * 4.0);
-        stageLabel = '2/6 DUPLICATE → 5m ARC L/R';
-      } else if (stage === 2) {
-        // 3/6: Go UP from full Right/Left 5m -> meet at Top of Head (Zenith) 5m away (0, +5, 0)
-        const phi = u * halfPi;
-        x = side * R * Math.cos(phi);
-        y = R * Math.sin(phi) * effElev;
-        z = 0;
-        splitFactor = Math.cos(phi);
-        stageLabel = '3/6 ASCEND L/R → MEET TOP ▲ (5m)';
-      } else if (stage === 3) {
-        // 4/6: Merge at Top of Head 5m -> go DOWN behind the head to 5m Behind Head (0, 0, +5)
-        const psi = u * halfPi;
-        x = 0;
-        y = R * Math.cos(psi) * effElev;
-        z = R * Math.sin(psi);
-        splitFactor = 0.0;
-        stageLabel = '4/6 MERGE TOP → DESCEND BACK ▼ (5m)';
-      } else if (stage === 4) {
-        // 5/6: Duplicate at 5m Behind Head -> turn Right & Left on a 5m circle arc to full Right (+5,0,0) & full Left (-5,0,0)
-        const a = u * halfPi;
-        x = side * R * Math.sin(a);
-        y = 0;
-        z = R * Math.cos(a);
-        splitFactor = Math.min(1.0, u * 4.0);
-        stageLabel = '5/6 DUPLICATE BACK → 5m ARC L/R';
+      const varIdx = geom === 'bifurcation5m' ? 0 : this._getBifurcationVariation(cycleIdx);
+
+      if (varIdx === 0) {
+        // VARIATION 1 (CLASSIC): Head -> 5m Front -> Split L/R -> Meet 5m Top ▲ -> Merge Down to 5m Back -> Split L/R -> Straight to Head
+        if (stage === 0) {
+          x = 0; y = 0; z = -R * u;
+          splitFactor = 0.0;
+          stageLabel = 'V1 [1/6] HEAD → 5m FRONT (MERGED)';
+        } else if (stage === 1) {
+          const a = u * halfPi;
+          x = side * R * Math.sin(a); y = 0; z = -R * Math.cos(a);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V1 [2/6] DUPLICATE → 5m ARC L/R';
+        } else if (stage === 2) {
+          const phi = u * halfPi;
+          x = side * R * Math.cos(phi); y = R * Math.sin(phi) * effElev; z = 0;
+          splitFactor = Math.cos(phi);
+          stageLabel = 'V1 [3/6] ASCEND L/R → MEET TOP ▲ (5m)';
+        } else if (stage === 3) {
+          const psi = u * halfPi;
+          x = 0; y = R * Math.cos(psi) * effElev; z = R * Math.sin(psi);
+          splitFactor = 0.0;
+          stageLabel = 'V1 [4/6] MERGE TOP → DESCEND BACK ▼ (5m)';
+        } else if (stage === 4) {
+          const a = u * halfPi;
+          x = side * R * Math.sin(a); y = 0; z = R * Math.cos(a);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V1 [5/6] DUPLICATE BACK → 5m ARC L/R';
+        } else {
+          x = side * R * (1.0 - u); y = 0; z = 0;
+          splitFactor = 1.0 - u;
+          stageLabel = 'V1 [6/6] STRAIGHT LINE L/R → MERGE IN HEAD';
+        }
+      } else if (varIdx === 1) {
+        // VARIATION 2 (CROWN ZENITH): Head -> 5m Top ▲ -> Split L/R Down -> Meet 5m Floor ▼ -> Merge Up to 5m Front -> Split L/R -> Straight to Head
+        if (stage === 0) {
+          x = 0; y = R * u * effElev; z = 0;
+          splitFactor = 0.0;
+          stageLabel = 'V2 [1/6] HEAD → 5m TOP ZENITH ▲ (MERGED)';
+        } else if (stage === 1) {
+          const phi = u * halfPi;
+          x = side * R * Math.sin(phi); y = R * Math.cos(phi) * effElev; z = 0;
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V2 [2/6] SPLIT AT TOP ▲ → DESCEND L/R (5m)';
+        } else if (stage === 2) {
+          const phi = u * halfPi;
+          x = side * R * Math.cos(phi); y = -R * Math.sin(phi) * effElev; z = 0;
+          splitFactor = Math.cos(phi);
+          stageLabel = 'V2 [3/6] DIVE L/R → MEET FLOOR ▼ (5m)';
+        } else if (stage === 3) {
+          const psi = u * halfPi;
+          x = 0; y = -R * Math.cos(psi) * effElev; z = -R * Math.sin(psi);
+          splitFactor = 0.0;
+          stageLabel = 'V2 [4/6] MERGE FLOOR ▼ → RISE 5m FRONT';
+        } else if (stage === 4) {
+          const a = u * halfPi;
+          x = side * R * Math.sin(a); y = 0; z = -R * Math.cos(a);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V2 [5/6] DUPLICATE FRONT → 5m ARC L/R';
+        } else {
+          x = side * R * (1.0 - u); y = 0; z = 0;
+          splitFactor = 1.0 - u;
+          stageLabel = 'V2 [6/6] STRAIGHT LINE L/R → MERGE IN HEAD';
+        }
+      } else if (varIdx === 2) {
+        // VARIATION 3 (VERTICAL SPLIT): Head -> 5m Back -> Split UP ▲ & DOWN ▼ -> Meet 5m Front -> Split L/R -> Meet 5m Top ▲ -> Straight Down into Head
+        if (stage === 0) {
+          x = 0; y = 0; z = R * u;
+          splitFactor = 0.0;
+          stageLabel = 'V3 [1/6] HEAD → 5m BEHIND NECK (MERGED)';
+        } else if (stage === 1) {
+          const phi = u * halfPi;
+          x = 0; y = side * R * Math.sin(phi) * effElev; z = R * Math.cos(phi);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V3 [2/6] VERTICAL SPLIT → UP ▲ & DOWN ▼ (5m)';
+        } else if (stage === 2) {
+          const phi = u * halfPi;
+          x = 0; y = side * R * Math.cos(phi) * effElev; z = -R * Math.sin(phi);
+          splitFactor = Math.cos(phi);
+          stageLabel = 'V3 [3/6] CONVERGE UP/DOWN → 5m FRONT';
+        } else if (stage === 3) {
+          const a = u * halfPi;
+          x = side * R * Math.sin(a); y = 0; z = -R * Math.cos(a);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V3 [4/6] DUPLICATE FRONT → 5m ARC L/R';
+        } else if (stage === 4) {
+          const phi = u * halfPi;
+          x = side * R * Math.cos(phi); y = R * Math.sin(phi) * effElev; z = 0;
+          splitFactor = Math.cos(phi);
+          stageLabel = 'V3 [5/6] ASCEND L/R → MERGE TOP ▲ (5m)';
+        } else {
+          x = 0; y = R * (1.0 - u) * effElev; z = 0;
+          splitFactor = 0.0;
+          stageLabel = 'V3 [6/6] STRAIGHT DOWN CROWN ▲ → HEAD';
+        }
+      } else if (varIdx === 3) {
+        // VARIATION 4 (BILATERAL BURST): Head -> Split Straight L/R to 5m -> Arc to 5m Front -> Merge & Arch Over Top ▲ to 5m Back -> Split 180° to Front -> Straight to Head
+        if (stage === 0) {
+          x = side * R * u; y = 0; z = 0;
+          splitFactor = Math.min(1.0, u * 3.0);
+          stageLabel = 'V4 [1/6] SPLIT IN HEAD → STRAIGHT 5m L/R';
+        } else if (stage === 1) {
+          const a = u * halfPi;
+          x = side * R * Math.cos(a); y = 0; z = -R * Math.sin(a);
+          splitFactor = Math.cos(a);
+          stageLabel = 'V4 [2/6] 5m ARC L/R → MEET 5m FRONT';
+        } else if (stage === 2) {
+          const phi = u * halfPi;
+          x = 0; y = R * Math.sin(phi) * effElev; z = -R * Math.cos(phi);
+          splitFactor = 0.0;
+          stageLabel = 'V4 [3/6] MERGE FRONT → ARCH TO TOP ▲ (5m)';
+        } else if (stage === 3) {
+          const phi = u * halfPi;
+          x = 0; y = R * Math.cos(phi) * effElev; z = R * Math.sin(phi);
+          splitFactor = 0.0;
+          stageLabel = 'V4 [4/6] OVERHEAD DOME ▲ → 5m BACK';
+        } else if (stage === 4) {
+          const a = u * Math.PI;
+          x = side * R * Math.sin(a); y = 0; z = R * Math.cos(a);
+          splitFactor = Math.sin(a);
+          stageLabel = 'V4 [5/6] SPLIT BACK → 360° HALO TO FRONT';
+        } else {
+          x = 0; y = 0; z = -R * (1.0 - u);
+          splitFactor = 0.0;
+          stageLabel = 'V4 [6/6] STRAIGHT FROM 5m FRONT → HEAD';
+        }
+      } else if (varIdx === 4) {
+        // VARIATION 5 (ABYSS TO SKY): Head -> 5m Floor ▼ -> Split L/R Up -> Meet 5m Top ▲ -> Merge Down to 5m Front -> Split 180° to 5m Back -> Straight to Head
+        if (stage === 0) {
+          x = 0; y = -R * u * effElev; z = 0;
+          splitFactor = 0.0;
+          stageLabel = 'V5 [1/6] HEAD → 5m FLOOR ▼ (MERGED)';
+        } else if (stage === 1) {
+          const phi = u * halfPi;
+          x = side * R * Math.sin(phi); y = -R * Math.cos(phi) * effElev; z = 0;
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V5 [2/6] SPLIT FLOOR ▼ → RISE L/R (5m)';
+        } else if (stage === 2) {
+          const phi = u * halfPi;
+          x = side * R * Math.cos(phi); y = R * Math.sin(phi) * effElev; z = 0;
+          splitFactor = Math.cos(phi);
+          stageLabel = 'V5 [3/6] CLIMB L/R → MEET TOP ▲ (5m)';
+        } else if (stage === 3) {
+          const psi = u * halfPi;
+          x = 0; y = R * Math.cos(psi) * effElev; z = -R * Math.sin(psi);
+          splitFactor = 0.0;
+          stageLabel = 'V5 [4/6] MERGE TOP ▲ → DESCEND 5m FRONT';
+        } else if (stage === 4) {
+          const a = u * Math.PI;
+          x = side * R * Math.sin(a); y = 0; z = -R * Math.cos(a);
+          splitFactor = Math.sin(a);
+          stageLabel = 'V5 [5/6] SPLIT FRONT → 5m ARC TO BACK';
+        } else {
+          x = 0; y = 0; z = R * (1.0 - u);
+          splitFactor = 0.0;
+          stageLabel = 'V5 [6/6] STRAIGHT FROM 5m BACK → HEAD';
+        }
       } else {
-        // 6/6: Move closer to the head in a straight line from +-5m Right/Left -> merge inside the Head (0,0,0)
-        x = side * R * (1.0 - u);
-        y = 0;
-        z = 0;
-        splitFactor = 1.0 - u;
-        stageLabel = '6/6 STRAIGHT LINE → MERGE IN HEAD';
+        // VARIATION 6 (DIAGONAL GREAT-CIRCLE): Head -> 5m Front -> Diagonal Split (R+Up ▲ / L+Down ▼) -> Meet 5m Back -> Merge to 5m Top ▲ -> Split L/R -> Straight to Head
+        const diag = Math.SQRT1_2; // 0.7071
+        if (stage === 0) {
+          x = 0; y = 0; z = -R * u;
+          splitFactor = 0.0;
+          stageLabel = 'V6 [1/6] HEAD → 5m FRONT (MERGED)';
+        } else if (stage === 1) {
+          const a = u * halfPi;
+          const rad = R * Math.sin(a);
+          x = side * rad * diag;
+          y = side * rad * diag * effElev;
+          z = -R * Math.cos(a);
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V6 [2/6] DIAGONAL SPLIT (R+SKY ▲ / L+FLOOR ▼)';
+        } else if (stage === 2) {
+          const a = u * halfPi;
+          const rad = R * Math.cos(a);
+          x = side * rad * diag;
+          y = side * rad * diag * effElev;
+          z = R * Math.sin(a);
+          splitFactor = Math.cos(a);
+          stageLabel = 'V6 [3/6] DIAGONAL ARCS → MEET 5m BACK';
+        } else if (stage === 3) {
+          const psi = u * halfPi;
+          x = 0; y = R * Math.sin(psi) * effElev; z = R * Math.cos(psi);
+          splitFactor = 0.0;
+          stageLabel = 'V6 [4/6] MERGE BACK → CLIMB TOP ▲ (5m)';
+        } else if (stage === 4) {
+          const phi = u * halfPi;
+          x = side * R * Math.sin(phi); y = R * Math.cos(phi) * effElev; z = 0;
+          splitFactor = Math.min(1.0, u * 4.0);
+          stageLabel = 'V6 [5/6] SPLIT TOP ▲ → DESCEND 5m L/R';
+        } else {
+          x = side * R * (1.0 - u); y = 0; z = 0;
+          splitFactor = 1.0 - u;
+          stageLabel = 'V6 [6/6] STRAIGHT LINE L/R → MERGE IN HEAD';
+        }
       }
     } else if (geom === 'orbit8d') {
       // 8D Spherical Orbit: Full 360° horizontal sweep coupled with true Spherical Elevation (phi in [-70°, +78°])
@@ -2599,9 +2765,10 @@ class ConsciousnessAudioEngine {
         const speed = this.params.spatial.speed;
         const asym = this.params.spatial.asymmetry;
         const rawCount = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
-        const trajectory = this.params.spatial.trajectory || 'bifurcation5m';
-        // Ensure at least 2 voices when using 'bifurcation5m' so Left & Right duplication is always active
-        const count = trajectory === 'bifurcation5m' ? Math.max(2, rawCount) : rawCount;
+        const trajectory = this.params.spatial.trajectory || 'bifurcation_random';
+        const isBifurcationMode = trajectory === 'bifurcation5m' || trajectory === 'bifurcation_random';
+        // Ensure at least 2 voices when using 5m Split & Merge so Left & Right duplication is always active
+        const count = isBifurcationMode ? Math.max(2, rawCount) : rawCount;
         const palette = this.params.spatial.palette || 'water_bowl';
         const continuousLevel = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.70;
         const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
@@ -2626,7 +2793,7 @@ class ConsciousnessAudioEngine {
         // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources!
         if (triggerRate > 0.05) {
           const isMergedBifurcation =
-            trajectory === 'bifurcation5m' &&
+            isBifurcationMode &&
             this.telemetry.spatialVoices[0] &&
             this.telemetry.spatialVoices[0].splitFactor !== undefined &&
             this.telemetry.spatialVoices[0].splitFactor < 0.15;
@@ -2676,9 +2843,9 @@ class ConsciousnessAudioEngine {
             stageLabel = pos.stageLabel || '';
           }
 
-          // When merged in 'bifurcation5m' (splitFactor -> 0), fuse paired voices (0 & 1) into ONE single unified pitch & energy!
+          // When merged in 5m Split & Merge (splitFactor -> 0), fuse paired voices (0 & 1) into ONE single unified pitch & energy!
           // When duplicated (splitFactor -> 1), they separate into independent Left & Right voices and harmonic intervals.
-          if (trajectory === 'bifurcation5m') {
+          if (isBifurcationMode) {
             const pairBaseVoice = voices[Math.floor(i / 2) * 2] || voices[0];
             const targetFreq = pairBaseVoice.freq + (v.freq - pairBaseVoice.freq) * splitFactor;
             v.osc.frequency.setTargetAtTime(targetFreq, now, spatTc);

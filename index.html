@@ -184,7 +184,8 @@
             <div class="control-row">
               <div class="control-label"><span>3D / 8D Trajectory Geometry</span></div>
               <select id="spatialTrajectory" class="select-input">
-                <option value="bifurcation5m" selected>5m Split &amp; Merge Journey (Head → 5m Front → Split L/R → Zenith ▲ → 5m Back → Split L/R → Head)</option>
+                <option value="bifurcation_random" selected>5m Split &amp; Merge — Random Variations (Head ↔ 5m Split/Merge Odyssey)</option>
+                <option value="bifurcation5m">5m Split &amp; Merge — Classic (Head → 5m Front → Split L/R → Zenith ▲ → Back → Head)</option>
                 <option value="orbit8d">8D Spherical Orbit (Left/Right + Front/Back + Up/Down Elevation)</option>
                 <option value="zenith_arch">Over-the-Head Zenith Dome Arch (Floor ▼ ↔ Overhead Crown ▲)</option>
                 <option value="helix3d">3D Vertical Helix / DNA Spiral (Climbing Floor ▼ ↔ Sky Zenith ▲)</option>
@@ -489,7 +490,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=4.0"></script>
-  <script src="app.js?v=4.0"></script>
+  <script src="audio-engine.js?v=4.1"></script>
+  <script src="app.js?v=4.1"></script>
 </body>
 </html>

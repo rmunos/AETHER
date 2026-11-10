@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
       spatial: {
         enabled: true,
         palette: 'water_bowl',
-        trajectory: 'bifurcation5m',
+        trajectory: 'bifurcation_random',
         count: 2,
         baseFreq: 110,
         gain: 0.85,
@@ -1379,11 +1379,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
     const rawCount = engine.params.spatial.count || 2;
-    const isBifurcation = engine.params.spatial.trajectory === 'bifurcation5m';
+    const isBifurcation =
+      engine.params.spatial.trajectory === 'bifurcation5m' ||
+      engine.params.spatial.trajectory === 'bifurcation_random';
     const activeCount = isBifurcation ? Math.max(2, rawCount) : rawCount;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
 
-    // Show live 6-Stage Choreography Banner when in 'bifurcation5m' mode
+    // Show live 6-Stage Choreography Banner when in 5m Split & Merge mode
     if (isBifurcation && voices[0] && voices[0].stageLabel) {
       ctx2d.fillStyle = 'rgba(56, 189, 248, 0.88)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
