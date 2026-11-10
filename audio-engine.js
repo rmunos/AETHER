@@ -61,7 +61,7 @@ class ConsciousnessAudioEngine {
       pac: {
         enabled: true,
         gain: 0.55,
-        baseFreq: 136.0,        // 55..432 Hz selectable base carrier frequency
+        baseFreq: 110.0,        // 55..432 Hz selectable base carrier frequency (aligned in harmonic unison with 110 Hz spatial root)
         harmonics: 0.45,        // 0 = pure fundamental sine, 1 = rich singing bowl / tanpura drone
         theta: 6.0,
         gamma: 40.0,
@@ -400,7 +400,7 @@ class ConsciousnessAudioEngine {
     for (let i = 0; i < 8; i++) {
       const freq = baseFreq * ratios[i];
 
-      // A. Continuous Moving Source Generators (Singing Bowl / 8D Chord / Overtone / Stream / Whisper / Silk)
+      // A. Continuous Moving Source Generators (Pure Harmonic Chord: 1x Fundamental Sine + 1.5x Perfect Fifth Triangle + 2x Pure Octave Sine)
       const osc = this.ctx.createOscillator();
       const bodyOsc = this.ctx.createOscillator();
       const overtoneOsc = this.ctx.createOscillator();
@@ -411,17 +411,17 @@ class ConsciousnessAudioEngine {
 
       osc.type = 'sine';
       osc.frequency.value = freq;
-      toneGain.gain.value = 0.45;
+      toneGain.gain.value = 0.48;
 
-      bodyOsc.type = 'sawtooth';
-      bodyOsc.frequency.value = freq;
+      bodyOsc.type = 'triangle';
+      bodyOsc.frequency.value = freq * 1.5; // Pure 3:2 Perfect Fifth harmonic
       bodyFilter.type = 'lowpass';
-      bodyFilter.frequency.value = Math.min(4800, freq * 10);
-      bodyGain.gain.value = 0.25;
+      bodyFilter.frequency.value = Math.min(2400, freq * 3.5);
+      bodyGain.gain.value = 0.22;
 
-      // Singing bowl / overtone whistle harmonic partial (2.756x singing bowl mode or integer overtone)
+      // Pure 2:1 Octave harmonic partial (warm, consonant harmonic shimmer — no inharmonic alarm ratios)
       overtoneOsc.type = 'sine';
-      overtoneOsc.frequency.value = Math.min(7200, freq * 2.756);
+      overtoneOsc.frequency.value = Math.min(6400, freq * 2.0);
       overtoneGain.gain.value = 0.18;
 
       // Continuous Moving Broadband Texture (Flowing Water Stream, Whisper Formants, Silk Brush & Auricle Velvet Air)
@@ -537,7 +537,7 @@ class ConsciousnessAudioEngine {
       panner.rolloffFactor = 0.48;
 
       const hrtfGain = this.ctx.createGain();
-      hrtfGain.gain.value = 0.45;
+      hrtfGain.gain.value = 0.16;
 
       const isActive = i < this.params.spatial.count;
       const weight = 0.42 / Math.pow(i + 1, 0.22);
@@ -714,68 +714,71 @@ class ConsciousnessAudioEngine {
       const f = baseFreq * ratios[i];
       v.freq = f;
       v.osc.frequency.setTargetAtTime(f, now, 0.06);
-      v.bodyOsc.frequency.setTargetAtTime(f, now, 0.06);
+      v.bodyOsc.frequency.setTargetAtTime(f * 1.5, now, 0.06);
 
       if (palette === 'water_bowl') {
-        // Warm Singing Bowl (fundamental + 2.756x singing-bowl rim partial + gentle liquid stream air)
-        v.toneGain.gain.setTargetAtTime(0.46, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.14, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(4200, f * 8), now, 0.06);
+        // Warm Harmonic Singing Bowl Pad (Pure 1x Fundamental + 1.5x Perfect Fifth + 2.0x Octave + gentle liquid air)
+        v.toneGain.gain.setTargetAtTime(0.52, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.24, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(2200, f * 3.2), now, 0.06);
         v.overtoneOsc.type = 'sine';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.756), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.22, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.32, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.26, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.20, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.14, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.15, now, 0.06);
       } else if (palette === 'water_drops') {
-        // Flowing 3D Cave Stream + Pure Water Droplets (high liquid formant & auricle air, subtle sub hum)
-        v.toneGain.gain.setTargetAtTime(0.16, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.06, now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.68, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.48, now, 0.06);
-      } else if (palette === 'crackle') {
-        // Continuous Binaural Silk Brush + Soft Warm Halo
-        v.toneGain.gain.setTargetAtTime(0.20, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.10, now, 0.06);
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.0), now, 0.06);
+        // Flowing 3D Cave Stream + Pure Water Droplets (gentle harmonic sub hum + liquid stream)
+        v.toneGain.gain.setTargetAtTime(0.28, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.12, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(1800, f * 2.8), now, 0.06);
+        v.overtoneOsc.type = 'sine';
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
         v.overtoneGain.gain.setTargetAtTime(0.10, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.55, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.65, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.45, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.32, now, 0.06);
+      } else if (palette === 'crackle') {
+        // Continuous Binaural Silk Brush + Soft Warm Harmonic Halo
+        v.toneGain.gain.setTargetAtTime(0.28, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.14, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.12, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.38, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.45, now, 0.06);
       } else if (palette === 'whisper') {
         // Continuous 8D Whispered Vocal Formants & Sibilant Breath Halo
-        v.toneGain.gain.setTargetAtTime(0.12, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.05, now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.05, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.85, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.60, now, 0.06);
+        v.toneGain.gain.setTargetAtTime(0.20, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.08, now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.06, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.68, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.42, now, 0.06);
       } else if (palette === 'tapping') {
-        // Warm Hollow Marimba / Bamboo Resonator Pad + Crisp 3D Taps
-        v.toneGain.gain.setTargetAtTime(0.32, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.12, now, 0.06);
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.32), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.15, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.38, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.32, now, 0.06);
-      } else if (palette === 'shamanic') {
-        // 110 Hz Tibetan / Tuvan Throat Singing Drone + Whistling Overtone Harmonic
+        // Warm Hollow Marimba / Bamboo Harmonic Pad + Crisp 3D Taps
         v.toneGain.gain.setTargetAtTime(0.38, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.42, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(2800, f * 6), now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.18, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.16, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.24, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.22, now, 0.06);
+      } else if (palette === 'shamanic') {
+        // 110 Hz Tibetan / Tuvan Overtone Singing Drone + Pure Harmonic Fifth & Overtone
+        v.toneGain.gain.setTargetAtTime(0.44, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.28, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(2200, f * 3.5), now, 0.06);
         v.overtoneOsc.type = 'sine';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 6.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.30, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.40, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.24, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 3.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.22, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.22, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.16, now, 0.06);
       } else {
-        // 'rich8d': Full-Spectrum 8D Celestial Harmonic Pad & Auricle Shimmer
-        v.toneGain.gain.setTargetAtTime(0.48, now, 0.06);
-        v.bodyGain.gain.setTargetAtTime(0.38, now, 0.06);
-        v.bodyFilter.frequency.setTargetAtTime(Math.min(6400, f * 14), now, 0.06);
-        v.overtoneOsc.type = 'triangle';
-        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.0), now, 0.06);
-        v.overtoneGain.gain.setTargetAtTime(0.26, now, 0.06);
-        v.formantGain.gain.setTargetAtTime(0.42, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.36, now, 0.06);
+        // 'rich8d': Full-Spectrum 8D Celestial Harmonic Pad & Auricle Shimmer (Pure 1x + 1.5x + 2x Harmonics)
+        v.toneGain.gain.setTargetAtTime(0.54, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.32, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(3200, f * 4.5), now, 0.06);
+        v.overtoneOsc.type = 'sine';
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(6400, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.24, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.18, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.18, now, 0.06);
       }
     });
   }
@@ -865,20 +868,33 @@ class ConsciousnessAudioEngine {
         subDropOsc.stop(t2 + 0.042);
       }
 
-      // 4. In 'water_bowl' mode, droplets also gently excite a resonant Singing Bowl bell harmonic
-      if (palette === 'water_bowl' && Math.random() < 0.45) {
-        const bowlFreq = Math.max(180, Math.min(1200, v.freq * (Math.random() < 0.5 ? 2 : 3)));
+      // 4. In 'water_bowl' mode, droplets also gently excite a lush Just-Intonation Harmonic Singing Bowl chord
+      if (palette === 'water_bowl' && Math.random() < 0.48) {
+        const harmRatios = [1.0, 1.25, 1.5, 2.0, 3.0];
+        const ratio = harmRatios[Math.floor(Math.random() * harmRatios.length)];
+        const bowlFreq = Math.max(110, Math.min(1320, v.freq * ratio));
         const bowlOsc = this.ctx.createOscillator();
+        const bowlFifth = this.ctx.createOscillator();
         const bowlGain = this.ctx.createGain();
         bowlOsc.type = 'sine';
         bowlOsc.frequency.setValueAtTime(bowlFreq, now);
+        bowlFifth.type = 'sine';
+        bowlFifth.frequency.setValueAtTime(bowlFreq * 1.5, now);
+
+        const fifthGain = this.ctx.createGain();
+        fifthGain.gain.value = 0.35;
+
         bowlGain.gain.setValueAtTime(0.001, now);
-        bowlGain.gain.linearRampToValueAtTime(0.24, now + 0.008);
-        bowlGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+        bowlGain.gain.linearRampToValueAtTime(0.22, now + 0.025);
+        bowlGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
         bowlOsc.connect(bowlGain);
+        bowlFifth.connect(fifthGain);
+        fifthGain.connect(bowlGain);
         bowlGain.connect(dest);
         bowlOsc.start(now);
-        bowlOsc.stop(now + 0.35);
+        bowlFifth.start(now);
+        bowlOsc.stop(now + 0.88);
+        bowlFifth.stop(now + 0.88);
       }
     } else if (palette === 'crackle') {
       // 1. Tactile Binaural Silk Brush Stroke
@@ -2843,18 +2859,14 @@ class ConsciousnessAudioEngine {
             stageLabel = pos.stageLabel || '';
           }
 
-          // When merged in 5m Split & Merge (splitFactor -> 0), fuse paired voices (0 & 1) into ONE single unified pitch & energy!
-          // When duplicated (splitFactor -> 1), they separate into independent Left & Right voices and harmonic intervals.
+          // Keep each voice locked to its pure consonant harmonic frequencies (1.0x Fundamental + 1.5x Perfect Fifth + 2.0x Octave)
+          // with zero pitch-gliding siren! In 5m Split & Merge mode, the merge/split is purely spatial & balanced in gain.
+          v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
+          v.bodyOsc.frequency.setTargetAtTime(v.freq * 1.5, now, spatTc);
           if (isBifurcationMode) {
-            const pairBaseVoice = voices[Math.floor(i / 2) * 2] || voices[0];
-            const targetFreq = pairBaseVoice.freq + (v.freq - pairBaseVoice.freq) * splitFactor;
-            v.osc.frequency.setTargetAtTime(targetFreq, now, spatTc);
-            v.bodyOsc.frequency.setTargetAtTime(targetFreq * 2.756, now, spatTc);
-            const mergeGainScale = 0.54 + 0.46 * splitFactor;
+            const mergeGainScale = 0.56 + 0.44 * splitFactor;
             v.voiceGain.gain.setTargetAtTime(v.weight * mergeGainScale, now, 0.04);
           } else {
-            v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
-            v.bodyOsc.frequency.setTargetAtTime(v.freq * 2.756, now, spatTc);
             v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
           }
 
@@ -2919,13 +2931,12 @@ class ConsciousnessAudioEngine {
             : 5500 * Math.pow(0.28 + 0.45 * (1 - auricle), -frontness) * elevOpen;
           v.shadowFilter.frequency.setTargetAtTime(Math.max(650, Math.min(16500, baseShadow * distAirDamp)), now, spatTc);
 
-          // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..680 us) + Radial Doppler Delay:
+          // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..680 us) — no radial Doppler delay so 0..5m motion never pitch-bends like a siren!
           const absSin = Math.abs(sinTheta);
           const woodworth = (absSin + Math.asin(absSin)) / (1 + Math.PI * 0.5); // 0..1
           const itdSec = 0.00068 * (0.4 + 0.6 * auricle) * woodworth;
-          const dopplerSec = Math.min(0.008, dist * 0.00065);
-          const delayL = 0.00005 + dopplerSec + (sinTheta > 0 ? itdSec : 0);
-          const delayR = 0.00005 + dopplerSec + (sinTheta < 0 ? itdSec : 0);
+          const delayL = 0.00008 + (sinTheta > 0 ? itdSec : 0);
+          const delayR = 0.00008 + (sinTheta < 0 ? itdSec : 0);
           v.itdDelayL.delayTime.setTargetAtTime(delayL, now, spatTc);
           v.itdDelayR.delayTime.setTargetAtTime(delayR, now, spatTc);
 
@@ -2953,11 +2964,17 @@ class ConsciousnessAudioEngine {
           v.earGainL.gain.setTargetAtTime(gL, now, spatTc);
           v.earGainR.gain.setTargetAtTime(gR, now, spatTc);
 
-          // 8. Continuous Moving Texture Formant Morphing (Flowing Water / Whisper / Silk / 8D Chord):
-          const [f1, f2] = this._vowelFormants(elapsed * (0.38 + i * 0.09) + i * 1.3);
-          const fScale = palette === 'whisper' ? 1.25 : palette === 'water_drops' ? 1.45 : 1.1;
-          v.formantF1.frequency.setTargetAtTime(f1 * fScale, now, 0.06);
-          v.formantF2.frequency.setTargetAtTime(f2 * fScale, now, 0.06);
+          // 8. Continuous Moving Texture Harmonics & Formants:
+          // For tonal harmonic palettes ('water_bowl', 'rich8d', 'tapping'), lock resonator filters to pure integer harmonics (2x & 3x) of v.freq!
+          if (palette === 'water_bowl' || palette === 'rich8d' || palette === 'tapping') {
+            v.formantF1.frequency.setTargetAtTime(Math.min(4800, v.freq * 2.0), now, 0.08);
+            v.formantF2.frequency.setTargetAtTime(Math.min(6400, v.freq * 3.0), now, 0.08);
+          } else {
+            const [f1, f2] = this._vowelFormants(elapsed * (0.38 + i * 0.09) + i * 1.3);
+            const fScale = palette === 'whisper' ? 1.25 : palette === 'water_drops' ? 1.45 : 1.1;
+            v.formantF1.frequency.setTargetAtTime(f1 * fScale, now, 0.06);
+            v.formantF2.frequency.setTargetAtTime(f2 * fScale, now, 0.06);
+          }
 
           // Syllabic / liquid ripple modulation on the continuous moving carrier
           let contMod = continuousLevel;
