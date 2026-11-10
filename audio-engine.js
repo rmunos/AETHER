@@ -32,14 +32,17 @@ class ConsciousnessAudioEngine {
 
       spatial: {
         enabled: true,
-        trajectory: 'infinity', // 'infinity' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
-        count: 2,               // 1..8 active 3D sources
-        baseFreq: 82,           // 36..320 Hz base fundamental pitch
-        gain: 0.80,
-        speed: 0.18,
-        pulse: 0.0,             // 0 = completely smooth continuous sound, 1 = rhythmic pulse
+        palette: 'water_bowl',  // 'water_bowl' | 'water_drops' | 'crackle' | 'whisper' | 'tapping' | 'rich8d' | 'shamanic'
+        trajectory: 'orbit8d',  // 'orbit8d' | 'infinity' | 'peripersonal' | 'radial' | 'mixed' | 'circle' | 'spiral' | 'torus'
+        count: 2,               // 1..8 active moving 3D sources
+        baseFreq: 110,          // 36..320 Hz base fundamental pitch
+        gain: 0.85,
+        speed: 0.16,
+        pulse: 0.70,            // Continuous Moving Source Level (0 = Drops/Triggers Only, 1 = Full Continuous 8D Moving Source)
+        rate: 3.2,              // 0..10 events/s for 3D Water Drops & ASMR Triggers emitted from moving sources
+        auricle: 0.90,          // 0..1 Ear Auricle (Pinna) Notch, Blauert Bands, Cranial Head-Shadow & ITD/ILD Depth
         collapse: 0.0,          // 0 = completely off, 1 = full in-cranial phase core
-        asymmetry: 0.85,
+        asymmetry: 0.80,
         tuning: 'octaves',
         manualPos: null         // {x, y, z} when user drags on 3D canvas
       },
@@ -106,6 +109,7 @@ class ConsciousnessAudioEngine {
       chaosHistory: [],
       chaosBins: new Array(16).fill(1), // Laplace smoothed histogram for Bayesian surprise
       recentDroplets: [],
+      spatialRipples: [],  // {x, y, z, time, voiceIndex, palette} for 3D Water Drops & ASMR triggers
       spatialVoices: [],   // {x, y, z, freq, index, normAmp}
       shepardVoices: []    // {octavePos, freq, amp}
     };
@@ -317,30 +321,75 @@ class ConsciousnessAudioEngine {
   }
 
   /**
-   * MODULE 1: Hyper-Spatial "Impossible Geometry"
-   * Configurable 1-8 HRTF 3D sources with steady non-oscillating low-to-mid pitch,
-   * selectable 3D geometries (Figure-8 through head, Far-Horizon ray, Circle, Mixed),
-   * Front/Back Pinna Shadowing, Elevation Filtering & strictly cancellable In-Cranial Core
+   * MODULE 1: Unified 8D Binaural Auricle (Pinna) & Spatial ASMR Engine
+   * Combines 1-8 moving 3D sources with:
+   *  - Rich Continuous Moving Voices (Singing Bowls, Flowing Stream, Silk Brush, Whisper Formants, 8D Harmonic Pad, Tibetan Overtones)
+   *  - Spatialized 3D Event Emitters (Minnaert Water Droplets, Silk Crackles, Bamboo/Wood/Glass Taps, Shamanic Frame Drum & Rattle)
+   *  - Anthropometric Ear Auricle (Pinna) Filter Chain:
+   *      1. Blauert Front/Back Directional Bands (3.65 kHz frontal presence vs 1.05 kHz posterior neck band)
+   *      2. Concha Cavity Funnel Resonance (4.5 kHz)
+   *      3. Direction-Dependent Pinna Antihelix Spectral Notch (sweeping 5.1 kHz to 11.5 kHz with 3D elevation & azimuth)
+   *      4. Pinna Rim Rear Cartilage Shadow
+   *  - Explicit Binaural Interaural Time Difference (ITD 0..720 us + Doppler), Contralateral Cranial Head-Shadow Low-Pass,
+   *    Near-Field Spherical ILD, KEMAR HRTF PannerNode, and 8D Early-Reflection Room Externalizer.
    */
   _setupSpatialModule() {
     const bus = this.ctx.createGain();
-    const initialGain = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0.0001;
+    const initialGain = this.params.spatial.enabled ? this.params.spatial.gain * 0.72 : 0.0001;
     bus.gain.value = initialGain;
-    // Connect 100% DRY so no centered reverb tail ever bleeds into the middle of the head
     bus.connect(this.spatialDryBus);
 
-    // Shared steady pink-filtered air buffer for subtle pinna localization cues on low notes
+    // 8D Early Lateral Reflection Externalizer (projects sound outside the skull without muddying the center)
+    const extSend = this.ctx.createGain();
+    extSend.gain.value = 0.16 * (this.params.spatial.auricle ?? 0.9);
+    const extFilter = this.ctx.createBiquadFilter();
+    extFilter.type = 'bandpass';
+    extFilter.frequency.value = 1400;
+    extFilter.Q.value = 0.7;
+
+    const extDelayL = this.ctx.createDelay(0.05);
+    const extDelayR = this.ctx.createDelay(0.05);
+    extDelayL.delayTime.value = 0.0165; // 16.5 ms left wall early reflection
+    extDelayR.delayTime.value = 0.0235; // 23.5 ms right wall early reflection
+
+    const extPanL = this.ctx.createStereoPanner();
+    const extPanR = this.ctx.createStereoPanner();
+    extPanL.pan.value = -0.92;
+    extPanR.pan.value = 0.92;
+
+    bus.connect(extSend);
+    extSend.connect(extFilter);
+    extFilter.connect(extDelayL);
+    extFilter.connect(extDelayR);
+    extDelayL.connect(extPanR); // Cross-lateral reflection
+    extDelayR.connect(extPanL);
+    extPanL.connect(this.spatialDryBus);
+    extPanR.connect(this.spatialDryBus);
+
+    // Shared 5-second pink-velvet noise buffer for continuous stream/whisper/silk textures & auricle air cues
     const rate = this.ctx.sampleRate;
-    const noiseLen = rate * 4;
+    const noiseLen = rate * 5;
     const pinnaNoiseBuf = this.ctx.createBuffer(1, noiseLen, rate);
     const noiseData = pinnaNoiseBuf.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0;
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < noiseLen; i++) {
-      const w = Math.random() * 2 - 1;
-      b0 = 0.99 * b0 + w * 0.08;
-      b1 = 0.95 * b1 + w * 0.12;
-      b2 = 0.80 * b2 + w * 0.20;
-      noiseData[i] = (b0 + b1 + b2) * 0.18;
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      noiseData[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.15;
+      b6 = white * 0.115926;
+    }
+
+    // Short 4ms water/tap surface-impact micro-transient buffer (for crisp auricle localization of drops & taps)
+    const clickLen = Math.floor(rate * 0.004);
+    const clickBuf = this.ctx.createBuffer(1, clickLen, rate);
+    const cd = clickBuf.getChannelData(0);
+    for (let i = 0; i < clickLen; i++) {
+      cd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.0008));
     }
 
     const baseFreq = this.params.spatial.baseFreq;
@@ -348,103 +397,233 @@ class ConsciousnessAudioEngine {
     const voices = [];
 
     for (let i = 0; i < 8; i++) {
+      const freq = baseFreq * ratios[i];
+
+      // A. Continuous Moving Source Generators (Singing Bowl / 8D Chord / Overtone / Stream / Whisper / Silk)
       const osc = this.ctx.createOscillator();
       const bodyOsc = this.ctx.createOscillator();
+      const overtoneOsc = this.ctx.createOscillator();
       const bodyFilter = this.ctx.createBiquadFilter();
+      const toneGain = this.ctx.createGain();
       const bodyGain = this.ctx.createGain();
+      const overtoneGain = this.ctx.createGain();
 
-      const noiseSrc = this.ctx.createBufferSource();
-      const noiseBand = this.ctx.createBiquadFilter();
-      const noiseGain = this.ctx.createGain();
-
-      // Front/Back Pinna Shadow Filter (opens in front z<0, shadows behind head z>0)
-      const shadowFilter = this.ctx.createBiquadFilter();
-      // Elevation Pinna Cue Filter (7.2 kHz boost above head y>0, notch below y<0)
-      const elevFilter = this.ctx.createBiquadFilter();
-
-      const voiceGain = this.ctx.createGain();
-      const pulseGain = this.ctx.createGain();
-      const panner = this.ctx.createPanner();
-
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 0.35;
-      panner.maxDistance = 25;
-      panner.rolloffFactor = 1.55;
-
-      const freq = baseFreq * ratios[i];
-      // Pure steady sine fundamental (no detuned beating!)
       osc.type = 'sine';
       osc.frequency.value = freq;
+      toneGain.gain.value = 0.45;
 
-      // Warm sawtooth harmonic body at the EXACT same frequency (zero beating oscillation)
       bodyOsc.type = 'sawtooth';
       bodyOsc.frequency.value = freq;
       bodyFilter.type = 'lowpass';
-      bodyFilter.frequency.value = Math.min(3200, freq * 8);
-      bodyGain.gain.value = 0.42;
+      bodyFilter.frequency.value = Math.min(4800, freq * 10);
+      bodyGain.gain.value = 0.25;
 
-      // Subtle steady airy pinna cue so even a 40 Hz bass source can be localized in 3D space
+      // Singing bowl / overtone whistle harmonic partial (2.756x singing bowl mode or integer overtone)
+      overtoneOsc.type = 'sine';
+      overtoneOsc.frequency.value = Math.min(7200, freq * 2.756);
+      overtoneGain.gain.value = 0.18;
+
+      // Continuous Moving Broadband Texture (Flowing Water Stream, Whisper Formants, Silk Brush & Auricle Velvet Air)
+      const noiseSrc = this.ctx.createBufferSource();
       noiseSrc.buffer = pinnaNoiseBuf;
       noiseSrc.loop = true;
+
+      const formantF1 = this.ctx.createBiquadFilter();
+      formantF1.type = 'bandpass';
+      formantF1.frequency.value = 680 + (i % 4) * 180;
+      formantF1.Q.value = 2.2;
+
+      const formantF2 = this.ctx.createBiquadFilter();
+      formantF2.type = 'bandpass';
+      formantF2.frequency.value = 1950 + (i % 4) * 380;
+      formantF2.Q.value = 2.4;
+
+      const formantGain = this.ctx.createGain();
+      formantGain.gain.value = 0.35;
+
+      // High-frequency Auricle Velvet Air Band (3.5 kHz - 10.5 kHz) so the Pinna Notch & Head Shadow are always audible
+      const noiseBand = this.ctx.createBiquadFilter();
       noiseBand.type = 'bandpass';
-      noiseBand.frequency.value = 2800 + (i % 4) * 900;
-      noiseBand.Q.value = 1.8;
-      noiseGain.gain.value = 0.08;
+      noiseBand.frequency.value = 4800 + (i % 3) * 1100;
+      noiseBand.Q.value = 1.1;
 
-      shadowFilter.type = 'lowpass';
-      shadowFilter.frequency.value = 6000;
-      shadowFilter.Q.value = 0.9;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.value = 0.24;
 
+      // Continuous Moving Source Master Gain (controlled by 'pulse' / Continuous Moving Source slider)
+      const pulseGain = this.ctx.createGain();
+      // Discrete 3D Trigger Input (Water Drops, Crackles, Bamboo Taps, Drum Hits inject here!)
+      const triggerInput = this.ctx.createGain();
+      triggerInput.gain.value = 1.15;
+
+      const preAuricle = this.ctx.createGain();
+      preAuricle.gain.value = 1.0;
+
+      // B. Anthropometric Ear Auricle (Pinna) 4-Stage Spectral Filter Chain
+      // 1. Blauert Front/Back Directional Band Filter (3650 Hz Front vs 1050 Hz Behind Neck)
+      const blauertFilter = this.ctx.createBiquadFilter();
+      blauertFilter.type = 'peaking';
+      blauertFilter.frequency.value = 3650;
+      blauertFilter.Q.value = 1.5;
+      blauertFilter.gain.value = 4.0;
+
+      // 2. Concha Cavity Funnel Resonance (4500 Hz boost when facing front/side)
+      const conchaFilter = this.ctx.createBiquadFilter();
+      conchaFilter.type = 'peaking';
+      conchaFilter.frequency.value = 4500;
+      conchaFilter.Q.value = 1.8;
+      conchaFilter.gain.value = 3.5;
+
+      // 3. Pinna Antihelix Spectral Notch (sweeps 5.1 kHz - 11.5 kHz with 3D Elevation y & Azimuth x)
+      const elevFilter = this.ctx.createBiquadFilter();
       elevFilter.type = 'peaking';
-      elevFilter.frequency.value = 7000;
-      elevFilter.Q.value = 1.8;
-      elevFilter.gain.value = 0;
+      elevFilter.frequency.value = 7600;
+      elevFilter.Q.value = 4.2;
+      elevFilter.gain.value = -11.0;
+
+      // 4. Pinna Rim Rear Cartilage Shadow & Distance Air Absorption Low-Pass
+      const shadowFilter = this.ctx.createBiquadFilter();
+      shadowFilter.type = 'lowpass';
+      shadowFilter.frequency.value = 12000;
+      shadowFilter.Q.value = 0.85;
+
+      const voiceGain = this.ctx.createGain();
+
+      // C. Dual Binaural Cranial Head-Shadow + Woodworth ITD Delay + Near-Field ILD + KEMAR HRTF
+      const itdDelayL = this.ctx.createDelay(0.02);
+      const itdDelayR = this.ctx.createDelay(0.02);
+      itdDelayL.delayTime.value = 0.0002;
+      itdDelayR.delayTime.value = 0.0002;
+
+      const headShadowL = this.ctx.createBiquadFilter();
+      const headShadowR = this.ctx.createBiquadFilter();
+      headShadowL.type = 'lowpass';
+      headShadowR.type = 'lowpass';
+      headShadowL.frequency.value = 15000;
+      headShadowR.frequency.value = 15000;
+      headShadowL.Q.value = 0.707;
+      headShadowR.Q.value = 0.707;
+
+      const earGainL = this.ctx.createGain();
+      const earGainR = this.ctx.createGain();
+      earGainL.gain.value = 0.65;
+      earGainR.gain.value = 0.65;
+
+      const earPanL = this.ctx.createStereoPanner();
+      const earPanR = this.ctx.createStereoPanner();
+      earPanL.pan.value = -1.0;
+      earPanR.pan.value = 1.0;
+
+      // Parallel KEMAR HRTF PannerNode for diffuse-field pinna convolution
+      const panner = this.ctx.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = 0.45;
+      panner.maxDistance = 25;
+      panner.rolloffFactor = 1.35;
+
+      const hrtfGain = this.ctx.createGain();
+      hrtfGain.gain.value = 0.45;
 
       const isActive = i < this.params.spatial.count;
-      const weight = 0.28 / Math.pow(i + 1, 0.25);
+      const weight = 0.42 / Math.pow(i + 1, 0.22);
       voiceGain.gain.value = isActive ? weight : 0;
-      pulseGain.gain.value = isActive ? 1.0 : 0;
+      pulseGain.gain.value = isActive ? (this.params.spatial.pulse ?? 0.70) : 0;
 
-      osc.connect(shadowFilter);
+      // Connect Continuous Generators -> pulseGain -> preAuricle
+      osc.connect(toneGain);
+      toneGain.connect(pulseGain);
+
       bodyOsc.connect(bodyFilter);
       bodyFilter.connect(bodyGain);
-      bodyGain.connect(shadowFilter);
+      bodyGain.connect(pulseGain);
+
+      overtoneOsc.connect(overtoneGain);
+      overtoneGain.connect(pulseGain);
+
+      noiseSrc.connect(formantF1);
+      noiseSrc.connect(formantF2);
+      formantF1.connect(formantGain);
+      formantF2.connect(formantGain);
+      formantGain.connect(pulseGain);
 
       noiseSrc.connect(noiseBand);
       noiseBand.connect(noiseGain);
-      noiseGain.connect(shadowFilter);
+      noiseGain.connect(pulseGain);
 
-      shadowFilter.connect(elevFilter);
-      elevFilter.connect(voiceGain);
-      voiceGain.connect(pulseGain);
-      pulseGain.connect(panner);
+      pulseGain.connect(preAuricle);
+      triggerInput.connect(preAuricle);
+
+      // Connect Auricle Filter Chain
+      preAuricle.connect(blauertFilter);
+      blauertFilter.connect(conchaFilter);
+      conchaFilter.connect(elevFilter);
+      elevFilter.connect(shadowFilter);
+      shadowFilter.connect(voiceGain);
+
+      // Connect Binaural Cranial Shadow + ITD Branch (Left & Right Ears)
+      voiceGain.connect(itdDelayL);
+      itdDelayL.connect(headShadowL);
+      headShadowL.connect(earGainL);
+      earGainL.connect(earPanL);
+      earPanL.connect(bus);
+
+      voiceGain.connect(itdDelayR);
+      itdDelayR.connect(headShadowR);
+      headShadowR.connect(earGainR);
+      earGainR.connect(earPanR);
+      earPanR.connect(bus);
+
+      // Connect parallel KEMAR HRTF Branch
+      voiceGain.connect(hrtfGain);
+      hrtfGain.connect(panner);
       panner.connect(bus);
 
       osc.start();
       bodyOsc.start();
-      noiseSrc.start(0, (i * 0.53) % 3.5);
+      overtoneOsc.start();
+      noiseSrc.start(0, (i * 0.61) % 4.5);
 
       voices.push({
         osc,
         bodyOsc,
+        overtoneOsc,
         bodyFilter,
+        toneGain,
+        bodyGain,
+        overtoneGain,
+        formantF1,
+        formantF2,
+        formantGain,
         noiseBand,
-        shadowFilter,
-        elevFilter,
-        voiceGain,
+        noiseGain,
         pulseGain,
+        triggerInput,
+        preAuricle,
+        blauertFilter,
+        conchaFilter,
+        elevFilter,
+        shadowFilter,
+        voiceGain,
+        itdDelayL,
+        itdDelayR,
+        headShadowL,
+        headShadowR,
+        earGainL,
+        earGainR,
         panner,
+        hrtfGain,
         index: i,
         freq,
-        weight
+        weight,
+        throatHarmonicIdx: i * 2
       });
       this.telemetry.spatialVoices.push({
         x: 0,
         y: 0,
         z: -1,
         dist: 1,
-        geomType: 'infinity',
+        geomType: 'orbit8d',
         trail: [],
         freq,
         index: i,
@@ -484,17 +663,404 @@ class ConsciousnessAudioEngine {
     coreOscL.start();
     coreOscR.start();
 
-    this.nodes.spatial = { bus, voices, coreOscL, coreOscR, coreGainL, coreGainR };
+    this.nodes.spatial = {
+      bus,
+      extSend,
+      pinnaNoiseBuf,
+      clickBuf,
+      voices,
+      coreOscL,
+      coreOscR,
+      coreGainL,
+      coreGainR,
+      nextTriggerTime: 0,
+      nextShamanicTime: 0,
+      nextOvertoneStepTime: 0,
+      lastTriggeredVoice: 0
+    };
+
+    this._applySpatialPaletteVoicing(this.params.spatial.palette || 'water_bowl');
   }
 
   /**
-   * Computes 3D (x, y, z) coordinates for source `i` according to selected geometry
+   * Configures continuous moving voice timbres for the selected 8D Sound & ASMR Palette
+   */
+  _applySpatialPaletteVoicing(palette) {
+    if (!this.nodes.spatial || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const voices = this.nodes.spatial.voices;
+    const baseFreq = this.params.spatial.baseFreq || 110;
+    const ratios = this.tuningRatios[this.params.spatial.tuning] || this.tuningRatios.octaves;
+
+    voices.forEach((v, i) => {
+      const f = baseFreq * ratios[i];
+      v.freq = f;
+      v.osc.frequency.setTargetAtTime(f, now, 0.06);
+      v.bodyOsc.frequency.setTargetAtTime(f, now, 0.06);
+
+      if (palette === 'water_bowl') {
+        // Warm Singing Bowl (fundamental + 2.756x singing-bowl rim partial + gentle liquid stream air)
+        v.toneGain.gain.setTargetAtTime(0.46, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.14, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(4200, f * 8), now, 0.06);
+        v.overtoneOsc.type = 'sine';
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.756), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.22, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.32, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.26, now, 0.06);
+      } else if (palette === 'water_drops') {
+        // Flowing 3D Cave Stream + Pure Water Droplets (high liquid formant & auricle air, subtle sub hum)
+        v.toneGain.gain.setTargetAtTime(0.16, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.06, now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.68, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.48, now, 0.06);
+      } else if (palette === 'crackle') {
+        // Continuous Binaural Silk Brush + Soft Warm Halo
+        v.toneGain.gain.setTargetAtTime(0.20, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.10, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.10, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.55, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.65, now, 0.06);
+      } else if (palette === 'whisper') {
+        // Continuous 8D Whispered Vocal Formants & Sibilant Breath Halo
+        v.toneGain.gain.setTargetAtTime(0.12, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.05, now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.05, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.85, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.60, now, 0.06);
+      } else if (palette === 'tapping') {
+        // Warm Hollow Marimba / Bamboo Resonator Pad + Crisp 3D Taps
+        v.toneGain.gain.setTargetAtTime(0.32, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.12, now, 0.06);
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.32), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.15, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.38, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.32, now, 0.06);
+      } else if (palette === 'shamanic') {
+        // 110 Hz Tibetan / Tuvan Throat Singing Drone + Whistling Overtone Harmonic
+        v.toneGain.gain.setTargetAtTime(0.38, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.42, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(2800, f * 6), now, 0.06);
+        v.overtoneOsc.type = 'sine';
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 6.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.30, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.40, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.24, now, 0.06);
+      } else {
+        // 'rich8d': Full-Spectrum 8D Celestial Harmonic Pad & Auricle Shimmer
+        v.toneGain.gain.setTargetAtTime(0.48, now, 0.06);
+        v.bodyGain.gain.setTargetAtTime(0.38, now, 0.06);
+        v.bodyFilter.frequency.setTargetAtTime(Math.min(6400, f * 14), now, 0.06);
+        v.overtoneOsc.type = 'triangle';
+        v.overtoneOsc.frequency.setTargetAtTime(Math.min(7000, f * 2.0), now, 0.06);
+        v.overtoneGain.gain.setTargetAtTime(0.26, now, 0.06);
+        v.formantGain.gain.setTargetAtTime(0.42, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.36, now, 0.06);
+      }
+    });
+  }
+
+  /**
+   * Emits a 3D spatialized event (Water Drop, Silk Crackle, Bamboo/Wood/Glass Tap, Whisper Puff, Shamanic Drum, or 8D Chime)
+   * directly into Moving 3D Voice `v.triggerInput` so it passes through `v`'s exact 3D Auricle + Cranial Shadow + ITD + HRTF pipeline!
+   */
+  _triggerSpatialEventOnVoice(v, now, palette, auricle) {
+    if (!this.ctx || !v || !v.triggerInput) return;
+    const dest = v.triggerInput;
+
+    // Record visual ripple at the exact 3D position of Voice v for the 3D radar canvas
+    const tv = this.telemetry.spatialVoices[v.index];
+    if (tv) {
+      this.telemetry.spatialRipples.push({
+        x: tv.x,
+        y: tv.y,
+        z: tv.z,
+        time: now,
+        voiceIndex: v.index,
+        palette
+      });
+      if (this.telemetry.spatialRipples.length > 28) {
+        this.telemetry.spatialRipples.shift();
+      }
+    }
+
+    if (palette === 'water_bowl' || palette === 'water_drops') {
+      // Minnaert Acoustic Bubble Physics: Water droplet hitting water surface entrains a microscopic air bubble
+      // whose resonant frequency chirps rapidly UPWARD (f0 -> 2.2*f0) over 18-32 ms!
+      const dropPool = [440, 528, 594, 660, 792, 880, 1056, 1188, 1320];
+      const f0 = dropPool[(v.index * 3 + Math.floor(Math.random() * dropPool.length)) % dropPool.length] * (0.92 + Math.random() * 0.16);
+      const chirpDur = 0.022 + Math.random() * 0.014;
+      const decayDur = 0.055 + Math.random() * 0.035;
+
+      // 1. Primary Upward-Chirping Bubble Sine
+      const dropOsc = this.ctx.createOscillator();
+      const dropGain = this.ctx.createGain();
+      dropOsc.type = 'sine';
+      dropOsc.frequency.setValueAtTime(f0, now);
+      dropOsc.frequency.setValueAtTime(f0 * 1.04, now + 0.004);
+      dropOsc.frequency.exponentialRampToValueAtTime(f0 * (2.05 + Math.random() * 0.35), now + chirpDur);
+
+      dropGain.gain.setValueAtTime(0.001, now);
+      dropGain.gain.linearRampToValueAtTime(0.78, now + 0.0025);
+      dropGain.gain.exponentialRampToValueAtTime(0.001, now + decayDur);
+
+      dropOsc.connect(dropGain);
+      dropGain.connect(dest);
+      dropOsc.start(now);
+      dropOsc.stop(now + decayDur + 0.005);
+
+      // 2. Crisp Surface-Tension Plink Transient (3.2-6.5 kHz so the Ear Auricle Notch pinpoints the drop's 3D angle!)
+      if (this.nodes.spatial.clickBuf) {
+        const clickSrc = this.ctx.createBufferSource();
+        clickSrc.buffer = this.nodes.spatial.clickBuf;
+        const clickBP = this.ctx.createBiquadFilter();
+        clickBP.type = 'bandpass';
+        clickBP.frequency.value = 3400 + Math.random() * 2800;
+        clickBP.Q.value = 2.2;
+        const clickGain = this.ctx.createGain();
+        clickGain.gain.value = 0.42;
+        clickSrc.connect(clickBP);
+        clickBP.connect(clickGain);
+        clickGain.connect(dest);
+        clickSrc.start(now);
+      }
+
+      // 3. Secondary Satellite Rebound Micro-Droplet (50% of drops produce a smaller high-pitched splash 35-70 ms later)
+      if (Math.random() < 0.52) {
+        const t2 = now + 0.034 + Math.random() * 0.038;
+        const f2 = f0 * (1.42 + Math.random() * 0.25);
+        const subDropOsc = this.ctx.createOscillator();
+        const subDropGain = this.ctx.createGain();
+        subDropOsc.type = 'sine';
+        subDropOsc.frequency.setValueAtTime(f2, t2);
+        subDropOsc.frequency.exponentialRampToValueAtTime(f2 * 2.15, t2 + 0.018);
+
+        subDropGain.gain.setValueAtTime(0.001, t2);
+        subDropGain.gain.linearRampToValueAtTime(0.42, t2 + 0.002);
+        subDropGain.gain.exponentialRampToValueAtTime(0.001, t2 + 0.038);
+
+        subDropOsc.connect(subDropGain);
+        subDropGain.connect(dest);
+        subDropOsc.start(t2);
+        subDropOsc.stop(t2 + 0.042);
+      }
+
+      // 4. In 'water_bowl' mode, droplets also gently excite a resonant Singing Bowl bell harmonic
+      if (palette === 'water_bowl' && Math.random() < 0.45) {
+        const bowlFreq = Math.max(180, Math.min(1200, v.freq * (Math.random() < 0.5 ? 2 : 3)));
+        const bowlOsc = this.ctx.createOscillator();
+        const bowlGain = this.ctx.createGain();
+        bowlOsc.type = 'sine';
+        bowlOsc.frequency.setValueAtTime(bowlFreq, now);
+        bowlGain.gain.setValueAtTime(0.001, now);
+        bowlGain.gain.linearRampToValueAtTime(0.24, now + 0.008);
+        bowlGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+        bowlOsc.connect(bowlGain);
+        bowlGain.connect(dest);
+        bowlOsc.start(now);
+        bowlOsc.stop(now + 0.35);
+      }
+    } else if (palette === 'crackle') {
+      // 1. Tactile Binaural Silk Brush Stroke
+      const brushDur = 0.075 + Math.random() * 0.055;
+      const brushLen = Math.floor(this.ctx.sampleRate * brushDur);
+      const brushBuf = this.ctx.createBuffer(1, brushLen, this.ctx.sampleRate);
+      const bd = brushBuf.getChannelData(0);
+      for (let i = 0; i < brushLen; i++) {
+        bd[i] = (Math.random() * 2 - 1) * Math.sin((i / brushLen) * Math.PI);
+      }
+      const brushSrc = this.ctx.createBufferSource();
+      brushSrc.buffer = brushBuf;
+      const brushBP = this.ctx.createBiquadFilter();
+      brushBP.type = 'bandpass';
+      brushBP.frequency.value = 2200 + Math.random() * 3400;
+      brushBP.Q.value = 1.5;
+      const brushGain = this.ctx.createGain();
+      brushGain.gain.value = 0.45;
+      brushSrc.connect(brushBP);
+      brushBP.connect(brushGain);
+      brushGain.connect(dest);
+      brushSrc.start(now);
+      brushSrc.stop(now + brushDur + 0.01);
+
+      // 2. 3-5 Crisp Close-Ear Micro-Crackle Pops
+      const count = 3 + Math.floor(Math.random() * 3);
+      for (let k = 0; k < count; k++) {
+        const t = now + k * (0.012 + Math.random() * 0.020);
+        const len = Math.floor(this.ctx.sampleRate * 0.010);
+        const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.8);
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        const f = this.ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = 2800 + Math.random() * 4800;
+        f.Q.value = 1.8;
+        const g = this.ctx.createGain();
+        g.gain.value = 0.65 + Math.random() * 0.30;
+        src.connect(f);
+        f.connect(g);
+        g.connect(dest);
+        src.start(t);
+        src.stop(t + 0.014);
+      }
+    } else if (palette === 'tapping') {
+      // Multi-Modal Hollow Bamboo, Rosewood & Crystal Glass Taps with Double-Tap Motifs
+      const offsets = Math.random() < 0.42 ? [0, 0.068 + Math.random() * 0.025] : [0];
+      const tapPool = [460, 580, 740, 920, 1160, 1420];
+      offsets.forEach((off, idx) => {
+        const t0 = now + off;
+        const vel = idx === 0 ? 1.0 : 0.72;
+        const tapFreq = tapPool[Math.floor(Math.random() * tapPool.length)];
+
+        // Mode 1: Hollow Bamboo Fundamental
+        const osc1 = this.ctx.createOscillator();
+        const g1 = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(tapFreq * 1.22, t0);
+        osc1.frequency.exponentialRampToValueAtTime(tapFreq, t0 + 0.012);
+        g1.gain.setValueAtTime(0.68 * vel, t0);
+        g1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.068);
+        osc1.connect(g1);
+        g1.connect(dest);
+        osc1.start(t0);
+        osc1.stop(t0 + 0.072);
+
+        // Mode 2: Woody Inharmonic Cavity Mode (2.32x)
+        const osc2 = this.ctx.createOscillator();
+        const g2 = this.ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(tapFreq * 2.32, t0);
+        g2.gain.setValueAtTime(0.36 * vel, t0);
+        g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.030);
+        osc2.connect(g2);
+        g2.connect(dest);
+        osc2.start(t0);
+        osc2.stop(t0 + 0.034);
+
+        // Mode 3: Fingernail / Knuckle High-Frequency Transient (for pinna notch localization)
+        if (this.nodes.spatial.clickBuf) {
+          const clickSrc = this.ctx.createBufferSource();
+          clickSrc.buffer = this.nodes.spatial.clickBuf;
+          const clickBP = this.ctx.createBiquadFilter();
+          clickBP.type = 'bandpass';
+          clickBP.frequency.value = 3800 + Math.random() * 2400;
+          clickBP.Q.value = 1.8;
+          const clickGain = this.ctx.createGain();
+          clickGain.gain.value = 0.45 * vel;
+          clickSrc.connect(clickBP);
+          clickBP.connect(clickGain);
+          clickGain.connect(dest);
+          clickSrc.start(t0);
+        }
+      });
+    } else if (palette === 'whisper') {
+      // Soft Intimate Whispered Consonant Puff ("shh" / "haa" sibilant breath grain)
+      const puffDur = 0.14 + Math.random() * 0.10;
+      const puffLen = Math.floor(this.ctx.sampleRate * puffDur);
+      const puffBuf = this.ctx.createBuffer(1, puffLen, this.ctx.sampleRate);
+      const pd = puffBuf.getChannelData(0);
+      for (let i = 0; i < puffLen; i++) {
+        pd[i] = (Math.random() * 2 - 1) * Math.sin((i / puffLen) * Math.PI);
+      }
+      const src = this.ctx.createBufferSource();
+      src.buffer = puffBuf;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(2600 + Math.random() * 2200, now);
+      bp.frequency.exponentialRampToValueAtTime(1600 + Math.random() * 1400, now + puffDur);
+      bp.Q.value = 2.0;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.48;
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(dest);
+      src.start(now);
+      src.stop(now + puffDur + 0.01);
+    } else if (palette === 'shamanic') {
+      // 1. Shamanic Skin-Frame Drum + 2x Warm Drumhead Body
+      const drumOsc = this.ctx.createOscillator();
+      const drumBody = this.ctx.createOscillator();
+      const drumLP = this.ctx.createBiquadFilter();
+      const drumGain = this.ctx.createGain();
+      const bodyGain = this.ctx.createGain();
+
+      drumOsc.type = 'sine';
+      drumOsc.frequency.setValueAtTime(94, now);
+      drumOsc.frequency.exponentialRampToValueAtTime(46, now + 0.14);
+
+      drumBody.type = 'triangle';
+      drumBody.frequency.setValueAtTime(188, now);
+      drumBody.frequency.exponentialRampToValueAtTime(92, now + 0.11);
+
+      drumLP.type = 'lowpass';
+      drumLP.frequency.value = 420;
+
+      drumGain.gain.setValueAtTime(0.88, now);
+      drumGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+      bodyGain.gain.setValueAtTime(0.42, now);
+      bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      drumOsc.connect(drumLP);
+      drumBody.connect(bodyGain);
+      bodyGain.connect(drumLP);
+      drumLP.connect(drumGain);
+      drumGain.connect(dest);
+      drumOsc.start(now);
+      drumBody.start(now);
+      drumOsc.stop(now + 0.20);
+      drumBody.stop(now + 0.13);
+
+      // 2. Off-beat Seed-Pod Rattle (high-frequency shaker so the ear auricle localizes the drum in 3D!)
+      const rattleTime = now + 0.075 + (Math.random() - 0.5) * 0.015;
+      const rattleLen = Math.floor(this.ctx.sampleRate * 0.048);
+      const rattleBuf = this.ctx.createBuffer(1, rattleLen, this.ctx.sampleRate);
+      const rd = rattleBuf.getChannelData(0);
+      for (let i = 0; i < rattleLen; i++) {
+        rd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.012));
+      }
+      const rattleSrc = this.ctx.createBufferSource();
+      rattleSrc.buffer = rattleBuf;
+      const rattleBP = this.ctx.createBiquadFilter();
+      rattleBP.type = 'bandpass';
+      rattleBP.frequency.value = 4200 + Math.random() * 2200;
+      rattleBP.Q.value = 1.4;
+      const rattleGain = this.ctx.createGain();
+      rattleGain.gain.value = 0.52;
+      rattleSrc.connect(rattleBP);
+      rattleBP.connect(rattleGain);
+      rattleGain.connect(dest);
+      rattleSrc.start(rattleTime);
+      rattleSrc.stop(rattleTime + 0.052);
+    } else {
+      // 'rich8d': Delicate Crystal Harmonic Bell Beacon on the moving 8D chord source
+      const chimeFreq = Math.min(3600, v.freq * (Math.random() < 0.5 ? 2 : 3));
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(chimeFreq, now);
+      g.gain.setValueAtTime(0.001, now);
+      g.gain.linearRampToValueAtTime(0.32, now + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(g);
+      g.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.19);
+    }
+  }
+
+  /**
+   * Computes 3D (x, y, z) coordinates for source `i` according to selected 3D / 8D geometry
    */
   _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode) {
-    // In 'mixed' mode, assign distinct geometries to each source
     let geom = trajectoryMode;
     if (trajectoryMode === 'mixed') {
-      const modes = ['infinity', 'radial', 'circle'];
+      const modes = ['orbit8d', 'infinity', 'radial', 'peripersonal'];
       geom = modes[i % modes.length];
     }
 
@@ -503,24 +1069,39 @@ class ConsciousnessAudioEngine {
 
     let x = 0, y = 0, z = -1;
 
-    if (geom === 'infinity') {
+    if (geom === 'orbit8d') {
+      // 8D Classic Sweep: Wide, ultra-clear Left <-> Front <-> Right <-> Behind-Neck 360° orbit
+      // with sinusoidal 3D elevation sweep so the Pinna Notch & Cranial Head-Shadow sweep dramatically!
+      const dir = i % 2 === 0 ? 1 : -1;
+      const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
+      const r = 0.45 + 0.85 * asym * (0.78 + 0.22 * Math.cos(a * 2));
+      x = r * Math.sin(a);
+      z = -r * Math.cos(a);
+      y = Math.sin(a * 2 + i * 0.7) * (0.35 + 0.55 * asym);
+    } else if (geom === 'peripersonal') {
+      // Intimate Peripersonal ASMR Halo: orbits 12cm - 32cm from the head, lingering close to Left & Right ear canals
+      const dir = i % 2 === 0 ? 1 : -1;
+      const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
+      const s = Math.sin(a);
+      // Lingers near the ears (|x| ~ 0.18-0.28m) for maximum near-field ILD & whisper/crackle intimacy
+      const r = 0.16 + 0.22 * asym;
+      x = Math.sign(s) * Math.pow(Math.abs(s), 0.72) * r;
+      z = -Math.cos(a) * r * 0.85;
+      y = Math.sin(a * 2) * 0.18 * asym;
+    } else if (geom === 'infinity') {
       // Figure-8 / Lemniscate (∞) passing directly through the center of the head (0,0,0)!
-      // At theta = 0 and theta = PI, sin(theta) = 0 and sin(2*theta) = 0 -> (x,y,z) = (0,0,0)!
-      const lobeRadius = 1.1 + 1.15 * asym;
+      const lobeRadius = 1.0 + 1.15 * asym;
       const u = lobeRadius * Math.sin(theta);
       const v = lobeRadius * 0.58 * Math.sin(2 * theta);
 
-      // Rotate each source's Figure-8 axis around the head so multiple sources weave through (0,0,0)
       const axisAngle = (i * Math.PI) / Math.max(1, count);
       x = u * Math.cos(axisAngle) - v * Math.sin(axisAngle);
       z = -u * Math.sin(axisAngle) - v * Math.cos(axisAngle);
-      // Elevation also passes through 0 at the head center
       y = Math.sin(theta) * Math.cos(theta) * 0.85 * asym * (i % 2 === 0 ? 1 : -1);
     } else if (geom === 'radial') {
       // Far-Horizon Excursion: starts near the ear/head, travels VERY FAR OUT (up to 11m) in one direction, and returns!
       const rayAngle = (i * Math.PI * 2) / Math.max(1, count) + elapsed * 0.05 * (i % 2 === 0 ? 1 : -1);
-      const maxHorizonDist = 3.5 + 8.0 * asym; // up to 11.5 meters away!
-      // Smooth excursion 0.15m -> maxHorizonDist -> 0.15m
+      const maxHorizonDist = 3.5 + 8.0 * asym;
       const excursion = Math.pow(0.5 - 0.5 * Math.cos(theta), 1.65);
       const r = 0.15 + maxHorizonDist * excursion;
 
@@ -530,15 +1111,15 @@ class ConsciousnessAudioEngine {
     } else if (geom === 'circle') {
       // Pure 360° Circular Halo around perimeter of the head
       const dir = i % 2 === 0 ? 1 : -1;
-      const r = 0.75 + 0.95 * asym;
+      const r = 0.65 + 0.90 * asym;
       const a = elapsed * speed * Math.PI * 2 * dir + phaseOffset;
       x = r * Math.sin(a);
       z = -r * Math.cos(a);
       y = Math.sin(a + i) * 0.45 * asym;
     } else if (geom === 'spiral') {
-      // Breathing Spiral: spirals inward from far horizon (5.5m) straight through center of skull (0m) and back out
+      // Breathing Spiral: spirals inward from far horizon straight through center of skull and back out
       const breathCycle = 0.5 - 0.5 * Math.cos(theta * 0.35);
-      const r = (0.02 + 5.2 * asym) * breathCycle;
+      const r = (0.08 + 4.8 * asym) * breathCycle;
       const fastAngle = theta * 2.0;
       x = r * Math.sin(fastAngle);
       z = -r * Math.cos(fastAngle);
@@ -1890,7 +2471,7 @@ class ConsciousnessAudioEngine {
     this.telemetry.breathPhase = (elapsed * 0.1 * Math.PI * 2) % (Math.PI * 2);
     this.telemetry.breathValue = Math.sin(this.telemetry.breathPhase);
 
-    // 2. Update MODULE 1: 3D HRTF Trajectories (Figure-8 ∞, Far-Horizon Excursion, Circle, Mixed)
+    // 2. Update MODULE 1: Unified 8D Binaural Auricle (Pinna), Cranial Head-Shadow, ITD/ILD & Spatial ASMR / Water Drops
     if (this.nodes.spatial) {
       if (!this.params.spatial.enabled) {
         if (!this.nodes.spatial._isMuted) {
@@ -1906,10 +2487,45 @@ class ConsciousnessAudioEngine {
         const speed = this.params.spatial.speed;
         const asym = this.params.spatial.asymmetry;
         const count = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
-        const trajectory = this.params.spatial.trajectory || 'infinity';
-        const pulseDepth = this.params.spatial.pulse || 0;
+        const trajectory = this.params.spatial.trajectory || 'orbit8d';
+        const palette = this.params.spatial.palette || 'water_bowl';
+        const continuousLevel = this.params.spatial.pulse !== undefined ? this.params.spatial.pulse : 0.70;
+        const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
+        const auricle = this.params.spatial.auricle !== undefined ? this.params.spatial.auricle : 0.90;
         const manualPos = this.params.spatial.manualPos;
         const voices = this.nodes.spatial.voices;
+        const spatTc = isBg ? 0.065 : 0.025;
+
+        // Overtone singing harmonic step for 'shamanic' palette on moving 3D voices
+        if (palette === 'shamanic' && now >= this.nodes.spatial.nextOvertoneStepTime) {
+          const harmonics = [4, 5, 6, 7, 8, 9, 10, 12];
+          for (let i = 0; i < count; i++) {
+            const v = voices[i];
+            v.throatHarmonicIdx = (v.throatHarmonicIdx + 1 + Math.floor(Math.random() * 2)) % harmonics.length;
+            const h = harmonics[v.throatHarmonicIdx];
+            v.overtoneOsc.frequency.setTargetAtTime(Math.min(7200, v.freq * h), now, 0.08);
+          }
+          this.nodes.spatial.nextOvertoneStepTime = now + (1.1 + Math.random() * 1.3);
+        }
+
+        // Schedule 3D Spatialized Water Drops / ASMR Triggers on the active moving 3D sources!
+        if (triggerRate > 0.05) {
+          if (palette === 'shamanic') {
+            const drumPeriod = 1.0 / Math.max(1.0, triggerRate);
+            if (now >= this.nodes.spatial.nextShamanicTime) {
+              const vIdx = this.nodes.spatial.lastTriggeredVoice % count;
+              this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
+              this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
+              this.nodes.spatial.nextShamanicTime = now + drumPeriod;
+            }
+          } else if (now >= this.nodes.spatial.nextTriggerTime) {
+            const vIdx = this.nodes.spatial.lastTriggeredVoice % count;
+            this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
+            this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
+            const dt = (1.0 / triggerRate) * (0.55 + Math.random() * 0.90);
+            this.nodes.spatial.nextTriggerTime = now + dt;
+          }
+        }
 
         for (let i = 0; i < voices.length; i++) {
           const v = voices[i];
@@ -1925,71 +2541,139 @@ class ConsciousnessAudioEngine {
 
           v.voiceGain.gain.setTargetAtTime(v.weight, now, 0.04);
 
-        let x, y, z, geomType;
-        if (manualPos && i === 0) {
-          x = manualPos.x;
-          y = manualPos.y;
-          z = manualPos.z;
-          geomType = 'manual';
-        } else {
-          const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory);
-          x = pos.x;
-          y = pos.y;
-          z = pos.z;
-          geomType = pos.geomType;
-        }
+          let x, y, z, geomType;
+          if (manualPos && i === 0) {
+            x = manualPos.x;
+            y = manualPos.y;
+            z = manualPos.z;
+            geomType = 'manual';
+          } else {
+            const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory);
+            x = pos.x;
+            y = pos.y;
+            z = pos.z;
+            geomType = pos.geomType;
+          }
 
-        const spatTc = isBg ? 0.065 : 0.025;
-        if (v.panner.positionX) {
-          v.panner.positionX.setTargetAtTime(x, now, spatTc);
-          v.panner.positionY.setTargetAtTime(y, now, spatTc);
-          v.panner.positionZ.setTargetAtTime(z, now, spatTc);
-        } else {
-          v.panner.setPosition(x, y, z);
-        }
+          if (v.panner.positionX) {
+            v.panner.positionX.setTargetAtTime(x, now, spatTc);
+            v.panner.positionY.setTargetAtTime(y, now, spatTc);
+            v.panner.positionZ.setTargetAtTime(z, now, spatTc);
+          } else {
+            v.panner.setPosition(x, y, z);
+          }
 
-        const dist = Math.sqrt(x * x + y * y + z * z);
+          const dist = Math.sqrt(x * x + y * y + z * z);
+          const safeDist = Math.max(0.16, dist);
 
-        // Psychoacoustic Front/Back Pinna Shadowing & Air Absorption with distance:
-        // In WebAudio, z < 0 is in front of the listener; z > 0 is behind the listener's head.
-        const frontness = dist > 0.05 ? Math.max(-1, Math.min(1, -z / dist)) : 0;
-        const distAirDamp = 1 / (1 + dist * 0.18); // Far-horizon high-frequency air absorption
-        const baseShadow = frontness >= 0
-          ? 3400 + frontness * 5800   // Front: bright pinna cues
-          : 3400 * Math.pow(0.30, -frontness); // Behind head: pinna cartilage shadow
-        v.shadowFilter.frequency.setTargetAtTime(Math.max(450, baseShadow * distAirDamp), now, isBg ? 0.065 : 0.03);
+          // Normalized directional cosines:
+          // sinTheta in [-1..+1]: -1 = hard Left ear, +1 = hard Right ear
+          // frontness in [-1..+1]: +1 = directly in front of face (-Z), -1 = directly behind neck (+Z)
+          // elevNorm in [-1..+1]: +1 = above head (+Y), -1 = below chin (-Y)
+          const sinTheta = Math.max(-1, Math.min(1, x / safeDist));
+          const frontness = Math.max(-1, Math.min(1, -z / safeDist));
+          const elevNorm = Math.max(-1, Math.min(1, y / safeDist));
+          const distAirDamp = 1 / (1 + Math.max(0, dist - 0.5) * 0.22);
 
-        // Psychoacoustic Elevation Notch/Peak:
-        const elevGainDb = Math.max(-1, Math.min(1, y)) * 9.5;
-        v.elevFilter.gain.setTargetAtTime(elevGainDb, now, isBg ? 0.065 : 0.03);
+          // 1. Blauert Front vs. Back Directional Band Filter:
+          // Front (z < 0): boosts 3650 Hz frontal presence band.
+          // Back (z > 0): shifts to 1050 Hz posterior Blauert band so the brain unmistakably perceives "behind the neck"!
+          if (frontness >= 0) {
+            v.blauertFilter.frequency.setTargetAtTime(3650, now, spatTc);
+            v.blauertFilter.gain.setTargetAtTime(frontness * 6.5 * auricle, now, spatTc);
+          } else {
+            v.blauertFilter.frequency.setTargetAtTime(1050, now, spatTc);
+            v.blauertFilter.gain.setTargetAtTime((-frontness) * 5.8 * auricle, now, spatTc);
+          }
 
-        // Envelope: when pulseDepth == 0 (default), sound is 100% smooth & continuous (zero oscillation!)
-        let activeEnergy = 1.0;
-        if (pulseDepth > 0.01) {
-          const wave = 0.5 + 0.5 * Math.sin(elapsed * (1.5 + pulseDepth * 3.5) * Math.PI * 2 + (i * Math.PI * 2) / count);
-          activeEnergy = (1 - pulseDepth) + pulseDepth * Math.pow(wave, 2.0) * 1.4;
-        }
+          // 2. Outer Ear Concha Cavity Funnel Resonance (4.5 kHz):
+          const conchaDb = (frontness >= -0.2 ? (frontness + 0.4) * 4.5 : frontness * 4.0) * auricle;
+          v.conchaFilter.gain.setTargetAtTime(conchaDb, now, spatTc);
 
-        v.pulseGain.gain.setTargetAtTime(activeEnergy, now, spatTc);
+          // 3. Anthropometric Auricle (Pinna) Antihelix Spectral Notch (5.1 kHz .. 11.6 kHz):
+          // Sweeps monotonically with 3D elevation (y) and lateral angle (|x|)
+          const notchFreq = Math.max(4800, Math.min(12000, 7600 * Math.pow(2, 0.56 * elevNorm) + 850 * Math.abs(sinTheta)));
+          v.elevFilter.frequency.setTargetAtTime(notchFreq, now, spatTc);
+          v.elevFilter.Q.setTargetAtTime(3.6 + 2.4 * auricle, now, spatTc);
+          v.elevFilter.gain.setTargetAtTime(-12.5 * auricle, now, spatTc);
 
-        const tv = this.telemetry.spatialVoices[i];
-        tv.x = x;
-        tv.y = y;
-        tv.z = z;
-        tv.dist = dist;
-        tv.geomType = geomType;
-        tv.activeEnergy = activeEnergy;
+          // 4. Pinna Rim Rear Cartilage Shadow & Air Absorption Low-Pass:
+          // Wide open in front (up to 14.5 kHz); shadowed by pinna cartilage behind the skull (down to 1650 Hz)
+          const baseShadow = frontness >= 0
+            ? 5500 + frontness * 9000
+            : 5500 * Math.pow(0.28 + 0.45 * (1 - auricle), -frontness);
+          v.shadowFilter.frequency.setTargetAtTime(Math.max(650, baseShadow * distAirDamp), now, spatTc);
 
-        // Store trail point for 3D geometric path visualization (skip in background to save CPU)
-        if (!isBg) {
-          tv.trail.push({ x, y, z });
-          if (tv.trail.length > 56) {
-            tv.trail.shift();
+          // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..680 us) + Radial Doppler Delay:
+          const absSin = Math.abs(sinTheta);
+          const woodworth = (absSin + Math.asin(absSin)) / (1 + Math.PI * 0.5); // 0..1
+          const itdSec = 0.00068 * (0.4 + 0.6 * auricle) * woodworth;
+          const dopplerSec = Math.min(0.008, dist * 0.00065);
+          const delayL = 0.00005 + dopplerSec + (sinTheta > 0 ? itdSec : 0);
+          const delayR = 0.00005 + dopplerSec + (sinTheta < 0 ? itdSec : 0);
+          v.itdDelayL.delayTime.setTargetAtTime(delayL, now, spatTc);
+          v.itdDelayR.delayTime.setTargetAtTime(delayR, now, spatTc);
+
+          // 6. Contralateral Cranial Head-Shadow Low-Pass (Near ear = 16 kHz crystal clear; Far ear = shadowed down to ~850 Hz by skull):
+          const shadowExp = 0.35 + 0.65 * auricle;
+          const cutoffL = sinTheta <= 0
+            ? 16000 * distAirDamp
+            : Math.max(780, 15500 * Math.pow(0.055, Math.pow(sinTheta, 0.85) * shadowExp) * distAirDamp);
+          const cutoffR = sinTheta >= 0
+            ? 16000 * distAirDamp
+            : Math.max(780, 15500 * Math.pow(0.055, Math.pow(-sinTheta, 0.85) * shadowExp) * distAirDamp);
+          v.headShadowL.frequency.setTargetAtTime(cutoffL, now, spatTc);
+          v.headShadowR.frequency.setTargetAtTime(cutoffR, now, spatTc);
+
+          // 7. Near-Field Spherical ILD & Ear-Canal Proximity Gain:
+          // True distance from source (x,y,z) to Left Ear (-0.09,0,0) and Right Ear (+0.09,0,0)
+          const dL = Math.sqrt((x + 0.09) * (x + 0.09) + y * y + z * z + 0.012);
+          const dR = Math.sqrt((x - 0.09) * (x - 0.09) + y * y + z * z + 0.012);
+          const distAtten = 1 / (1 + 0.32 * Math.pow(Math.max(0, dist - 0.25), 1.2));
+          const panAngle = (sinTheta + 1) * (Math.PI * 0.25); // 0 (Left) .. PI/2 (Right)
+          const nearRatioL = Math.min(1.65, 0.45 / dL);
+          const nearRatioR = Math.min(1.65, 0.45 / dR);
+          const gL = Math.cos(panAngle) * (0.75 + 0.35 * nearRatioL * auricle) * distAtten;
+          const gR = Math.sin(panAngle) * (0.75 + 0.35 * nearRatioR * auricle) * distAtten;
+          v.earGainL.gain.setTargetAtTime(gL, now, spatTc);
+          v.earGainR.gain.setTargetAtTime(gR, now, spatTc);
+
+          // 8. Continuous Moving Texture Formant Morphing (Flowing Water / Whisper / Silk / 8D Chord):
+          const [f1, f2] = this._vowelFormants(elapsed * (0.38 + i * 0.09) + i * 1.3);
+          const fScale = palette === 'whisper' ? 1.25 : palette === 'water_drops' ? 1.45 : 1.1;
+          v.formantF1.frequency.setTargetAtTime(f1 * fScale, now, 0.06);
+          v.formantF2.frequency.setTargetAtTime(f2 * fScale, now, 0.06);
+
+          // Syllabic / liquid ripple modulation on the continuous moving carrier
+          let contMod = continuousLevel;
+          if (palette === 'whisper') {
+            const syllable = 0.60 + 0.40 * Math.sin(elapsed * 2.4 + i) * Math.cos(elapsed * 3.9 - i);
+            contMod = continuousLevel * syllable;
+          } else if (palette === 'water_drops') {
+            const streamRipple = 0.72 + 0.28 * Math.sin(elapsed * 4.5 + i * 1.7) * Math.cos(elapsed * 7.1);
+            contMod = continuousLevel * streamRipple;
+          }
+          v.pulseGain.gain.setTargetAtTime(contMod, now, spatTc);
+
+          const activeEnergy = Math.max(0.25, contMod + (triggerRate > 0 ? 0.35 : 0));
+          const tv = this.telemetry.spatialVoices[i];
+          tv.x = x;
+          tv.y = y;
+          tv.z = z;
+          tv.dist = dist;
+          tv.geomType = geomType;
+          tv.activeEnergy = activeEnergy;
+
+          // Store trail point for 3D geometric path visualization (skip in background to save CPU)
+          if (!isBg) {
+            tv.trail.push({ x, y, z });
+            if (tv.trail.length > 56) {
+              tv.trail.shift();
+            }
           }
         }
       }
     }
-  }
 
     // 3. Update MODULE 2: Chaos Multi-Archetype & Rhythm Scheduler
     if (this.nodes.chaos && this.params.chaos.enabled) {
@@ -2330,10 +3014,19 @@ class ConsciousnessAudioEngine {
     }
 
     if (mod === 'spatial') {
-      const targetBus = this.params.spatial.enabled ? this.params.spatial.gain * 0.52 : 0;
+      const targetBus = this.params.spatial.enabled ? this.params.spatial.gain * 0.72 : 0;
       this.nodes.spatial.bus.gain.setTargetAtTime(targetBus, now, 0.05);
 
-      if (key === 'collapse') {
+      if (key === 'palette') {
+        this._applySpatialPaletteVoicing(val);
+        this.nodes.spatial.nextTriggerTime = 0;
+        this.nodes.spatial.nextShamanicTime = 0;
+        this.nodes.spatial.nextOvertoneStepTime = 0;
+      } else if (key === 'auricle') {
+        if (this.nodes.spatial.extSend) {
+          this.nodes.spatial.extSend.gain.setTargetAtTime(0.16 * val, now, 0.05);
+        }
+      } else if (key === 'collapse') {
         this.nodes.spatial.coreGainL.gain.cancelScheduledValues(now);
         this.nodes.spatial.coreGainR.gain.cancelScheduledValues(now);
         if (val <= 0.005) {
@@ -2345,17 +3038,13 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.coreGainR.gain.setTargetAtTime(-lvl, now, 0.06);
         }
       } else if (key === 'tuning' || key === 'baseFreq') {
-        const ratios = this.tuningRatios[this.params.spatial.tuning] || this.tuningRatios.octaves;
         const base = this.params.spatial.baseFreq;
         this.nodes.spatial.coreOscL.frequency.setTargetAtTime(base, now, 0.1);
         this.nodes.spatial.coreOscR.frequency.setTargetAtTime(base, now, 0.1);
+        this._applySpatialPaletteVoicing(this.params.spatial.palette || 'water_bowl');
+        const ratios = this.tuningRatios[this.params.spatial.tuning] || this.tuningRatios.octaves;
         this.nodes.spatial.voices.forEach((v, i) => {
-          const f = base * ratios[i];
-          v.freq = f;
-          v.osc.frequency.setTargetAtTime(f, now, 0.1);
-          v.bodyOsc.frequency.setTargetAtTime(f, now, 0.1);
-          v.bodyFilter.frequency.setTargetAtTime(Math.min(3200, f * 8), now, 0.1);
-          this.telemetry.spatialVoices[i].freq = f;
+          this.telemetry.spatialVoices[i].freq = base * ratios[i];
         });
       } else if (key === 'trajectory' || key === 'count') {
         this.telemetry.spatialVoices.forEach((tv) => {

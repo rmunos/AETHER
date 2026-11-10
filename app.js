@@ -33,44 +33,50 @@ document.addEventListener('DOMContentLoaded', () => {
   // Phenomenological Presets Definition
   const PRESETS = {
     egoDissolution: {
-      name: 'NON-DUAL SPATIAL',
-      mechTitle: 'Neuro-Mechanism: Proprioceptive & Parietal De-Anchoring',
+      name: '8D BOWLS & WATER DROPS',
+      mechTitle: 'Neuro-Mechanism: 8D Auricle (Pinna) Localization & Parietal De-Anchoring',
       mechText:
-        'Consciousness anchors the "observer" at the center of a 3D auditory map. By guiding deep harmonic sources along a Figure-8 (∞) trajectory that passes directly through the center of the skull and out into 3D space, the parietal cortex relaxes its rigid inside/outside ego boundary.',
-      reverbMix: 0.45,
+        'True 3D/8D localization combines Interaural Time Difference (ITD 0–680 µs), contralateral cranial head-shadowing, Blauert front/back bands (1.05 kHz rear vs 3.65 kHz front), and the ear auricle (pinna) elevation spectral notch (5–11.5 kHz) on moving singing bowls and water droplets.',
+      reverbMix: 0.38,
       spatial: {
         enabled: true,
-        trajectory: 'infinity',
+        palette: 'water_bowl',
+        trajectory: 'orbit8d',
         count: 2,
-        baseFreq: 72,
-        gain: 0.82,
-        speed: 0.18,
-        pulse: 0.0,
+        baseFreq: 110,
+        gain: 0.85,
+        speed: 0.16,
+        pulse: 0.72,
+        rate: 3.2,
+        auricle: 0.92,
         collapse: 0.0,
-        asymmetry: 0.88,
+        asymmetry: 0.82,
         tuning: 'octaves'
       },
-      chaos: { enabled: true, gain: 0.25, r: 3.68, rate: 2.0, morph: 0.75 },
-      pac: { enabled: true, gain: 0.40, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
+      chaos: { enabled: true, gain: 0.22, r: 3.68, rate: 2.0, morph: 0.75 },
+      pac: { enabled: true, gain: 0.38, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.60, center: 220 },
       sub: { enabled: true, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
-      ganzfeld: { enabled: true, gain: 0.24, color: 0.65, sweep: 0.60 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      ganzfeld: { enabled: true, gain: 0.20, color: 0.65, sweep: 0.60 },
+      asmr: { enabled: false }
     },
     dmnQuieting: {
       name: 'DMN SUPPRESSION',
       mechTitle: 'Neuro-Mechanism: Bayesian Surprise & Default Mode Network Quieting',
       mechText:
-        'The Default Mode Network (DMN) sustains narrative self-talk when sensory input is either static (boredom) or periodic. Operating at Logistic Map r = 3.76 ("Edge of Chaos"), microtonal formant droplets maximize non-repeating Bayesian surprise without triggering startle, suspending autobiographical rumination.',
-      reverbMix: 0.58,
+        'The Default Mode Network (DMN) sustains narrative self-talk when sensory input is either static (boredom) or periodic. Operating at Logistic Map r = 3.76 ("Edge of Chaos"), microtonal formant droplets and 3D cave water drops maximize non-repeating Bayesian surprise.',
+      reverbMix: 0.55,
       spatial: {
         enabled: true,
+        palette: 'water_drops',
         trajectory: 'mixed',
         count: 3,
-        baseFreq: 85,
-        gain: 0.50,
+        baseFreq: 96,
+        gain: 0.58,
         speed: 0.14,
-        pulse: 0.0,
+        pulse: 0.50,
+        rate: 3.5,
+        auricle: 0.88,
         collapse: 0.0,
         asymmetry: 0.75,
         tuning: 'quartal'
@@ -79,25 +85,28 @@ document.addEventListener('DOMContentLoaded', () => {
       pac: { enabled: true, gain: 0.40, harmonics: 0.35, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
       fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
       sub: { enabled: false, gain: 0.30, freq: 36.0, pulse: 1.5, warmth: 0.35 },
-      ganzfeld: { enabled: true, gain: 0.42, color: 0.52, sweep: 0.72 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      ganzfeld: { enabled: true, gain: 0.38, color: 0.52, sweep: 0.72 },
+      asmr: { enabled: false }
     },
     lucidHypnagogia: {
       name: 'LUCID θ–γ PAC',
       mechTitle: 'Neuro-Mechanism: Thalamocortical Theta-Gamma Phase-Amplitude Coupling',
       mechText:
-        'In deep meditative and lucid dream states, high-frequency 40 Hz Gamma bursts (conscious lucidity & sensory binding) are nested directly on the peaks of slow 6 Hz Theta oscillations, carried by a 0.1 Hz vagal breath wave. This prevents falling into unconscious sleep while entering deep trance.',
-      reverbMix: 0.62,
+        'In deep meditative and lucid dream states, high-frequency 40 Hz Gamma bursts (conscious lucidity & sensory binding) are nested directly on the peaks of slow 6 Hz Theta oscillations, carried by a 0.1 Hz vagal breath wave and an 8D celestial harmonic aura.',
+      reverbMix: 0.58,
       spatial: {
         enabled: true,
-        trajectory: 'circle',
+        palette: 'rich8d',
+        trajectory: 'orbit8d',
         count: 2,
-        baseFreq: 64,
-        gain: 0.55,
+        baseFreq: 96,
+        gain: 0.58,
         speed: 0.12,
-        pulse: 0.0,
+        pulse: 0.85,
+        rate: 1.4,
+        auricle: 0.90,
         collapse: 0.0,
-        asymmetry: 0.65,
+        asymmetry: 0.70,
         tuning: 'just'
       },
       chaos: { enabled: false, gain: 0.25, r: 3.62, rate: 1.8, morph: 0.50 },
@@ -105,22 +114,25 @@ document.addEventListener('DOMContentLoaded', () => {
       fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.50, center: 216 },
       sub: { enabled: true, gain: 0.52, freq: 32.0, pulse: 1.5, warmth: 0.50 },
       ganzfeld: { enabled: true, gain: 0.25, color: 0.70, sweep: 0.45 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      asmr: { enabled: false }
     },
     timelessFractal: {
       name: 'FRACTAL HORIZON',
       mechTitle: 'Neuro-Mechanism: Scale-Invariant 1/f Dynamics & Shepard-Risset Paradox',
       mechText:
-        'Combines an 8-octave Shepard-Risset continuous glissando with a multi-scale Weierstrass fractal modulator. Because the acoustic trajectory ascends forever without ever getting higher and exhibits self-similarity across time scales, the brain’s linear time-keeping loop is suspended.',
-      reverbMix: 0.75,
+        'Combines an 8-octave Shepard-Risset continuous glissando with a multi-scale Weierstrass fractal modulator and far-horizon 8D excursions. Because the acoustic trajectory ascends forever without ever getting higher, the brain’s linear time-keeping loop is suspended.',
+      reverbMix: 0.72,
       spatial: {
         enabled: true,
+        palette: 'rich8d',
         trajectory: 'radial',
         count: 3,
-        baseFreq: 96,
-        gain: 0.55,
+        baseFreq: 108,
+        gain: 0.58,
         speed: 0.15,
-        pulse: 0.0,
+        pulse: 0.80,
+        rate: 1.6,
+        auricle: 0.90,
         collapse: 0.0,
         asymmetry: 0.85,
         tuning: 'overtone'
@@ -130,47 +142,53 @@ document.addEventListener('DOMContentLoaded', () => {
       fractal: { enabled: true, gain: 0.72, speed: 0.07, depth: 0.85, center: 216 },
       sub: { enabled: true, gain: 0.42, freq: 36.0, pulse: 0.8, warmth: 0.45 },
       ganzfeld: { enabled: true, gain: 0.22, color: 0.58, sweep: 0.50 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      asmr: { enabled: false }
     },
     somaticVagal: {
       name: 'SOMATIC INFRASOUND',
       mechTitle: 'Neuro-Mechanism: Vestibular Otolith & Vagal Sub-Bass Entrainment',
       mechText:
-        'Pairs a 30 Hz sub-bass carrier with 2nd/3rd harmonic "missing-fundamental" psychoacoustic warmth and a 1.65 Hz (~100 BPM) trance meter pulse. Stimulates vestibular pathways and vagal afferent fibers to induce grounded somatic awe and temporal absorption.',
-      reverbMix: 0.48,
+        'Pairs a 30 Hz sub-bass carrier with 2nd/3rd harmonic "missing-fundamental" psychoacoustic warmth, a 1.65 Hz (~100 BPM) trance meter pulse, and spiraling 8D singing bowls.',
+      reverbMix: 0.45,
       spatial: {
         enabled: true,
+        palette: 'water_bowl',
         trajectory: 'spiral',
         count: 2,
-        baseFreq: 48,
+        baseFreq: 64,
         gain: 0.65,
         speed: 0.10,
-        pulse: 0.0,
+        pulse: 0.75,
+        rate: 2.0,
+        auricle: 0.88,
         collapse: 0.0,
-        asymmetry: 0.70,
+        asymmetry: 0.75,
         tuning: 'octaves'
       },
       chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.5, morph: 0.40 },
       pac: { enabled: true, gain: 0.55, harmonics: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
       fractal: { enabled: false, gain: 0.20, speed: -0.04, depth: 0.40, center: 144 },
       sub: { enabled: true, gain: 0.82, freq: 30.0, pulse: 1.65, warmth: 0.68 },
-      ganzfeld: { enabled: true, gain: 0.35, color: 0.82, sweep: 0.65 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      ganzfeld: { enabled: true, gain: 0.32, color: 0.82, sweep: 0.65 },
+      asmr: { enabled: false }
     },
     auditoryGanzfeld: {
       name: 'GANZFELD SONIC VOID',
       mechTitle: 'Neuro-Mechanism: Stochastic Resonance & Sensory Deprivation Horizon',
       mechText:
-        'Binaurally decorrelated 1/f Pink and 1/f² Brown noise sculpted by dual resonant cavern filters deprives the auditory cortex of directional anchors. Through stochastic resonance, uniform broadband energy lowers the detection threshold for subtle internal neural imagery.',
-      reverbMix: 0.80,
+        'Binaurally decorrelated 1/f Pink and 1/f² Brown noise sculpted by dual resonant cavern filters and orbiting 8D whispered breath deprives the auditory cortex of static anchors, lowering the threshold for subtle internal imagery.',
+      reverbMix: 0.78,
       spatial: {
         enabled: true,
+        palette: 'whisper',
         trajectory: 'radial',
         count: 2,
-        baseFreq: 60,
-        gain: 0.45,
-        speed: 0.08,
-        pulse: 0.0,
+        baseFreq: 80,
+        gain: 0.55,
+        speed: 0.09,
+        pulse: 0.80,
+        rate: 1.8,
+        auricle: 0.90,
         collapse: 0.0,
         asymmetry: 0.80,
         tuning: 'quartal'
@@ -180,57 +198,63 @@ document.addEventListener('DOMContentLoaded', () => {
       fractal: { enabled: true, gain: 0.38, speed: -0.03, depth: 0.70, center: 180 },
       sub: { enabled: true, gain: 0.45, freq: 28.0, pulse: 0.9, warmth: 0.35 },
       ganzfeld: { enabled: true, gain: 0.78, color: 0.68, sweep: 0.85 },
-      asmr: { enabled: false, gain: 0.40, palette: 'whisper', proximity: 0.25, rate: 3.5, resonance: 0.65 }
+      asmr: { enabled: false }
     },
     shamanicTrance: {
-      name: 'SHAMANIC THETA FLIGHT',
-      mechTitle: 'Neuro-Mechanism: 4.5 Hz Auditory Steady-State Entrainment & Overtone Trance',
+      name: '8D SHAMANIC FLIGHT',
+      mechTitle: 'Neuro-Mechanism: 4.5 Hz 8D Frame Drum Entrainment & 110 Hz Tibetan Overtones',
       mechText:
-        'A steady 4.5 Hz skin-frame drum driving thalamocortical theta synchronization paired with Tuvan/Tibetan overtone singing at the 110 Hz ancient megalithic chamber resonance induces hypnagogic dream-journey states and deep contemplative absorption.',
-      reverbMix: 0.52,
+        'Orbiting 110 Hz Tibetan/Tuvan overtone singing paired with a 3D-spatialized 4.5 Hz skin-frame drum and seed rattle sweeping around the ear auricles induces thalamocortical theta synchronization and hypnagogic trance.',
+      reverbMix: 0.42,
       spatial: {
         enabled: true,
-        trajectory: 'circle',
+        palette: 'shamanic',
+        trajectory: 'orbit8d',
         count: 2,
-        baseFreq: 55,
-        gain: 0.45,
-        speed: 0.10,
-        pulse: 0.0,
+        baseFreq: 110,
+        gain: 0.92,
+        speed: 0.14,
+        pulse: 0.82,
+        rate: 4.5,
+        auricle: 0.94,
         collapse: 0.0,
-        asymmetry: 0.70,
+        asymmetry: 0.78,
         tuning: 'just'
       },
       chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.40 },
-      pac: { enabled: true, gain: 0.60, harmonics: 0.40, theta: 4.5, gamma: 40, depth: 0.55, breath: 0.70 },
+      pac: { enabled: true, gain: 0.55, harmonics: 0.40, theta: 4.5, gamma: 40, depth: 0.55, breath: 0.70 },
       fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
-      sub: { enabled: true, gain: 0.65, freq: 32.0, pulse: 1.125, warmth: 0.55 },
+      sub: { enabled: true, gain: 0.62, freq: 32.0, pulse: 1.125, warmth: 0.55 },
       ganzfeld: { enabled: false, gain: 0.25, color: 0.70, sweep: 0.50 },
-      asmr: { enabled: true, gain: 0.75, palette: 'shamanic', proximity: 0.35, rate: 4.5, resonance: 0.70 }
+      asmr: { enabled: false }
     },
     somaticTingles: {
-      name: 'PERIPERSONAL ASMR TINGLES',
-      mechTitle: 'Neuro-Mechanism: Somatosensory De-Gating & Oxytocinergic Vagal Cascade',
+      name: '8D PERIPERSONAL ASMR',
+      mechTitle: 'Neuro-Mechanism: Near-Field Auricle Notch, Cranial Shadow & ASMR Paresthesia',
       mechText:
-        'Micro-tactile silk brushing, hollow bamboo taps, and intimate whispered vocal formants orbiting within 5–15 cm of the ear pinna activate the insular cortex and superior temporal sulcus, triggering immediate scalp-to-spine ASMR paresthesia.',
-      reverbMix: 0.28,
+        'Continuous binaural silk brushing, micro-crackles, whispers, and water droplets orbiting 10–25 cm from the ear auricle maximize interaural time/level asymmetry and pinna spectral notches, triggering scalp-to-spine ASMR tingles.',
+      reverbMix: 0.22,
       spatial: {
         enabled: true,
-        trajectory: 'spiral',
+        palette: 'crackle',
+        trajectory: 'peripersonal',
         count: 2,
-        baseFreq: 96,
-        gain: 0.35,
-        speed: 0.08,
-        pulse: 0.0,
+        baseFreq: 128,
+        gain: 0.94,
+        speed: 0.18,
+        pulse: 0.76,
+        rate: 4.4,
+        auricle: 0.96,
         collapse: 0.0,
-        asymmetry: 0.85,
+        asymmetry: 0.65,
         tuning: 'golden'
       },
-      chaos: { enabled: true, gain: 0.22, r: 3.60, rate: 1.2, morph: 0.45 },
-      pac: { enabled: true, gain: 0.40, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.45, breath: 0.85 },
+      chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.2, morph: 0.45 },
+      pac: { enabled: true, gain: 0.35, harmonics: 0.45, theta: 6.0, gamma: 40, depth: 0.40, breath: 0.85 },
       fractal: { enabled: false, gain: 0.20, speed: 0.03, depth: 0.40, center: 216 },
-      sub: { enabled: true, gain: 0.35, freq: 36.0, pulse: 0.8, warmth: 0.40 },
-      ganzfeld: { enabled: true, gain: 0.20, color: 0.60, sweep: 0.40 },
-      asmr: { enabled: true, gain: 0.85, palette: 'crackle', proximity: 0.15, rate: 4.0, resonance: 0.75 }
+      sub: { enabled: true, gain: 0.32, freq: 36.0, pulse: 0.8, warmth: 0.40 },
+      ganzfeld: { enabled: false, gain: 0.18, color: 0.60, sweep: 0.40 },
+      asmr: { enabled: false }
     }
   };
 
@@ -601,15 +625,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Bind Module 1: Spatial
+  // Bind Module 1: Unified 8D Binaural Auricle & Spatial ASMR
   bindToggle('spatialEnabled', 'spatial');
-
-  const spatialTrajectoryEl = document.getElementById('spatialTrajectory');
-  if (spatialTrajectoryEl) {
-    spatialTrajectoryEl.addEventListener('change', (e) => {
-      engine.updateModule('spatial', 'trajectory', e.target.value);
-    });
-  }
+  bindSelect('spatialPalette', 'spatial', 'palette');
+  bindSelect('spatialTrajectory', 'spatial', 'trajectory');
+  bindSelect('spatialTuning', 'spatial', 'tuning');
 
   bindSlider('spatialCount', 'spatial', 'count', (v) => `${Math.round(v)} ${Math.round(v) === 1 ? 'Source' : 'Sources'}`);
   bindSlider('spatialBaseFreq', 'spatial', 'baseFreq', (v) => {
@@ -618,28 +638,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   bindSlider('spatialGain', 'spatial', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`);
-  bindSlider('spatialPulse', 'spatial', 'pulse', (v) => (v <= 0.01 ? '0% (Smooth)' : `${Math.round(v * 100)}%`));
+  bindSlider('spatialPulse', 'spatial', 'pulse', (v) =>
+    v <= 0.02 ? '0% (Drops Only)' : v >= 0.98 ? '100% (Full Moving)' : `${Math.round(v * 100)}% (Moving + Drops)`
+  );
+  bindSlider('spatialRate', 'spatial', 'rate', (v) => (v <= 0.05 ? '0 /s (Continuous)' : `${v.toFixed(1)} /s`));
+  bindSlider('spatialAuricle', 'spatial', 'auricle', (v) => {
+    const label = v > 0.75 ? '8D Hyper-Real' : v > 0.35 ? 'Balanced' : 'Subtle';
+    return `${Math.round(v * 100)}% (${label})`;
+  });
   bindSlider('spatialCollapse', 'spatial', 'collapse', (v) => `${Math.round(v * 100)}%`);
   bindSlider('spatialAsymmetry', 'spatial', 'asymmetry', (v) => `${Math.round(v * 100)}%`);
-  document.getElementById('spatialTuning').addEventListener('change', (e) => {
-    engine.updateModule('spatial', 'tuning', e.target.value);
-  });
 
   // ==========================================
-  // UNIFIED SOLO ENGINE (All 7 Modules)
+  // UNIFIED SOLO ENGINE (All 6 Modules)
   // ==========================================
-  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld', 'asmr'];
+  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
   let currentSoloMod = null;
   let savedSoloState = null;
 
   const soloButtons = {
-    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '3D', tab: 'spatial' },
+    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '8D', tab: 'spatial' },
     chaos: { btn: document.getElementById('soloChaosBtn'), label: 'CHAOS', tab: 'chaos' },
     pac: { btn: document.getElementById('soloPacBtn'), label: 'PAC', tab: 'pac' },
     fractal: { btn: document.getElementById('soloFractalBtn'), label: 'FRACTAL', tab: 'chaos' },
     sub: { btn: document.getElementById('soloSubBtn'), label: 'SUB', tab: 'chaos' },
-    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' },
-    asmr: { btn: document.getElementById('soloAsmrBtn'), label: 'ASMR', tab: 'spatial' }
+    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' }
   };
 
   function setModuleActiveUIAndEngine(mod, enabled) {
@@ -878,9 +901,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset Solo buttons state when loading a full config
     resetAllSoloButtonsUI();
 
-    // 1. Spatial
+    // 1. Spatial (Unified 8D Binaural Auricle & Spatial ASMR)
     if (p.spatial) {
       syncToggle('spatialEnabled', 'spatial', p.spatial.enabled);
+      if (document.getElementById('spatialPalette') && p.spatial.palette) {
+        document.getElementById('spatialPalette').value = p.spatial.palette;
+      }
       if (document.getElementById('spatialTrajectory') && p.spatial.trajectory) {
         document.getElementById('spatialTrajectory').value = p.spatial.trajectory;
       }
@@ -894,11 +920,24 @@ document.addEventListener('DOMContentLoaded', () => {
       syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
       syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz`);
       if (p.spatial.pulse !== undefined) {
-        syncControl('spatialPulse', p.spatial.pulse, p.spatial.pulse <= 0.01 ? '0% (Smooth)' : `${Math.round(p.spatial.pulse * 100)}%`);
+        const pTxt =
+          p.spatial.pulse <= 0.02
+            ? '0% (Drops Only)'
+            : p.spatial.pulse >= 0.98
+            ? '100% (Full Moving)'
+            : `${Math.round(p.spatial.pulse * 100)}% (Moving + Drops)`;
+        syncControl('spatialPulse', p.spatial.pulse, pTxt);
+      }
+      if (p.spatial.rate !== undefined) {
+        syncControl('spatialRate', p.spatial.rate, p.spatial.rate <= 0.05 ? '0 /s (Continuous)' : `${p.spatial.rate.toFixed(1)} /s`);
+      }
+      if (p.spatial.auricle !== undefined) {
+        const aLabel = p.spatial.auricle > 0.75 ? '8D Hyper-Real' : p.spatial.auricle > 0.35 ? 'Balanced' : 'Subtle';
+        syncControl('spatialAuricle', p.spatial.auricle, `${Math.round(p.spatial.auricle * 100)}% (${aLabel})`);
       }
       syncControl('spatialCollapse', p.spatial.collapse, `${Math.round(p.spatial.collapse * 100)}%`);
       syncControl('spatialAsymmetry', p.spatial.asymmetry, `${Math.round(p.spatial.asymmetry * 100)}%`);
-      if (p.spatial.tuning) {
+      if (p.spatial.tuning && document.getElementById('spatialTuning')) {
         document.getElementById('spatialTuning').value = p.spatial.tuning;
       }
       Object.entries(p.spatial).forEach(([k, v]) => {
@@ -1241,7 +1280,30 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx2d.fillRect(cx - 21, cy - 6, 4, 12);
     ctx2d.fillRect(cx + 17, cy - 6, 4, 12);
 
-    // 3. Draw Active 3D HRTF Voices + Geometric Trails
+    // 3. Draw 3D Water Drop & ASMR Trigger Ripples at exact 3D emission coordinates
+    if (engine.telemetry.spatialRipples && engine.telemetry.spatialRipples.length > 0 && engine.ctx) {
+      const audioNow = engine.ctx.currentTime;
+      for (let rIdx = engine.telemetry.spatialRipples.length - 1; rIdx >= 0; rIdx--) {
+        const rp = engine.telemetry.spatialRipples[rIdx];
+        const age = audioNow - rp.time;
+        if (age > 0.85) {
+          engine.telemetry.spatialRipples.splice(rIdx, 1);
+          continue;
+        }
+        if (age >= 0) {
+          const { px, py } = project3DToRadar(rp.x, rp.y, rp.z, cx, cy, scale);
+          const rRad = 6 + age * 46;
+          const alpha = Math.max(0, (1 - age / 0.85) * 0.65);
+          ctx2d.beginPath();
+          ctx2d.arc(px, py, rRad, 0, Math.PI * 2);
+          ctx2d.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+          ctx2d.lineWidth = 1.6;
+          ctx2d.stroke();
+        }
+      }
+    }
+
+    // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails
     const activeCount = engine.params.spatial.count || 2;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
 
@@ -1261,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
       const hue = palette[v.index % palette.length];
 
-      // Draw Geometric Trail (shows Figure-8 ∞ through head, Far-Horizon ray, or Circle)
+      // Draw Geometric Trail (shows 8D Orbit, Figure-8 ∞ through head, Far-Horizon ray, or Halo)
       if (v.trail && v.trail.length > 2) {
         ctx2d.beginPath();
         for (let t = 0; t < v.trail.length; t++) {
@@ -1299,18 +1361,18 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.arc(px, py, radius * 2.6, 0, Math.PI * 2);
       ctx2d.fill();
 
-      // Label with Source #, Frequency, Distance & Position
+      // Label with Source #, Pinna Cue, Distance & Position
       ctx2d.fillStyle = 'rgba(241, 245, 249, 0.92)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
       const locTag = dist < 0.28
-        ? 'IN-SKULL'
+        ? 'NEAR-EAR'
         : v.z > 0.25
-        ? 'BACK'
+        ? 'BACK 1.1kHz'
         : v.z < -0.25
-        ? 'FRONT'
+        ? 'FRONT 3.7kHz'
         : v.x < 0
-        ? 'LEFT'
-        : 'RIGHT';
+        ? 'LEFT PINNA'
+        : 'RIGHT PINNA';
       ctx2d.fillText(
         `S${v.index + 1}: ${Math.round(v.freq)}Hz (${dist.toFixed(1)}m ${locTag})`,
         px + radius + 5,

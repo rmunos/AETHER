@@ -74,7 +74,7 @@
         <div class="visualizer-card">
           <div class="visualizer-header">
             <div class="viz-tabs" role="tablist">
-              <button class="viz-tab active" data-viz="spatial" role="tab">3D HRTF Spatial Geometry</button>
+              <button class="viz-tab active" data-viz="spatial" role="tab">8D Auricle HRTF &amp; Spatial ASMR</button>
               <button class="viz-tab" data-viz="pac" role="tab">θ–γ PAC &amp; Binaural Lissajous</button>
               <button class="viz-tab" data-viz="chaos" role="tab">Edge-of-Chaos &amp; Fractal Spectrum</button>
             </div>
@@ -105,8 +105,8 @@
 
           <div class="preset-grid">
             <button class="preset-btn active" data-preset="egoDissolution">
-              <span class="preset-title">1. Non-Dual Spatial Unbinding</span>
-              <span class="preset-desc">Counter-rotating 3D HRTF harmonics + in-cranial phase collapse to soften spatial self-boundaries</span>
+              <span class="preset-title">1. 8D Singing Bowls &amp; Water Drops</span>
+              <span class="preset-desc">8D Binaural Auricle orbits with crystal water droplets &amp; moving singing bowls around the pinna</span>
             </button>
             <button class="preset-btn" data-preset="dmnQuieting">
               <span class="preset-title">2. DMN Quieting (Edge of Chaos)</span>
@@ -129,20 +129,20 @@
               <span class="preset-desc">Decorrelated 3D 1/f pink/brown cavern resonance for stochastic internal imagery</span>
             </button>
             <button class="preset-btn" data-preset="shamanicTrance">
-              <span class="preset-title">7. Shamanic Theta Flight</span>
-              <span class="preset-desc">4.5 Hz theta skin drum &amp; seed rattle + Tuvan overtone whistling and 110 Hz megalith resonance</span>
+              <span class="preset-title">7. 8D Shamanic &amp; Tibetan Overtones</span>
+              <span class="preset-desc">Orbiting 110 Hz Tibetan throat overtones + 4.5 Hz spatialized theta skin drum &amp; seed rattle</span>
             </button>
             <button class="preset-btn" data-preset="somaticTingles">
-              <span class="preset-title">8. Peripersonal ASMR Tingles</span>
-              <span class="preset-desc">Micro-tactile silk brushing &amp; bamboo taps orbiting centimeters from the pinna for somatic paresthesia</span>
+              <span class="preset-title">8. 8D Peripersonal ASMR &amp; Silk</span>
+              <span class="preset-desc">Close-ear binaural silk brushing, whispers, water drops &amp; bamboo taps sculpting the ear auricle</span>
             </button>
           </div>
 
           <!-- Active Phenomenology Mechanism Note -->
           <div class="mechanism-banner" id="mechanismBanner">
-            <div class="mech-title" id="mechTitle">Neuro-Mechanism: Proprioceptive &amp; Parietal De-Anchoring</div>
+            <div class="mech-title" id="mechTitle">Neuro-Mechanism: 8D Auricle (Pinna) Localization &amp; Parietal De-Anchoring</div>
             <p class="mech-text" id="mechText">
-              Consciousness anchors the "observer" at the center of a 3D auditory map. By splitting a Golden-Ratio harmonic chord into 8 HRTF voices orbiting in opposite toroidal paths while phase-inverting the fundamental inside the cranium, the parietal cortex relaxes its rigid inside/outside ego boundary.
+              True 3D/8D localization combines Interaural Time Difference (ITD 0–700 µs), contralateral cranial head-shadowing, Blauert front/back bands (1.1 kHz rear vs 3.7 kHz front), and the ear auricle (pinna) elevation spectral notch (5–11 kHz) on rich moving sources and water droplets.
             </p>
           </div>
         </div>
@@ -151,62 +151,84 @@
       <!-- Right Column: 6 Real-Time Synthesis Modules -->
       <section class="modules-grid">
 
-        <!-- MODULE 1: Hyper-Spatial Impossible Geometry -->
+        <!-- MODULE 1: Unified 8D Binaural Auricle & Spatial ASMR -->
         <article class="module-card active-module" data-module="spatial">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-cyan">01 // PARIETAL SELF-MODEL</span>
-              <h3>Hyper-Spatial "Impossible Geometry"</h3>
+              <span class="module-tag tag-cyan">01 // 8D BINAURAL AURICLE &amp; SPATIAL ASMR</span>
+              <h3>8D Spatial ASMR &amp; Auricle Geometry</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloSpatialBtn" class="btn-solo" title="Mute all other modules to hear pure 3D spatial trajectories">SOLO 3D</button>
+              <button type="button" id="soloSpatialBtn" class="btn-solo" title="Mute all other modules to hear pure 8D Binaural Auricle &amp; Spatial ASMR">SOLO 8D</button>
               <label class="toggle-switch">
                 <input type="checkbox" id="spatialEnabled" checked />
                 <span class="slider"></span>
               </label>
             </div>
           </div>
-          <p class="module-subtitle">Configurable 1–8 3D HRTF sources with Figure-8 (∞), Far-Horizon &amp; Halo geometries. Drag on canvas to move manually.</p>
+          <p class="module-subtitle">Ear-auricle (pinna) spectral notch, cranial head-shadow &amp; ITD/ILD phase with moving 8D sources, water drops &amp; ASMR. Drag on canvas to move manually.</p>
 
           <div class="control-list">
             <div class="control-row">
-              <div class="control-label"><span>3D Trajectory Geometry</span></div>
+              <div class="control-label"><span>8D Sound &amp; ASMR Palette</span></div>
+              <select id="spatialPalette" class="select-input">
+                <option value="water_bowl" selected>🥣 8D Singing Bowls + Crystal Water Drops (Moving + Drops)</option>
+                <option value="water_drops">💧 3D Cave Water Droplets &amp; Flowing Stream (ASMR Water)</option>
+                <option value="crackle">✨ 8D Silk Brush &amp; Micro-Crackle Tingles (Binaural ASMR)</option>
+                <option value="whisper">🌬️ 8D Whispered Air &amp; Breath Halo (Moving Vocal ASMR)</option>
+                <option value="tapping">🎋 8D Hollow Bamboo, Wood &amp; Glass Taps (Percussive ASMR)</option>
+                <option value="rich8d">🌌 8D Celestial Harmonic Pad &amp; Auricle Shimmer (Continuous 8D)</option>
+                <option value="shamanic">🥁 8D Tibetan Overtone Singing &amp; 4.5 Hz Shamanic Drum</option>
+              </select>
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>3D / 8D Trajectory Geometry</span></div>
               <select id="spatialTrajectory" class="select-input">
-                <option value="infinity" selected>Figure-8 / Infinity (∞ Passing Through Head)</option>
-                <option value="radial">Far-Horizon Excursion (Goes Very Far &amp; Returns)</option>
-                <option value="mixed">Mixed Geometries (Circle + ∞ + Far Excursion)</option>
+                <option value="orbit8d" selected>8D Classic Sweep (360° Smooth Orbit + Pinna Elevation)</option>
+                <option value="infinity">Figure-8 / Infinity (∞ Passing Through Head)</option>
+                <option value="peripersonal">Intimate Peripersonal Halo (5–20 cm Ear-to-Ear ASMR)</option>
+                <option value="radial">Far-Horizon Excursion (Close Ear ↔ 10m Distance)</option>
+                <option value="mixed">Mixed Geometries (8D Orbit + ∞ + Far Excursion)</option>
                 <option value="circle">360° Circular Halo (Around Perimeter of Head)</option>
                 <option value="spiral">Breathing Spiral (Far Horizon ↔ Center of Head)</option>
                 <option value="torus">Counter-Rotating 3D Toroidal Knot</option>
               </select>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Number of 3D Sources (1–8)</span><span class="mono-val" id="spatialCountVal">2 Sources</span></div>
+              <div class="control-label"><span>Number of Moving 3D Sources (1–8)</span><span class="mono-val" id="spatialCountVal">2 Sources</span></div>
               <input type="range" id="spatialCount" min="1" max="8" step="1" value="2" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Lowest Source Pitch (Base Freq)</span><span class="mono-val" id="spatialBaseFreqVal">82 Hz (Low)</span></div>
-              <input type="range" id="spatialBaseFreq" min="36" max="320" step="1" value="82" />
+              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="spatialGainVal">85%</span></div>
+              <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.85" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="spatialGainVal">80%</span></div>
-              <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.80" />
+              <div class="control-label"><span>3D Orbit Speed</span><span class="mono-val" id="spatialSpeedVal">0.16 Hz</span></div>
+              <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.16" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Trajectory Speed</span><span class="mono-val" id="spatialSpeedVal">0.18 Hz</span></div>
-              <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.18" />
+              <div class="control-label"><span>Continuous Moving Source Level</span><span class="mono-val" id="spatialPulseVal">70% (Moving + Drops)</span></div>
+              <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.70" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Pulse / Oscillation (0% = Smooth)</span><span class="mono-val" id="spatialPulseVal">0% (Smooth)</span></div>
-              <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0" />
+              <div class="control-label"><span>Water Drop / ASMR Trigger Rate</span><span class="mono-val" id="spatialRateVal">3.2 /s</span></div>
+              <input type="range" id="spatialRate" min="0" max="10" step="0.2" value="3.2" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Ear Auricle (Pinna) &amp; Cranial Shadow</span><span class="mono-val" id="spatialAuricleVal">90% (8D Hyper-Real)</span></div>
+              <input type="range" id="spatialAuricle" min="0" max="1" step="0.01" value="0.90" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Proximity &amp; 3D Elevation Range</span><span class="mono-val" id="spatialAsymmetryVal">80%</span></div>
+              <input type="range" id="spatialAsymmetry" min="0" max="1" step="0.01" value="0.80" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Moving Source Base Pitch</span><span class="mono-val" id="spatialBaseFreqVal">110 Hz (Low)</span></div>
+              <input type="range" id="spatialBaseFreq" min="36" max="320" step="1" value="110" />
             </div>
             <div class="control-row">
               <div class="control-label"><span>In-Cranial Phase Collapse (0% = Off)</span><span class="mono-val" id="spatialCollapseVal">0%</span></div>
               <input type="range" id="spatialCollapse" min="0" max="1" step="0.01" value="0" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Distance Range &amp; 3D Elevation</span><span class="mono-val" id="spatialAsymmetryVal">85%</span></div>
-              <input type="range" id="spatialAsymmetry" min="0" max="1" step="0.01" value="0.85" />
             </div>
             <div class="control-row">
               <div class="control-label"><span>Harmonic Tuning Intervals</span></div>
@@ -453,53 +475,6 @@
           </div>
         </article>
 
-        <!-- MODULE 7: 3D Binaural ASMR & Shamanic Ritual Trance -->
-        <article class="module-card" data-module="asmr">
-          <div class="module-header">
-            <div>
-              <span class="module-tag tag-fuchsia">07 // PERIPERSONAL ASMR &amp; RITUAL TRANCE</span>
-              <h3>3D Binaural ASMR &amp; Ritual Trance</h3>
-            </div>
-            <div class="header-actions">
-              <button type="button" id="soloAsmrBtn" class="btn-solo" title="Mute all other modules to isolate 3D Binaural ASMR &amp; Ritual Trance">SOLO ASMR</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="asmrEnabled" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-          <p class="module-subtitle">Micro-tactile binaural triggers, 4.5 Hz theta frame drum &amp; Tibetan overtone singing in near-field 3D space.</p>
-
-          <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Acoustic Trigger Palette</span></div>
-              <select id="asmrPalette" class="select-input">
-                <option value="crackle" selected>Silk Brush &amp; Micro-Crackle Tingles (ASMR)</option>
-                <option value="whisper">Whispered Air &amp; Intimate Breath Halo (ASMR)</option>
-                <option value="tapping">Hollow Bamboo &amp; Wooden Taps (Binaural)</option>
-                <option value="shamanic">4.5 Hz Shamanic Trance Drum &amp; Seed Rattle</option>
-                <option value="throat">Tibetan Overtone Singing (110 Hz Megalith)</option>
-              </select>
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="asmrGainVal">50%</span></div>
-              <input type="range" id="asmrGain" min="0" max="1" step="0.01" value="0.50" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Spatial Proximity / Intimacy</span><span class="mono-val" id="asmrProximityVal">Intimate (5cm)</span></div>
-              <input type="range" id="asmrProximity" min="0.05" max="1.0" step="0.01" value="0.25" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Event Density / Cadence</span><span class="mono-val" id="asmrRateVal">3.5 /s</span></div>
-              <input type="range" id="asmrRate" min="0.5" max="8.0" step="0.1" value="3.5" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Tingle Resonance / Overtone Q</span><span class="mono-val" id="asmrResonanceVal">65%</span></div>
-              <input type="range" id="asmrResonance" min="0" max="1" step="0.01" value="0.65" />
-            </div>
-          </div>
-        </article>
-
       </section>
     </main>
   </div>
@@ -507,7 +482,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=3.7"></script>
-  <script src="app.js?v=3.7"></script>
+  <script src="audio-engine.js?v=3.8"></script>
+  <script src="app.js?v=3.8"></script>
 </body>
 </html>
