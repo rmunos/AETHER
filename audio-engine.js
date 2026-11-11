@@ -38,7 +38,8 @@ class ConsciousnessAudioEngine {
         baseFreq: 174,          // 36..320 Hz base fundamental pitch (174 Hz warm singing bowl & crystal harp register)
         gain: 0.85,
         speed: 0.16,
-        pulse: 0.50,            // Drops <-> Moving Harmonic Pad Crossfader (0 = 100% Drops Only, 0.5 = Balanced Both, 1 = 100% Moving Harmonic Pad Only)
+        spiral: 0.0,            // 0..3 Toroidal Spiral Speed around head (0 = No Spiraling / Pure Vertical Turning, >0 = Helical Spiral revolutions)
+        pulse: 0.50,            // Drops <-> Moving Inhale/Exhale & Harmonic Sound Crossfader (0 = 100% Drops Only, 1 = 100% Moving Sound Only / 0% Drops)
         rate: 3.2,              // 0.2..10 events/s for 3D Water Drops & ASMR Triggers emitted from moving sources
         auricle: 0.90,          // 0..1 Ear Auricle (Pinna) Notch, Blauert Bands, Cranial Head-Shadow & ITD/ILD Depth
         elevation: 0.85,        // 0..1 3D Vertical Elevation Range (0 = Flat Horizontal, 1 = Full -75° Floor <-> +85° Zenith)
@@ -756,15 +757,21 @@ class ConsciousnessAudioEngine {
 
       if (palette === 'rebal') {
         // Monroe Gateway REBAL (Resonant Energy Balloon):
-        // Silence static droning oscillators; enable Resonant Tuning Inspire/Expire Vocal Formant Breath + 3D Auricle Velvet Halo,
-        // paired with phase-synchronized Pure Harmonic 3D Energy Pulses (`_triggerRebalEnergyOnVoice`)!
-        v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
-        v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
-        v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
-        v.formantF1.Q.setTargetAtTime(6.2, now, 0.05);
-        v.formantF2.Q.setTargetAtTime(5.4, now, 0.05);
-        v.formantGain.gain.setTargetAtTime(0.28, now, 0.06);
-        v.noiseGain.gain.setTargetAtTime(0.14, now, 0.06);
+        // Continuous Moving 3D Inhale / Exhale Vocal Formant Breath + Pure Integer Harmonic Resonant Tuning Choir!
+        // All gains pass through `v.pulseGain`, which rises and falls with the Inhale/Exhale breath envelope (never a static drone).
+        if (this.nodes.spatial.warmHarmonicWave && typeof v.osc.setPeriodicWave === 'function') {
+          v.osc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+        }
+        if (this.nodes.spatial.pinnaHarmonicWave && typeof v.overtoneOsc.setPeriodicWave === 'function') {
+          v.overtoneOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+        }
+        v.toneGain.gain.setTargetAtTime(0.15, now, 0.05);
+        v.bodyGain.gain.setTargetAtTime(0.08, now, 0.05);
+        v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.05);
+        v.formantF1.Q.setTargetAtTime(5.6, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(5.0, now, 0.05);
+        v.formantGain.gain.setTargetAtTime(0.36, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.20, now, 0.06);
       } else if (palette === 'water_bowl' || palette === 'water_drops' || palette === 'tapping' || palette === 'rich8d') {
         // Silence continuous droning oscillators — replaced by Pure Integer Harmonic 3D Acoustic Pulses!
         v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
@@ -1465,8 +1472,9 @@ class ConsciousnessAudioEngine {
   /**
    * Computes 3D (x, y, z) spherical coordinates for source `i` according to selected 3D / 8D geometry
    * Includes full vertical elevation (-75° Below Chin/Floor <-> +85° Overhead Crown/Zenith)
+   * and tunable Toroidal Spiral Speed (`spiral`: 0 = Pure Turning with No Spiraling, >0 = Helical Spiraling around the head)
    */
-  _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode, elevRange = 0.85) {
+  _computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectoryMode, elevRange = 0.85, spiral = 0.0) {
     let geom = trajectoryMode;
     if (trajectoryMode === 'mixed') {
       const modes = ['bifurcation_random', 'orbit8d', 'zenith_arch', 'helix3d'];
@@ -1476,6 +1484,7 @@ class ConsciousnessAudioEngine {
     const phaseOffset = (i * Math.PI * 2) / Math.max(1, count);
     const theta = elapsed * speed * Math.PI * 2 + phaseOffset;
     const elevScale = Math.max(0, Math.min(1, elevRange));
+    const spiralTurns = Math.max(0, spiral !== undefined ? spiral : 0.0);
 
     let x = 0, y = 0, z = -1;
     let splitFactor = 1.0;
@@ -1485,8 +1494,10 @@ class ConsciousnessAudioEngine {
       // MONROE GATEWAY REBAL (Resonant Energy Balloon) — 5-Stage Breath-Synchronized 3D Toroidal Loop:
       // - EXHALE PHASE (rebalCycle in [0.00 .. 0.50]):
       //   1. Starts in the Head, fountains UP through the Top of the Head (Crown Zenith ▲ +85°).
-      //   2. Splits into `count` (2 or 4) symmetric directions (Front/Right/Back/Left).
-      //   3. Turns/spirals downward around the outside of the body along a 3D Torus cocoon and merges at the Feet (Floor ▼ -75°).
+      //   2. Splits into `count` (2 = Left/Right, 4 = Front/Right/Back/Left) symmetric directions.
+      //   3. Turns downward around the outside of the body along a 3D Torus cocoon (with tunable `spiralTurns`:
+      //      0 = Pure vertical torus turning with NO horizontal spiraling; >0 = Spiraling around the head at `spiralTurns` rev/loop)
+      //      and merges back together at the Feet (Floor ▼ -75°).
       // - INHALE PHASE (rebalCycle in [0.50 .. 1.00]):
       //   4. Merged stream enters at the Feet (Floor ▼ -75°) and rises straight UP through the core of the whole body (x~0, z~0).
       //   5. Crosses into the Head, filling up the entire cranium with vibrant resonant energy before repeating!
@@ -1494,7 +1505,10 @@ class ConsciousnessAudioEngine {
       const effElev = Math.max(0.35, elevScale);
       const rebalCycle = (elapsed * speed * 0.75) % 1.0;
       const nBranches = Math.max(2, count);
-      const branchAz = (i * Math.PI * 2) / nBranches;
+      // For 2 branches, align to Right (+90°) and Left (-90°) for maximum binaural separation; for 4+, space evenly around 360°
+      const branchAz = nBranches === 2
+        ? (i % 2 === 0 ? Math.PI * 0.5 : -Math.PI * 0.5)
+        : (i * Math.PI * 2) / nBranches;
 
       if (rebalCycle < 0.50) {
         // =========================================================
@@ -1519,25 +1533,26 @@ class ConsciousnessAudioEngine {
             ? 'EXHALE ▼ [1/5] HEAD → FOUNTAIN UP CROWN ▲'
             : `EXHALE ▼ [2/5] CROWN ▲ → SPLIT ${nBranches} DIRECTIONS`;
         } else if (u < 0.86) {
-          // Stage E2: 2 or 4 Streams Turning Downward Around Outside of Body Along a 3D Torus 🌀
+          // Stage E2: 2 or 4 Streams Turning Downward Around Outside of Body Along a 3D Torus
           const t = (u - 0.16) / 0.70; // 0..1
           const poloidal = startPoloidal + t * (endPoloidal - startPoloidal);
           const horizR = R * Math.sin(poloidal);
           y = R * 0.92 * Math.cos(poloidal) * effElev;
-          // 1.75 full helical turns around the outside of the body during the descent
-          const torusTurn = t * Math.PI * 3.5;
+          // Tunable horizontal spiraling around the head (`spiralTurns = 0` => pure vertical torus turning with NO spiraling!)
+          const torusTurn = t * Math.PI * 2.0 * spiralTurns;
           const az = branchAz + torusTurn;
           x = horizR * Math.sin(az);
           z = -horizR * Math.cos(az);
           splitFactor = Math.min(1.0, Math.sin(poloidal) * 1.25);
+          const modeTag = spiralTurns <= 0.02 ? 'TORUS LOOP (JUST TURNING)' : `TORUS SPIRAL (${spiralTurns.toFixed(1)}x 🌀)`;
           stageLabel = t < 0.50
-            ? `EXHALE ▼ [2/5] ${nBranches}-WAY TORUS SPIRAL (UPPER BODY 🌀)`
+            ? `EXHALE ▼ [2/5] ${nBranches}-WAY ${modeTag}`
             : `EXHALE ▼ [3/5] TURNING DOWN TORUS → TOWARD FEET ▼`;
         } else {
           // Stage E3: Converge & Merge Back Together Under the Feet (Floor ▼ -75°)
           const m = (u - 0.86) / 0.14; // 0..1
           const remR = R * Math.sin(endPoloidal) * (1.0 - m);
-          const az = branchAz + Math.PI * 3.5 + m * 0.6;
+          const az = branchAz + Math.PI * 2.0 * spiralTurns * (1.0 + m * 0.15);
           x = remR * Math.sin(az);
           z = -remR * Math.cos(az);
           y = -R * 0.92 * (Math.cos(startPoloidal) + (1.0 - Math.cos(startPoloidal)) * m) * effElev;
@@ -1553,11 +1568,16 @@ class ConsciousnessAudioEngine {
           // Stage I1: Merged Stream Enters Through Feet ▼ & Rises Straight Up Through Whole Body to Head ▲
           const c = w / 0.70; // 0 (Feet) -> 1 (Center of Head)
           y = -R * 0.92 * effElev * (1.0 - c);
-          // Intimate 11cm internal spinal/chakra micro-vortex right inside the central axis of the body
-          const rCore = 0.11 * Math.sin(c * Math.PI);
-          const coreSpin = c * Math.PI * 4.0;
-          x = rCore * Math.sin(coreSpin);
-          z = -rCore * Math.cos(coreSpin);
+          if (spiralTurns <= 0.02) {
+            // No spiraling: rises straight up the central vertical axis of the body
+            x = 0;
+            z = -0.10 * Math.sin(c * Math.PI);
+          } else {
+            const rCore = 0.11 * Math.sin(c * Math.PI);
+            const coreSpin = c * Math.PI * 2.0 * spiralTurns;
+            x = rCore * Math.sin(coreSpin);
+            z = -rCore * Math.cos(coreSpin);
+          }
           splitFactor = 0.0; // Merged into ONE core body column!
           stageLabel = c < 0.48
             ? 'INHALE ▲ [4/5] FEET ▼ → RISING UP CORE BODY'
@@ -1566,7 +1586,7 @@ class ConsciousnessAudioEngine {
           // Stage I2: Crosses the Head & Fills Up the Entire Cranium with Vibrant Energy ✨
           const h = (w - 0.70) / 0.30; // 0..1
           const rHead = 0.22 * Math.sin(h * Math.PI); // Swells to 22cm cranial halo then focuses at top of skull
-          const headSpin = branchAz + h * Math.PI * 2.5;
+          const headSpin = branchAz + h * Math.PI * 2.0 * Math.max(0.25, spiralTurns);
           x = rHead * Math.sin(headSpin);
           z = -rHead * Math.cos(headSpin);
           y = 0.24 * effElev * Math.sin(h * Math.PI * 0.5);
@@ -3260,6 +3280,7 @@ class ConsciousnessAudioEngine {
         const triggerRate = this.params.spatial.rate !== undefined ? this.params.spatial.rate : 3.2;
         const auricle = this.params.spatial.auricle !== undefined ? this.params.spatial.auricle : 0.90;
         const elevRange = this.params.spatial.elevation !== undefined ? this.params.spatial.elevation : 0.85;
+        const spiral = this.params.spatial.spiral !== undefined ? this.params.spatial.spiral : 0.0;
         const manualPos = this.params.spatial.manualPos;
         const voices = this.nodes.spatial.voices;
         const spatTc = isBg ? 0.065 : 0.025;
@@ -3276,7 +3297,8 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.nextOvertoneStepTime = now + (1.1 + Math.random() * 1.3);
         }
 
-        // Schedule 3D Spatialized Water Drops, REBAL Toroidal Energy Pulses & Pure Integer Harmonic 3D Acoustic Pulses!
+        // Schedule 3D Spatialized Water Drops & Pure Integer Harmonic 3D Acoustic Pulses!
+        // Note: In 'rebal' mode, setting `pulse = 1.0` (`dropLevel <= 0.02`) completely removes all drops/plucks so ONLY the Moving 3D Inhale/Exhale sounds play!
         const effectiveRate = Math.max(0.4, triggerRate || 3.2);
         const curSplit =
           isBifurcationMode && this.telemetry.spatialVoices[0] && this.telemetry.spatialVoices[0].splitFactor !== undefined
@@ -3300,7 +3322,11 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
 
           if (palette === 'rebal') {
-            this._triggerRebalEnergyOnVoice(voices[vIdx], now, rebalCycle, dropLevel, continuousLevel);
+            // In REBAL mode, drops are ONLY triggered if the user blends in Drops (`dropLevel > 0.02`).
+            // At 100% Moving Inhale/Exhale (`dropLevel === 0`), zero drops are emitted!
+            if (dropLevel > 0.02) {
+              this._triggerSpatialEventOnVoice(voices[vIdx], now, 'water_drops', auricle);
+            }
           } else {
             if (dropLevel > 0.01) {
               this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
@@ -3339,7 +3365,7 @@ class ConsciousnessAudioEngine {
             z = manualPos.z;
             geomType = 'manual';
           } else {
-            const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory, elevRange);
+            const pos = this._computeSpatialTrajectory(i, count, elapsed, speed, asym, trajectory, elevRange, spiral);
             x = pos.x;
             y = pos.y;
             z = pos.z;
@@ -3348,9 +3374,11 @@ class ConsciousnessAudioEngine {
             stageLabel = pos.stageLabel || '';
           }
 
-          // Keep each voice locked to its pure consonant integer harmonic frequencies (1.0x Fundamental, 2.0x Octave)
-          v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
-          v.bodyOsc.frequency.setTargetAtTime(v.freq * 2.0, now, spatTc);
+          // Keep each voice locked to its pure consonant integer harmonic frequencies (or breath-swept pitch in 'rebal' mode)
+          if (palette !== 'rebal') {
+            v.osc.frequency.setTargetAtTime(v.freq, now, spatTc);
+            v.bodyOsc.frequency.setTargetAtTime(v.freq * 2.0, now, spatTc);
+          }
           if (isBifurcationMode) {
             const mergeGainScale = 0.68 + 0.32 * splitFactor;
             v.voiceGain.gain.setTargetAtTime(v.weight * mergeGainScale, now, 0.04);
@@ -3455,28 +3483,47 @@ class ConsciousnessAudioEngine {
           // 8. Continuous Moving Texture Harmonics & Formants:
           let contMod = continuousLevel;
           if (palette === 'rebal') {
-            // Monroe Gateway REBAL Inspire / Expire Vibrant Breath & Vocal Formant Sweep:
-            // - On EXHALE ▼ (rebalCycle < 0.50, u in 0..1): Crown Fountain ("HAAA" 690/2230 Hz) -> Toroidal Swirl -> Feet ("OOO" 310/780 Hz)
-            // - On INHALE ▲ (rebalCycle >= 0.50, w in 0..1): Feet ("OOO" 300/820 Hz) -> Heart ("AHH" 640/1280 Hz) -> Filling Head ("EEE" 440/2550 Hz)
-            const breathCarrierLvl = Math.max(0.28, continuousLevel);
+            // Monroe Gateway REBAL Moving 3D Inhale / Exhale Breath + Resonant Tuning Harmonic Choir:
+            // - On EXHALE ▼ (rebalCycle < 0.50, u in 0..1): Crown Fountain ("HAAA" 690/2280 Hz) -> Turning Torus -> Feet ("OOO" 295/760 Hz)
+            // - On INHALE ▲ (rebalCycle >= 0.50, w in 0..1): Feet ("OOO" 295/760 Hz) -> Body Core ("AHH" 620/1320 Hz) -> Filling Head ("EEE" 430/2640 Hz)
+            const baseF = Math.max(48, Math.min(440, this.params.spatial.baseFreq || 144));
+            const chordRatios = [1.0, 1.25, 1.5, 2.0];
+            const branchRatio = chordRatios[i % chordRatios.length];
+            const airFlutter = 0.84 + 0.16 * Math.sin(elapsed * (10.5 + i * 1.9));
+
             if (rebalCycle < 0.50) {
-              const u = rebalCycle * 2.0; // 0..1 Exhale
-              const f1 = 310 + 380 * (1.0 - u);
-              const f2 = 780 + 1450 * Math.pow(1.0 - u, 1.25);
+              const u = rebalCycle * 2.0; // 0..1 Exhale progress
+              // Downward harmonic & vocal-breath glide from Crown (+85°) around the body down to the Feet (-75°)
+              const fExhale = Math.max(44, baseF * branchRatio * (1.60 - 0.75 * u));
+              v.osc.frequency.setTargetAtTime(fExhale, now, spatTc);
+              v.bodyOsc.frequency.setTargetAtTime(fExhale * 2.0, now, spatTc);
+              v.overtoneOsc.frequency.setTargetAtTime(fExhale, now, spatTc);
+
+              const f1 = 295 + 395 * Math.pow(1.0 - u, 0.90);
+              const f2 = 760 + 1520 * Math.pow(1.0 - u, 1.20);
               v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
               v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
+
               const exhaleEnv = Math.sin(Math.pow(u, 0.72) * Math.PI);
-              const torusSwirl = 0.72 + 0.28 * Math.sin(u * Math.PI * 7.0 + (i * Math.PI * 2) / Math.max(2, count));
-              contMod = breathCarrierLvl * exhaleEnv * torusSwirl * 1.15;
+              // Rotating 3D spotlight across the 2 or 4 branches so each turning stream is distinctly localized in 3D!
+              const branchSpotlight = 0.38 + 0.62 * Math.pow(0.5 + 0.5 * Math.sin(u * Math.PI * 4.0 - (i * Math.PI * 2) / Math.max(2, count)), 1.4);
+              contMod = continuousLevel * exhaleEnv * branchSpotlight * airFlutter * 1.35;
             } else {
-              const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale
-              const f1 = 300 + 340 * Math.sin(w * Math.PI * 0.85);
-              const f2 = 820 + 1750 * Math.pow(w, 1.15);
+              const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale progress
+              // Upward harmonic & vocal-breath glide from Feet (-75°) up through the whole body into the Head (0°..+25°)
+              const fInhale = Math.max(44, baseF * (w < 0.70 ? 1.0 : branchRatio) * (0.85 + 0.95 * Math.pow(w, 1.10)));
+              v.osc.frequency.setTargetAtTime(fInhale, now, spatTc);
+              v.bodyOsc.frequency.setTargetAtTime(fInhale * 2.0, now, spatTc);
+              v.overtoneOsc.frequency.setTargetAtTime(fInhale, now, spatTc);
+
+              const f1 = 295 + 340 * Math.sin(w * Math.PI * 0.82);
+              const f2 = 760 + 1880 * Math.pow(w, 1.15);
               v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
               v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
+
               const inhaleEnv = Math.sin(Math.pow(w, 0.85) * Math.PI);
-              const chakraPulse = 0.82 + 0.18 * Math.sin(w * Math.PI * 10.0);
-              contMod = breathCarrierLvl * inhaleEnv * chakraPulse * 1.20;
+              const chakraPulse = 0.82 + 0.18 * Math.sin(w * Math.PI * 10.0 + i * 0.7);
+              contMod = continuousLevel * inhaleEnv * chakraPulse * airFlutter * 1.35;
             }
           } else if (palette === 'water_bowl' || palette === 'rich8d' || palette === 'tapping') {
             v.formantF1.frequency.setTargetAtTime(Math.min(4800, v.freq * 2.0), now, 0.08);

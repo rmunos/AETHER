@@ -213,11 +213,15 @@
               <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.85" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>3D Orbit Speed</span><span class="mono-val" id="spatialSpeedVal">0.16 Hz</span></div>
+              <div class="control-label"><span>3D Orbit / Breath Loop Speed</span><span class="mono-val" id="spatialSpeedVal">0.16 Hz</span></div>
               <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.16" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Drops 💧 ↔ Harmonic Sound 🎶 Balance</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Harmonics)</span></div>
+              <div class="control-label"><span>Toroidal Spiral Speed (0 = Just Turning)</span><span class="mono-val" id="spatialSpiralVal">0.00 (Just Turning)</span></div>
+              <input type="range" id="spatialSpiral" min="0" max="3" step="0.05" value="0" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Drops 💧 ↔ Moving Inhale/Exhale &amp; Harmonics 🌬️🎶</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Harmonics)</span></div>
               <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.50" />
             </div>
             <div class="control-row">
@@ -496,7 +500,7 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=4.7"></script>
-  <script src="app.js?v=4.7"></script>
+  <script src="audio-engine.js?v=4.8"></script>
+  <script src="app.js?v=4.8"></script>
 </body>
 </html>

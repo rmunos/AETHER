@@ -278,7 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
         baseFreq: 144,
         gain: 0.92,
         speed: 0.12,
-        pulse: 0.58,
+        spiral: 0.0,
+        pulse: 1.00,
         rate: 4.2,
         auricle: 0.95,
         elevation: 0.95,
@@ -668,7 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSelect('spatialTrajectory', 'spatial', 'trajectory');
   bindSelect('spatialTuning', 'spatial', 'tuning');
 
-  // When selecting REBAL in the Palette dropdown, automatically pair it with the REBAL Toroidal Breath Trajectory & 4 Directions
+  // When selecting REBAL in the Palette dropdown, automatically pair it with the REBAL Toroidal Breath Trajectory, 4 Directions & 0% Drops
   const spatialPaletteSelect = document.getElementById('spatialPalette');
   if (spatialPaletteSelect) {
     spatialPaletteSelect.addEventListener('change', (e) => {
@@ -685,6 +686,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (countValEl) countValEl.textContent = '4 Sources';
           engine.updateModule('spatial', 'count', 4);
         }
+        const pulseEl = document.getElementById('spatialPulse');
+        const pulseValEl = document.getElementById('spatialPulseVal');
+        if (pulseEl) {
+          pulseEl.value = 1.0;
+          if (pulseValEl) pulseValEl.textContent = '100% (No Drops — Moving Sound 🌬️🎶)';
+          engine.updateModule('spatial', 'pulse', 1.0);
+        }
       }
     });
   }
@@ -696,12 +704,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   bindSlider('spatialGain', 'spatial', 'gain', (v) => `${Math.round(v * 100)}%`);
   bindSlider('spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`);
+  bindSlider('spatialSpiral', 'spatial', 'spiral', (v) =>
+    v <= 0.02 ? '0.00 (Just Turning)' : `${v.toFixed(2)}x Spiral`
+  );
   bindSlider('spatialPulse', 'spatial', 'pulse', (v) =>
     v <= 0.02
       ? '0% (100% Drops Only 💧)'
       : v >= 0.98
-      ? '100% (100% Harmonics 🎶)'
-      : `${Math.round(v * 100)}% (Drops 💧 + Harmonics 🎶)`
+      ? '100% (No Drops — Moving Sound 🌬️🎶)'
+      : `${Math.round(v * 100)}% (Drops 💧 + Moving Sound 🌬️🎶)`
   );
   bindSlider('spatialRate', 'spatial', 'rate', (v) => (v <= 0.05 ? '0 /s (Continuous)' : `${v.toFixed(1)} /s`));
   bindSlider('spatialAuricle', 'spatial', 'auricle', (v) => {
@@ -1007,13 +1018,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (p.spatial.gain !== undefined) syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
       if (p.spatial.speed !== undefined) syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz`);
+      const spVal = p.spatial.spiral !== undefined ? p.spatial.spiral : 0.0;
+      syncControl(
+        'spatialSpiral',
+        spVal,
+        spVal <= 0.02 ? '0.00 (Just Turning)' : `${spVal.toFixed(2)}x Spiral`
+      );
+      engine.updateModule('spatial', 'spiral', spVal);
       if (p.spatial.pulse !== undefined) {
         const pTxt =
           p.spatial.pulse <= 0.02
             ? '0% (100% Drops Only 💧)'
             : p.spatial.pulse >= 0.98
-            ? '100% (100% Harmonics 🎶)'
-            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Harmonics 🎶)`;
+            ? '100% (No Drops — Moving Sound 🌬️🎶)'
+            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Moving Sound 🌬️🎶)`;
         syncControl('spatialPulse', p.spatial.pulse, pTxt);
       }
       if (p.spatial.rate !== undefined) {
