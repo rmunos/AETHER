@@ -1,110 +1,114 @@
 # AETHER // WebAudio Neurophenomenology & Consciousness Lab
 
-**AETHER** is an interactive, zero-dependency real-time WebAudio synthesizer designed to explore how structured acoustic fields interact with human perception, predictive coding, spatial self-location, and neural oscillations.
+**AETHER** is an interactive, zero-dependency real-time WebAudio synthesis engine designed for meditation, neural entrainment, sensory unbinding, and consciousness exploration.
 
-> **🎧 Stereo Headphones Required:** The synthesis engine relies on interaural time/level differences (ITD/ILD), Head-Related Transfer Function (HRTF) pinna cues, and dichotic binaural phase offsets.
+> **🎧 Stereo Headphones Required:** The spatial engine relies on explicit spherical Woodworth interaural time differences (ITD), head-shadow level differences (ILD), pinna front/back obstruction filtering, and elevation-dependent spectral sculpting.
 
 ---
 
-## Launch the Live App
+## Quick Links
 
 - **🌐 Live Web App (GitHub Pages):** [https://rmunos.github.io/AETHER/](https://rmunos.github.io/AETHER/)
-- **📖 Full Documentation & Guide:** [https://rmunos.github.io/AETHER/docs.html](https://rmunos.github.io/AETHER/docs.html)
-- **💻 Run Locally (Zero Server Required):** Simply open [`index.html`](./index.html) directly in your browser (`file://...`), or serve locally via `python3 -m http.server 8080`.
+- **📖 Scientific Guide & Documentation:** [https://rmunos.github.io/AETHER/docs.html](https://rmunos.github.io/AETHER/docs.html)
+- **💻 Run Locally (Zero Dependencies):** Simply open [`index.html`](./index.html) directly in any modern browser (`file://...`), or serve via:
+  ```bash
+  python3 -m http.server 8080
+  ```
 
 ---
 
-## Core Architecture & Features
+## Module 01: 3D Sound Space & Monroe REBAL Energy Torus
 
-### Global Controls & Custom Configuration
-- **Initialize Audio Engine:** Starts/pauses the real-time WebAudio synthesis graph (`44.1 / 48 kHz`) and `60 FPS` modulation & telemetry loop.
-- **💾 Save Config / ↺ Restore Saved:** Saves and restores your complete hand-tuned configuration across all 6 modules (`masterGain`, `reverbMix`, and all module toggles, sliders, and selectors) via `localStorage` (`aether_custom_config_v1`).
-- **SOLO Module Buttons (`SOLO 3D`, `SOLO CHAOS`, `SOLO PAC`, `SOLO FRACTAL`, `SOLO SUB`, `SOLO GANZFELD`):** Isolates any individual module by muting the others and switching to the corresponding real-time visualizer.
-- **Live Telemetry Strip:** Displays real-time **Target State**, **Bayesian Surprise (bits)**, **PAC Index ($\theta\text{–}\gamma$)**, and **0.1 Hz Breath Phase (`INHALE ▲ / EXHALE ▼`)**.
+Module 01 provides an explicit, psychoacoustically validated dual-ear binaural engine with pinpoint 3D localization across all axes:
 
----
+### 1. The 3D Psychoacoustic Spatializer
+- **Left / Right Separation:**
+  - Exact spherical **Woodworth ITD** formula ($\Delta t = \frac{a}{c}(\sin|\theta| + |\theta|)$) generating physical arrival delays between $0$ and $660\,\mu\text{s}$.
+  - **Acoustic Head-Shadow ILD:** Up to $-18.4\,\text{dB}$ attenuation and a steep 2nd-order low-pass filter rolling off from $19\,\text{kHz}$ down to $1.5\,\text{kHz}$ on the contralateral ear.
+  - Dedicated `ChannelMergerNode(2)` bypassing the master compressor for 100% pure stereo channel isolation.
+- **Front vs. Back Discrimination:**
+  - **Front ($-Z$, in front of eyes):** Ear concha resonance boost ($+3.8\,\text{dB}$ at $3.6\,\text{kHz}$) with full high-frequency extension to $19\,\text{kHz}$.
+  - **Back ($+Z$, behind neck):** Anatomical pinna flap obstruction filter rolling off highs down to $3.2\,\text{kHz}$ with a deep pinna notch at $7.2\,\text{kHz}$ ($-8.5\,\text{dB}$).
+- **Up (Zenith / Crown) vs. Down (Nadir / Feet):**
+  - **Above Head ($+Y$, Zenith):** Open-sky brilliance ($+8.5\,\text{dB}$ high-shelf at $7.5\,\text{kHz}$), low-frequency chest decoupling ($-6\,\text{dB}$), formant shift towards bright vowels, and Pratt pitch elevation lift ($+2$ semitones).
+  - **Below Head ($-Y$, Feet):** Torso, jaw, and cheekbone shadow rolling off highs down to $1.6\,\text{kHz}$, paired with deep chest cavity resonance ($+8.5\,\text{dB}$ low-shelf at $180\,\text{Hz}$) and fundamental pitch grounding ($-2$ semitones).
 
-## The 6 Real-Time Synthesis Modules
+### 2. Robert Monroe REBAL (Resonant Energy Balloon) Trajectory
+Inspired by the **Monroe Institute Gateway Experience**, this 3D toroidal breath cycle aids energetic visualization:
+- **Exhale ▼ ($0 \to 50\%$ cycle):** Starts at the crown of the head, releases a radiant energy burst, fountains **high overhead ($+1.5\,\text{m}$ above the head)**, splits Left & Right, and spirals down around the outside of the body past ear level to beneath the feet.
+- **Inhale ▲ ($50 \to 100\%$ cycle):** Enters the soles of the feet ($-1.65\,\text{m}$, deep warm chest bass), rises **straight up through the body core and spine** into the cranium, building in luminance and radiance!
+- **Sparkle Transient Anchors:** Accompanying acoustic micro-sparkles across $4\text{–}12\,\text{kHz}$ give the auditory cortex sharp arrival markers for effortless 3D tracking.
 
-### 01 // Parietal Self-Model: Hyper-Spatial "Impossible Geometry"
-Targets spatial self-location in the temporoparietal junction (TPJ) and posterior parietal cortex using 100% dry binaural HRTF `PannerNode` trajectories enhanced with psychoacoustic pinna front/back shadow filtering and 7 kHz elevation notch/peak cues.
-- **3D Trajectory Geometry:**
-  - `Figure-8 / Infinity (∞ Passing Through Head)`
-  - `Far-Horizon Excursion (Goes Very Far & Returns)`
-  - `Mixed Geometries (Circle + ∞ + Far Excursion)`
-  - `360° Circular Halo (Around Perimeter of Head)`
-  - `Breathing Spiral (Far Horizon ↔ Center of Head)`
-  - `Counter-Rotating 3D Toroidal Knot`
-- **Number of 3D Sources (`1–8`):** Select how many independent sources orbit simultaneously.
-- **Lowest Source Pitch (`36–320 Hz`):** Sets the base fundamental frequency (from sub-bass `36 Hz` to `320 Hz`).
-- **Trajectory Speed (`0.03–0.80 Hz`):** Controls orbital speed.
-- **Pulse / Oscillation (`0%–100%`):** `0%` produces a 100% smooth continuous tone; higher values add rhythmic pulsing.
-- **In-Cranial Phase Collapse (`0%–100%`):** `0%` strictly disables the phase-inverted core; raising it blends a $180^\circ$ phase-inverted dichotic wave that collapses localization inside the cranium.
-- **Harmonic Tuning Intervals:** `Deep Octaves & 5ths`, `Just Intonation`, `Golden Ratio (φ = 1.618)`, `Natural Overtone Series`, `Mystic Quartal Space`.
-- **Interactive 3D Canvas Drag:** Click and drag directly on the 3D radar canvas to grab Source 1 and move it around your head in real time.
+### 3. Sonic Palettes
+- **⚡ Breath Energy (`energy`):** Sacred harmonic chord ($108\,\text{Hz}$ root, 5th, octave, 12th) flowing through vocal formants that breathe in phase with the cycle.
+- **🥣 Singing Bowls (`bowl`):** Authentic Tibetan singing bowl partials with acoustic beating pairs and felt mallet strikes.
+- **💧 Water Drops (`drops`):** Resonant Minnaert bubble chirps with surface micro-transients.
+- **✨ Crystal Chimes (`chimes`):** Pure harmonic glass chimes tuned to a celestial D-major pentatonic scale.
 
----
-
-### 02 // Default Mode Network: Predictive-Coding "Edge of Chaos"
-Drives musical events using a coupled **Logistic Map** ($x_{n+1} = r x_n (1 - x_n)$) and **2D Hénon Strange Attractor** at the mathematical Edge of Chaos ($r \approx 3.57\text{–}3.82$) to maximize continuous Bayesian surprise ($-\log_2 P(x)$ bits) while preventing repetitive looping.
-- **Sonic Archetype Palette:**
-  - `All Archetypes (Strange-Attractor Mutation)`
-  - `Inharmonic/Harmonic FM Bells, Singing Bowls & Gongs`
-  - `Liquid Formant Vowels & Bio-Acoustic Calls`
-  - `Modal Wood, Koto Plucks & Bowed Glass`
-  - `Deep Tectonic Sub-Drops & Microsound Clicks`
-  - `Reverse Envelope Swells & Throat Overtones`
-- **Rhythmic & Temporal Engine:**
-  - `Neuronal Avalanche (Rapid Flurries & Contemplative Silences)`
-  - `Strange-Attractor Syncopated Groove`
-  - `Golden-Ratio (φ) & Prime Polyrhythm (1 : 1.618 : 2.333)`
-  - `Elastic Time Gravity (Accelerando ↔ Ritardando)`
-  - `Logistic Cloud (r-Controlled Periodicity)`
-- **Musical Notes (Strict 12-TET Multi-Octave Quantization + Anti-Repetition Engine):**
-  - `All 12 Chromatic Notes`, `Dorian Mode`, `Lydian Dream Scale`, `Suspended Pentatonic`, `Phrygian Dominant`.
-  - Every event is quantized to exact 12-TET frequencies ($f = 440 \cdot 2^{(m-69)/12}\text{ Hz}$). A transition-memory tracker forms 4–7 note motifs and automatically mutates any note or interval as soon as a bigram repeats more than ~1–2 times.
-- **Chaos Parameter ($r$ `2.80–3.99`), Tempo (`0.5–12 /s`), Pitch Register (`Sub ↔ Crystalline`), Timbral Mutation (`0%–100%`).**
+### 4. Movement Geometries
+- `REBAL Energy Torus`: Exhale crown $\to$ fountain $\to$ outer body $\to$ feet; Inhale feet $\to$ spine $\to$ head.
+- `Horizontal Orbit`: Sweeps $360^\circ$ at ear level.
+- `Vertical Loops`: Loops from Front $\to$ Overhead Zenith $\to$ Behind $\to$ Below.
+- `Free 3D Wander`: Smoothly explores the full spherical space.
+- `Hold Still (Manual)`: Click/drag on the canvas radar or elevation gauge to place a source anywhere in 3D.
 
 ---
 
-### 03 // Thalamocortical Binding: Cross-Frequency PAC ($\theta\text{–}\gamma$ Coupling)
-Pairs a dichotic binaural beat carrier ($f_0 \pm f_\theta/2$) with **true audio-rate (`48 kHz`) Gamma bursts (`25–75 Hz`)** gated by the positive peaks of the slow Theta wave and modulated by a **10-second (`0.1 Hz`) coherent breath swell**.
-- **Base Carrier Frequency (`55–432 Hz`):** Sets the fundamental pitch of the binaural drone and its harmonic Gamma overtones (`2x`, `3x`, `4x`).
-- **Slow Phase Rhythm (`1.5–12.0 Hz`):** Sets the binaural beat frequency and the slow phase gate (`Delta`, `Theta`, `Alpha`).
-- **Nested Gamma Burst Freq (`25–75 Hz`):** Audio-rate oscillator + raised-power pulse `WaveShaperNode` controlling the rapid pulse rate inside each Theta burst.
-- **PAC Coupling Index (`0%–100%`):** At `0%` (uncoupled), only the smooth binaural wave plays; at `100%`, every Theta peak triggers a high-contrast burst of Gamma pulses while troughs drop to silence.
-- **0.1 Hz Coherent Breath Swell (`0%–100%`):** 10-second Mayer-wave / HRV cycle (5s Inhale ▲, 5s Exhale ▼) that swells volume (`10% → 135%`) and blooms a resonant lowpass harmonic filter on every Inhale.
+## Other Synthesis Modules
 
----
+### 02 // Predictive Coding: Edge of Chaos
+- Multi-archetype synthesis (FM bells, singing bowls, liquid formants, modal wood, tectonic sub-drops, throat overtones).
+- Driven by a coupled **Logistic Map** ($x_{n+1} = r x_n (1 - x_n)$) and **Hénon Strange Attractor** at the mathematical edge of chaos ($r \approx 3.74$).
+- Strictly quantized to 12-TET musical scales with an anti-repetition motif engine that suspends Default Mode Network (DMN) narrative rumination.
+
+### 03 // Thalamocortical Binding: Cross-Frequency PAC ($\theta\text{–}\gamma$)
+- Pairs a pure dichotic binaural beat carrier ($f_0 \pm f_\theta/2$) with **audio-rate Gamma pulses ($25\text{–}75\,\text{Hz}$)** nested directly on the positive peaks of slow Theta waves ($1.5\text{–}12\,\text{Hz}$).
+- Coherently modulated by a **$0.1\,\text{Hz}$ (10-second) Mayer-wave / vagal breath swell**.
 
 ### 04 // Temporal Suspension: Fractal & Shepard-Risset Horizon
-8 octave-spaced voices cycling through a raised-cosine spectral bell envelope with true multi-scale $1/f$ Weierstrass self-similarity.
-- **Shepard Drift Velocity (`-0.25 to +0.25 oct/s`):** Endless descent, hover, or ascent.
-- **Multi-Scale $1/f$ Self-Similarity (`0%–100%`):**
-  - At `0%`: Pure, smooth linear Shepard-Risset glissando.
-  - Toward `100%`: Keeps all 8 voices in 100% pure octave alignment while blossoming a **Pure Just-Intonation Celestial Triad (Root $1:1$, Major 3rd $5:4$ / Major 9th $9:8$, Perfect 5th $3:2$)** across a 4-scale $1/f$ Weierstrass envelope: low octaves breathe slowly in warm major-fifth swells (`~0.26 Hz`), mid octaves weave medium triad waves (`~0.85 Hz`), and high octaves shimmer with delicate consonant bell arpeggios (`~2.2 Hz`).
-- **Spectral Bell Center (`65–528 Hz`):** Center frequency of the 8-octave spectral envelope.
-
----
+- 8 octave-spaced voices cycling through a raised-cosine spectral envelope for endless pitch ascent or descent.
+- Blends a multi-scale $1/f$ Weierstrass self-similar celestial triad (Root $1:1$, 3rd $5:4$, 5th $3:2$) across low, mid, and high octaves.
 
 ### 05 // Vestibular & Vagal: Infrasound & Somatic Sub-Bass
-- **Sub-Bass Carrier (`24–60 Hz`):** Deep somatic fundamental ($f_0$).
-- **Vestibular Trance Pulse (`0.2–4.0 Hz`):** Amplitude modulation pulse.
-- **Missing-Fundamental Warmth (`0%–100%`):** Adds $2f_0$ and $3f_0$ harmonics for psychoacoustic fundamental reconstruction.
+- Deep $24\text{–}60\,\text{Hz}$ sub-bass carrier with $2f_0$ and $3f_0$ "missing-fundamental" harmonics for psychoacoustic bass presence.
+- Rhythmic $0.2\text{–}4.0\,\text{Hz}$ vestibular pulse.
+
+### 06 // Stochastic Resonance: Auditory Ganzfeld ($1/f$ Sonic Void)
+- Binaurally decorrelated $1/f$ Pink and $1/f^2$ Brown noise sculpted by dual cavern formant filters (oo $\to$ oh $\to$ ah $\to$ eh $\to$ ee).
+- Global $6.5\,\text{s}$ stereo cathedral convolution reverb + shimmer choir of just-intonation resonators.
 
 ---
 
-### 06 // Stochastic Resonance: Auditory Ganzfeld ($1/f$ Sonic Void)
-- **Color (`1/f` Pink ↔ `1/f²` Brown):** Spectral roll-off tilt between bright pink and deep cavern brown noise.
-- **Cavern Formant Sweep (`0%–100%`):** Independent left/right vocal formant pairs (F1+F2) morphing through vowel shapes (oo → oh → ah → eh → ee) — a breathing, whispering cave drifting around the head.
-- **Cathedral Shimmer Space (`0%–100%`):** Global 6.5-second stereo convolution reverb (35 ms pre-delay) + a shimmer choir of six high-Q resonators tuned to a just-intonation major chord, with gentle dry ducking (3D HRTF sources stay dry).
+## Phenomenological Presets
+
+1. **3D SINGING BOWLS:** Struck bowls wandering the sphere with measured ITD/ILD and floor reflections.
+2. **DMN SUPPRESSION:** Non-repeating microtonal drops and cave water droplets at the mathematical Edge of Chaos.
+3. **LUCID $\theta\text{–}\gamma$ PAC:** $40\,\text{Hz}$ gamma bursts on $6\,\text{Hz}$ theta peaks with a $0.1\,\text{Hz}$ breath swell.
+4. **FRACTAL HORIZON:** Endless Shepard-Risset glissando and $1/f$ self-similar harmonic triad.
+5. **SOMATIC INFRASOUND:** $30\,\text{Hz}$ sub-bass with missing-fundamental warmth and vestibular trance pulse.
+6. **GANZFELD SONIC VOID:** Binaural pink/brown noise cavern with drifting vowel formants.
+7. **8D SHAMANIC FLIGHT:** $110\,\text{Hz}$ overtone singing paired with a spatialized $4.5\,\text{Hz}$ frame drum.
+8. **8D PERIPERSONAL ASMR:** Near-field ear-canal brushing, micro-crackles, and whispers.
+9. **REBAL // MONROE GATEWAY:** Complete 3D Toroidal breath cycle: crown fountain $\to$ torus body $\to$ feet $\to$ spine ascent.
 
 ---
 
 ## Project Structure
 
-- [`index.html`](./index.html) — Main Consciousness Lab UI, 3 real-time visualizers, preset bar, and 6 module control panels.
-- [`docs.html`](./docs.html) — Full in-app interactive documentation and scientific reference guide.
-- [`audio-engine.js`](./audio-engine.js) — Real-time WebAudio synthesis engine (`ConsciousnessAudioEngine`).
-- [`app.js`](./app.js) — UI bindings, state presets, custom configuration persistence, and 60 FPS canvas visualizers.
-- [`styles.css`](./styles.css) — Dark bioluminescent UI theme and responsive layout.
+```
+ai-music/
+├── index.html          # Main UI, responsive layout, 3 canvas visualizers, module controls
+├── docs.html           # Full interactive scientific guide & documentation
+├── spatial-engine.js   # Module 01: Dual-ear binaural 3D spatializer & REBAL torus engine
+├── audio-engine.js     # Core WebAudio engine (Modules 02-06, cathedral convolver, telemetry)
+├── app.js              # UI controller, preset loader, localStorage config, 60 FPS visualizers
+├── styles.css          # Dark theme styles and responsive layout
+├── silence.wav         # Keep-alive loop for continuous background playback on mobile
+└── README.md           # Architecture overview and documentation
+```
+
+---
+
+## License
+
+MIT License. Designed and developed for consciousness research, meditation, and auditory neurophenomenology.
