@@ -1329,15 +1329,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * Helper to project 3D (x, y, z) to 2D radar coordinates with smooth compression for far-horizon rays
+   * Helper to project 3D (x, y, z) to 2D radar/field coordinates with smooth compression.
+   * In 'rebal' mode, projects into a Frontal-Perspective 3D Apple-Torus view ("The Flow of Your Energy Field")
+   * so vertical elevation y (going UP through the body, exploding in the head, fountaining UP to the top arch,
+   * descending down the outside of the body to below the feet, and curving UP into the feet) is clearly visible!
    */
   function project3DToRadar(x, y, z, cx, cy, scale) {
     const horizDist = Math.sqrt(x * x + z * z);
-    // Softly compress distances > 1.8m so 11m far-horizon excursions still fit on screen
     const compressedDist = horizDist <= 1.8
       ? horizDist
       : 1.8 + Math.log1p(horizDist - 1.8) * 0.62;
     const ratio = horizDist > 0.0001 ? compressedDist / horizDist : 1;
+
+    if (engine.params.spatial.trajectory === 'rebal') {
+      // Frontal 3D Apple-Torus Projection: X = Left/Right, Y = Up/Down (Vertical Axis), Z = 3D Depth Tilt
+      const px = cx + (x * ratio * 0.78 + z * ratio * 0.25) * scale;
+      const py = (cy - 6) - y * scale * 0.30 + z * ratio * scale * 0.16;
+      return { px, py, horizDist };
+    }
+
     const px = cx + x * ratio * scale;
     const py = cy + z * ratio * scale * 0.88 - y * 14;
     return { px, py, horizDist };
@@ -1478,36 +1488,104 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeCount = isBifurcation ? Math.max(2, rawCount) : rawCount;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
 
-    // Draw REBAL Toroidal Cocoon Meridians & Cranial/Core Energy Glow when in REBAL mode
+    // Draw REBAL Apple-Torus Energy Field Lines, Arrows, Human Body ("YOU") & Head Explosion when in REBAL mode
     if (isRebal && voices[0]) {
       const stageTxt = voices[0].stageLabel || '';
       const isInhalePhase = stageTxt.startsWith('INHALE');
-      const isFillingHead = stageTxt.includes('FILLING HEAD');
+      const isHeadExplosion = stageTxt.includes('HEAD ENERGY EXPLOSION');
+      const asym = engine.params.spatial.asymmetry !== undefined ? engine.params.spatial.asymmetry : 0.85;
+      const elevScale = Math.max(0.35, engine.params.spatial.elevation !== undefined ? engine.params.spatial.elevation : 0.95);
+      const R = 2.4 + 2.0 * asym;
+      const Y = (2.2 + 1.6 * asym) * elevScale;
 
-      // Subtle 4-quadrant Toroidal Meridian Rings around the body
       ctx2d.save();
-      ctx2d.strokeStyle = isInhalePhase ? 'rgba(56, 189, 248, 0.14)' : 'rgba(167, 139, 250, 0.18)';
-      ctx2d.lineWidth = 1.2;
-      for (let m = 0; m < 4; m++) {
-        const ang = (m * Math.PI) / 4 + nowMs * 0.0003;
-        ctx2d.beginPath();
-        ctx2d.ellipse(cx, cy, scale * 1.38, scale * 0.62, ang, 0, Math.PI * 2);
-        ctx2d.stroke();
-      }
-      ctx2d.restore();
+      // 1. Draw nested Apple-Torus Energy Field Loops (Left & Right dipole lobes matching "The Flow of Your Energy Field")
+      const loopScales = [0.68, 1.0, 1.28];
+      loopScales.forEach((ls, lIdx) => {
+        [-1, 1].forEach((side) => {
+          ctx2d.beginPath();
+          const steps = 44;
+          for (let s = 0; s <= steps; s++) {
+            const u = s / steps;
+            const pol = u * Math.PI;
+            const lx = side * R * ls * Math.sin(pol);
+            const ly = Y * (0.12 * Math.cos(pol) - 0.23 * (1 - Math.cos(pol)) + 0.88 * ls * Math.sin(2.0 * pol));
+            const pt = project3DToRadar(lx, ly, 0, cx, cy, scale);
+            if (s === 0) ctx2d.moveTo(pt.px, pt.py);
+            else ctx2d.lineTo(pt.px, pt.py);
+          }
+          ctx2d.strokeStyle = isInhalePhase
+            ? `rgba(56, 189, 248, ${0.14 + lIdx * 0.05})`
+            : `rgba(167, 139, 250, ${0.18 + lIdx * 0.06})`;
+          ctx2d.lineWidth = lIdx === 1 ? 1.6 : 1.0;
+          ctx2d.stroke();
 
-      // Golden-Cyan Cranial Energy Aura when Inhale fills the head with energy
+          // Draw directional flow arrowheads along the middle loop (u = 0.14 going UP-OUT, u = 0.50 going DOWN, u = 0.86 curving UP into feet)
+          if (lIdx === 1) {
+            [0.14, 0.50, 0.86].forEach((uArr) => {
+              const pol1 = uArr * Math.PI;
+              const pol2 = (uArr + 0.025) * Math.PI;
+              const p1 = project3DToRadar(
+                side * R * ls * Math.sin(pol1),
+                Y * (0.12 * Math.cos(pol1) - 0.23 * (1 - Math.cos(pol1)) + 0.88 * ls * Math.sin(2.0 * pol1)),
+                0, cx, cy, scale
+              );
+              const p2 = project3DToRadar(
+                side * R * ls * Math.sin(pol2),
+                Y * (0.12 * Math.cos(pol2) - 0.23 * (1 - Math.cos(pol2)) + 0.88 * ls * Math.sin(2.0 * pol2)),
+                0, cx, cy, scale
+              );
+              const ang = Math.atan2(p2.py - p1.py, p2.px - p1.px);
+              ctx2d.fillStyle = 'rgba(167, 139, 250, 0.65)';
+              ctx2d.beginPath();
+              ctx2d.moveTo(p2.px, p2.py);
+              ctx2d.lineTo(p2.px - 7 * Math.cos(ang - 0.5), p2.py - 7 * Math.sin(ang - 0.5));
+              ctx2d.lineTo(p2.px - 7 * Math.cos(ang + 0.5), p2.py - 7 * Math.sin(ang + 0.5));
+              ctx2d.closePath();
+              ctx2d.fill();
+            });
+          }
+        });
+      });
+
+      // 2. Draw Central Vertical Core Channel (Feet -> Torso -> Head) & Human Body Silhouette ("YOU")
+      const headPt = project3DToRadar(0, 0.12 * Y, 0, cx, cy, scale);
+      const feetPt = project3DToRadar(0, -0.58 * Y, 0, cx, cy, scale);
+      ctx2d.strokeStyle = isInhalePhase ? 'rgba(251, 191, 36, 0.55)' : 'rgba(56, 189, 248, 0.25)';
+      ctx2d.lineWidth = 2.2;
+      ctx2d.beginPath();
+      ctx2d.moveTo(feetPt.px, feetPt.py);
+      ctx2d.lineTo(headPt.px, headPt.py);
+      ctx2d.stroke();
+
+      // Subtle Human Torso & Legs Pillar ("YOU") between headPt and feetPt
+      const bodyTopY = headPt.py + 14;
+      const bodyH = Math.max(24, feetPt.py - bodyTopY);
+      ctx2d.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx2d.strokeStyle = 'rgba(241, 245, 249, 0.38)';
+      ctx2d.lineWidth = 1.3;
+      ctx2d.beginPath();
+      ctx2d.roundRect(cx - 14, bodyTopY, 28, bodyH * 0.55, 6);
+      ctx2d.fill();
+      ctx2d.stroke();
+      ctx2d.fillStyle = 'rgba(241, 245, 249, 0.65)';
+      ctx2d.font = '8px "JetBrains Mono", monospace';
+      ctx2d.textAlign = 'center';
+      ctx2d.fillText('YOU', cx, bodyTopY + bodyH * 0.30);
+
+      // 3. Radiant Golden-Cyan Head Energy Explosion when Inhale reaches the Head
       if (isInhalePhase) {
-        const headGlowRad = isFillingHead ? 38 + Math.sin(nowMs * 0.012) * 8 : 24;
-        const headGrad = ctx2d.createRadialGradient(cx, cy, 2, cx, cy, headGlowRad);
-        headGrad.addColorStop(0, isFillingHead ? 'rgba(251, 191, 36, 0.65)' : 'rgba(56, 189, 248, 0.45)');
-        headGrad.addColorStop(0.55, isFillingHead ? 'rgba(56, 189, 248, 0.32)' : 'rgba(167, 139, 250, 0.18)');
+        const headGlowRad = isHeadExplosion ? 48 + Math.sin(nowMs * 0.018) * 12 : 26;
+        const headGrad = ctx2d.createRadialGradient(headPt.px, headPt.py, 2, headPt.px, headPt.py, headGlowRad);
+        headGrad.addColorStop(0, isHeadExplosion ? 'rgba(251, 191, 36, 0.85)' : 'rgba(56, 189, 248, 0.48)');
+        headGrad.addColorStop(0.5, isHeadExplosion ? 'rgba(56, 189, 248, 0.45)' : 'rgba(167, 139, 250, 0.20)');
         headGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
         ctx2d.fillStyle = headGrad;
         ctx2d.beginPath();
-        ctx2d.arc(cx, cy, headGlowRad, 0, Math.PI * 2);
+        ctx2d.arc(headPt.px, headPt.py, headGlowRad, 0, Math.PI * 2);
         ctx2d.fill();
       }
+      ctx2d.restore();
     }
 
     // Show live Stage Choreography Banner when in REBAL or 5m Split & Merge mode

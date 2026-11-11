@@ -403,31 +403,23 @@ class ConsciousnessAudioEngine {
     let warmHarmonicWave = null;
     let pinnaHarmonicWave = null;
     if (typeof this.ctx.createPeriodicWave === 'function') {
-      const real = new Float32Array(9);
-      const imag = new Float32Array(9);
-      imag[1] = 1.00;  // 1f Fundamental
-      imag[2] = 0.52;  // 2f Octave
-      imag[3] = 0.30;  // 3f Twelfth (Perfect 5th)
-      imag[4] = 0.18;  // 4f Double Octave
-      imag[5] = 0.10;  // 5f Pure Major Third
-      imag[6] = 0.06;  // 6f Perfect Fifth
-      imag[8] = 0.03;  // 8f Triple Octave
+      // 1. Warm Integer Harmonic Wave (harmonics n = 1..16 with natural 1/n^1.22 acoustic rolloff)
+      const real = new Float32Array(17);
+      const imag = new Float32Array(17);
+      for (let n = 1; n <= 16; n++) {
+        imag[n] = 1.0 / Math.pow(n, 1.22);
+      }
       warmHarmonicWave = this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
 
-      const pReal = new Float32Array(49);
-      const pImag = new Float32Array(49);
-      pImag[6] = 0.35;   // ~1.04 kHz (Posterior Blauert Back-of-Neck cue)
-      pImag[8] = 0.30;   // ~1.39 kHz
-      pImag[10] = 0.26;  // ~1.74 kHz
-      pImag[12] = 0.22;  // ~2.09 kHz
-      pImag[16] = 0.20;  // ~2.78 kHz
-      pImag[20] = 0.18;  // ~3.48 kHz (Frontal Blauert Front-of-Face cue)
-      pImag[24] = 0.16;  // ~4.18 kHz (Below-Chin Notch & Concha Funnel cue)
-      pImag[28] = 0.14;  // ~4.87 kHz (Concha Cavity resonance)
-      pImag[32] = 0.12;  // ~5.57 kHz
-      pImag[36] = 0.10;  // ~6.26 kHz (Ear-level Pinna Antihelix Notch)
-      pImag[42] = 0.08;  // ~7.31 kHz
-      pImag[48] = 0.07;  // ~8.35 kHz (Blauert Overhead Zenith +85° Sky cue)
+      // 2. Dense Pinna-Localization Integer Harmonic Wave (EVERY integer harmonic n = 4..72 up to 12 kHz!)
+      // Having continuous harmonic density across 600 Hz - 12 kHz ensures that as the Pinna Concha Peak P1 (+8 dB)
+      // and Pinna Antihelix Notch N1 (-18 dB) sweep from 3.5 kHz (Below) -> 6.4 kHz (Ear) -> 11.4 kHz (Above),
+      // the Dorsal Cochlear Nucleus hears a continuous, high-contrast moving elevation notch!
+      const pReal = new Float32Array(73);
+      const pImag = new Float32Array(73);
+      for (let n = 4; n <= 72; n++) {
+        pImag[n] = 0.45 / Math.pow(n - 2, 0.68);
+      }
       pinnaHarmonicWave = this.ctx.createPeriodicWave(pReal, pImag, { disableNormalization: false });
     }
 
@@ -476,9 +468,9 @@ class ConsciousnessAudioEngine {
       formantGain.gain.value = 0.0;
 
       const noiseBand = this.ctx.createBiquadFilter();
-      noiseBand.type = 'bandpass';
-      noiseBand.frequency.value = 4800 + (i % 3) * 1100;
-      noiseBand.Q.value = 1.1;
+      noiseBand.type = 'highpass';
+      noiseBand.frequency.value = 1800;
+      noiseBand.Q.value = 0.707;
 
       const noiseGain = this.ctx.createGain();
       noiseGain.gain.value = 0.0;
@@ -1130,7 +1122,12 @@ class ConsciousnessAudioEngine {
       }
     }
 
-    // Layer 1: Warm Pure Integer Harmonic Body (1f, 2f, 3f, 4f, 5f, 6f, 8f)
+    // Compute normalized vertical elevation (-1 = Below Feet/Chin ▼, 0 = Ear Level, +1 = Overhead Crown ▲)
+    const elevNorm = tv ? Math.max(-1, Math.min(1, (tv.y || 0) / Math.max(0.18, tv.dist || 1))) : 0;
+    // Slight natural pitch-height coupling (Pratt's effect) + sub-octave body when below head
+    const fElev = f0 * Math.pow(2, elevNorm * 0.22);
+
+    // Layer 1: Warm Pure Integer Harmonic Body (1f..16f)
     const bodyOsc = this.ctx.createOscillator();
     const bodyEnv = this.ctx.createGain();
     if (this.nodes.spatial.warmHarmonicWave && typeof bodyOsc.setPeriodicWave === 'function') {
@@ -1138,7 +1135,7 @@ class ConsciousnessAudioEngine {
     } else {
       bodyOsc.type = 'sine';
     }
-    bodyOsc.frequency.setValueAtTime(f0, now);
+    bodyOsc.frequency.setValueAtTime(fElev, now);
 
     const bodyDur = 0.52;
     const bodyPeak = 0.62 * level;
@@ -1151,20 +1148,37 @@ class ConsciousnessAudioEngine {
     bodyOsc.start(now);
     bodyOsc.stop(now + bodyDur + 0.015);
 
-    // Layer 2: Upper Integer Harmonic Pinna-Localization Pluck (6f..48f across 1-8.5 kHz, 95ms natural string/bell pluck decay)
-    // Gives the Ear Auricle (Blauert 1.05/3.65 kHz, Concha 4.5 kHz, Pinna Notch 4.2-11 kHz, Zenith 8.6 kHz) full pure-harmonic energy!
+    // Optional Sub-Octave Somatic Floor Weight when source is Below Head (elevNorm < -0.1)
+    if (elevNorm < -0.1) {
+      const subOsc = this.ctx.createOscillator();
+      const subEnv = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(Math.max(32, fElev * 0.5), now);
+      const subPeak = (-elevNorm) * 0.55 * level;
+      subEnv.gain.setValueAtTime(0.0001, now);
+      subEnv.gain.linearRampToValueAtTime(subPeak, now + 0.008);
+      subEnv.gain.exponentialRampToValueAtTime(0.0005, now + bodyDur);
+      subOsc.connect(subEnv);
+      subEnv.connect(dest);
+      subOsc.start(now);
+      subOsc.stop(now + bodyDur + 0.015);
+    }
+
+    // Layer 2: Upper Integer Harmonic Pinna-Localization Pluck (4f..72f across 600 Hz - 12 kHz, 110ms pluck decay)
+    // Strongly boosted when Overhead (+Y) and gently softened when Below Chin/Feet (-Y)
     const pinnaOsc = this.ctx.createOscillator();
     const pinnaEnv = this.ctx.createGain();
     if (this.nodes.spatial.pinnaHarmonicWave && typeof pinnaOsc.setPeriodicWave === 'function') {
       pinnaOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
-      pinnaOsc.frequency.setValueAtTime(f0, now);
+      pinnaOsc.frequency.setValueAtTime(fElev, now);
     } else {
       pinnaOsc.type = 'sine';
-      pinnaOsc.frequency.setValueAtTime(Math.min(4800, f0 * 8.0), now);
+      pinnaOsc.frequency.setValueAtTime(Math.min(6400, fElev * 8.0), now);
     }
 
-    const pinnaDur = 0.095;
-    const pinnaPeak = 0.36 * level;
+    const pinnaDur = 0.11;
+    const elevPinnaScale = elevNorm >= 0 ? (1.0 + 0.75 * elevNorm) : Math.max(0.28, 1.0 + 0.65 * elevNorm);
+    const pinnaPeak = 0.42 * level * elevPinnaScale;
     pinnaEnv.gain.setValueAtTime(0.0001, now);
     pinnaEnv.gain.linearRampToValueAtTime(pinnaPeak, now + 0.003); // 3ms pluck transient
     pinnaEnv.gain.exponentialRampToValueAtTime(0.0005, now + pinnaDur);
@@ -1491,18 +1505,20 @@ class ConsciousnessAudioEngine {
     let stageLabel = '';
 
     if (geom === 'rebal') {
-      // MONROE GATEWAY REBAL (Resonant Energy Balloon) — 5-Stage Breath-Synchronized 3D Toroidal Loop:
-      // - EXHALE PHASE (rebalCycle in [0.00 .. 0.50]):
-      //   1. Starts in the Head, fountains UP through the Top of the Head (Crown Zenith ▲ +85°).
-      //   2. Splits into `count` (2 = Left/Right, 4 = Front/Right/Back/Left) symmetric directions.
-      //   3. Turns downward around the outside of the body along a 3D Torus cocoon (with tunable `spiralTurns`:
-      //      0 = Pure vertical torus turning with NO horizontal spiraling; >0 = Spiraling around the head at `spiralTurns` rev/loop)
-      //      and merges back together at the Feet (Floor ▼ -75°).
+      // MONROE GATEWAY REBAL (Resonant Energy Balloon) — True Apple-Torus / Dipole Energy Field Loop:
+      // Matches the exact geometry of the human toroidal bio-field:
       // - INHALE PHASE (rebalCycle in [0.50 .. 1.00]):
-      //   4. Merged stream enters at the Feet (Floor ▼ -75°) and rises straight UP through the core of the whole body (x~0, z~0).
-      //   5. Crosses into the Head, filling up the entire cranium with vibrant resonant energy before repeating!
-      const R = 2.4 + 2.2 * asym; // ~3.5m - 4.6m toroidal cocoon radius around the body
+      //   1. Enters at the Soles of the Feet (y = -0.58*Y) and rises straight UP through the core of the body to the Head (y = 0).
+      //   2. Explodes with resonant energy inside the Head (y: 0 -> +0.12*Y, cranial bloom).
+      // - EXHALE PHASE (rebalCycle in [0.00 .. 0.50]):
+      //   3. After exploding in the Head, fountains UP & OUTWARD high above the head (y climbs from +0.12*Y up to +0.94*Y
+      //      at u = 0.24 while splitting into 2 or 4 directions!).
+      //   4. Curves over the top of the upper torus arch and goes DOWN wide outside the body (r = R, passing ear level y = 0
+      //      down to y = -1.18*Y underneath the feet at u = 0.76).
+      //   5. Curves underneath the feet and UPWARD into the Soles of the Feet (r = 0, y = -0.58*Y) to repeat the loop!
+      const R = 2.4 + 2.0 * asym; // ~4.1m max horizontal torus radius outside the body
       const effElev = Math.max(0.35, elevScale);
+      const Y = (2.2 + 1.6 * asym) * effElev; // Vertical torus scale
       const rebalCycle = (elapsed * speed * 0.75) % 1.0;
       const nBranches = Math.max(2, count);
       // For 2 branches, align to Right (+90°) and Left (-90°) for maximum binaural separation; for 4+, space evenly around 360°
@@ -1513,85 +1529,69 @@ class ConsciousnessAudioEngine {
       if (rebalCycle < 0.50) {
         // =========================================================
         // EXPIRATION / EXHALE ▼ (0.00 .. 0.50 -> u in 0.00 .. 1.00)
+        // True Apple-Torus Dipole Curve parameterized by poloidal angle pol in [0, PI]:
+        //   horizR(pol) = R * sin(pol)
+        //   y(pol)      = Y * (0.12 * cos(pol) - 0.23 * (1 - cos(pol)) + 0.88 * sin(2 * pol))
+        // Notice:
+        //   - At u = 0.00 (Head):      horizR = 0,      y = +0.12 * Y (Top of Head)
+        //   - At u = 0.24 (Top Arch):  horizR = 0.68*R, y = +0.94 * Y (Climbs HIGH ABOVE HEAD first!)
+        //   - At u = 0.47 (Mid Torus): horizR = 1.00*R, y =  0.00     (Wide outside body at ear level)
+        //   - At u = 0.76 (Bottom):    horizR = 0.68*R, y = -1.18 * Y (Curves underneath the feet!)
+        //   - At u = 1.00 (Feet):      horizR = 0,      y = -0.58 * Y (Merges UP into the Soles of the Feet!)
         // =========================================================
-        const u = rebalCycle * 2.0;
-        const startPoloidal = 0.07 * Math.PI;
-        const endPoloidal = 0.93 * Math.PI;
-        const crownY = R * 0.92 * Math.cos(startPoloidal) * effElev;
-        const crownR = R * Math.sin(startPoloidal);
+        const u = rebalCycle * 2.0; // 0..1
+        const pol = u * Math.PI;
+        const horizR = R * Math.sin(pol);
+        y = Y * (0.12 * Math.cos(pol) - 0.23 * (1.0 - Math.cos(pol)) + 0.88 * Math.sin(2.0 * pol));
 
-        if (u < 0.16) {
-          // Stage E1: Head -> Fountain Up Through Top of Head (Crown ▲ +85°) & Begin 2/4-Way Split
-          const p = u / 0.16; // 0..1
-          const bloom = p > 0.55 ? (p - 0.55) / 0.45 : 0.0;
-          const rOut = crownR * bloom;
-          x = rOut * Math.sin(branchAz);
-          z = -rOut * Math.cos(branchAz);
-          y = (0.24 * effElev) + (crownY - 0.24 * effElev) * Math.sin(p * Math.PI * 0.5);
-          splitFactor = bloom * 0.75;
-          stageLabel = p < 0.55
-            ? 'EXHALE ▼ [1/5] HEAD → FOUNTAIN UP CROWN ▲'
-            : `EXHALE ▼ [2/5] CROWN ▲ → SPLIT ${nBranches} DIRECTIONS`;
-        } else if (u < 0.86) {
-          // Stage E2: 2 or 4 Streams Turning Downward Around Outside of Body Along a 3D Torus
-          const t = (u - 0.16) / 0.70; // 0..1
-          const poloidal = startPoloidal + t * (endPoloidal - startPoloidal);
-          const horizR = R * Math.sin(poloidal);
-          y = R * 0.92 * Math.cos(poloidal) * effElev;
-          // Tunable horizontal spiraling around the head (`spiralTurns = 0` => pure vertical torus turning with NO spiraling!)
-          const torusTurn = t * Math.PI * 2.0 * spiralTurns;
-          const az = branchAz + torusTurn;
-          x = horizR * Math.sin(az);
-          z = -horizR * Math.cos(az);
-          splitFactor = Math.min(1.0, Math.sin(poloidal) * 1.25);
-          const modeTag = spiralTurns <= 0.02 ? 'TORUS LOOP (JUST TURNING)' : `TORUS SPIRAL (${spiralTurns.toFixed(1)}x 🌀)`;
-          stageLabel = t < 0.50
-            ? `EXHALE ▼ [2/5] ${nBranches}-WAY ${modeTag}`
-            : `EXHALE ▼ [3/5] TURNING DOWN TORUS → TOWARD FEET ▼`;
+        // Tunable horizontal spiraling around the head (`spiralTurns = 0` => pure vertical torus turning with NO spiraling!)
+        const torusTurn = u * Math.PI * 2.0 * spiralTurns;
+        const az = branchAz + torusTurn;
+        x = horizR * Math.sin(az);
+        z = -horizR * Math.cos(az);
+        splitFactor = Math.min(1.0, Math.sin(pol) * 1.35);
+
+        const modeTag = spiralTurns <= 0.02 ? 'JUST TURNING' : `${spiralTurns.toFixed(1)}x SPIRAL 🌀`;
+        if (u < 0.25) {
+          stageLabel = `EXHALE ▼ [1/5] HEAD → GOING UP & OUT TO TOP ARCH ▲ (${modeTag})`;
+        } else if (u < 0.76) {
+          stageLabel = `EXHALE ▼ [2/5] OVER TOP ARCH ▲ → GOING DOWN TORUS ▼ (${modeTag})`;
         } else {
-          // Stage E3: Converge & Merge Back Together Under the Feet (Floor ▼ -75°)
-          const m = (u - 0.86) / 0.14; // 0..1
-          const remR = R * Math.sin(endPoloidal) * (1.0 - m);
-          const az = branchAz + Math.PI * 2.0 * spiralTurns * (1.0 + m * 0.15);
-          x = remR * Math.sin(az);
-          z = -remR * Math.cos(az);
-          y = -R * 0.92 * (Math.cos(startPoloidal) + (1.0 - Math.cos(startPoloidal)) * m) * effElev;
-          splitFactor = (1.0 - m) * 0.25;
-          stageLabel = 'EXHALE ▼ [3/5] MERGE AT FEET ▼ (ROOT CONVERGENCE)';
+          stageLabel = 'EXHALE ▼ [3/5] CURVING UNDER FEET ▼ → MERGING AT SOLES';
         }
       } else {
         // =========================================================
         // INSPIRATION / INHALE ▲ (0.50 .. 1.00 -> w in 0.00 .. 1.00)
         // =========================================================
         const w = (rebalCycle - 0.50) * 2.0;
-        if (w < 0.70) {
-          // Stage I1: Merged Stream Enters Through Feet ▼ & Rises Straight Up Through Whole Body to Head ▲
-          const c = w / 0.70; // 0 (Feet) -> 1 (Center of Head)
-          y = -R * 0.92 * effElev * (1.0 - c);
+        const feetY = -0.58 * Y;
+        if (w < 0.72) {
+          // Stage I1: Merged Stream Enters Soles of Feet ▼ & Rises Straight Up Through Whole Body into the Head ▲
+          const c = w / 0.72; // 0 (Feet) -> 1 (Center of Head)
+          y = feetY * (1.0 - c);
           if (spiralTurns <= 0.02) {
-            // No spiraling: rises straight up the central vertical axis of the body
             x = 0;
-            z = -0.10 * Math.sin(c * Math.PI);
+            z = -0.08 * Math.sin(c * Math.PI);
           } else {
-            const rCore = 0.11 * Math.sin(c * Math.PI);
+            const rCore = 0.10 * Math.sin(c * Math.PI);
             const coreSpin = c * Math.PI * 2.0 * spiralTurns;
             x = rCore * Math.sin(coreSpin);
             z = -rCore * Math.cos(coreSpin);
           }
           splitFactor = 0.0; // Merged into ONE core body column!
-          stageLabel = c < 0.48
-            ? 'INHALE ▲ [4/5] FEET ▼ → RISING UP CORE BODY'
+          stageLabel = c < 0.50
+            ? 'INHALE ▲ [4/5] SOLES OF FEET ▼ → RISING UP CORE BODY'
             : 'INHALE ▲ [4/5] HEART & THROAT → ENTERING HEAD ▲';
         } else {
-          // Stage I2: Crosses the Head & Fills Up the Entire Cranium with Vibrant Energy ✨
-          const h = (w - 0.70) / 0.30; // 0..1
-          const rHead = 0.22 * Math.sin(h * Math.PI); // Swells to 22cm cranial halo then focuses at top of skull
-          const headSpin = branchAz + h * Math.PI * 2.0 * Math.max(0.25, spiralTurns);
+          // Stage I2: Crosses the Head & Explodes with Vibrant Energy Inside the Cranium ✨ (before going UP on Exhale!)
+          const h = (w - 0.72) / 0.28; // 0..1
+          const rHead = 0.32 * Math.sin(h * Math.PI); // Radial energy burst inside/around the head
+          const headSpin = branchAz + h * Math.PI * 2.0 * Math.max(0.35, spiralTurns);
           x = rHead * Math.sin(headSpin);
           z = -rHead * Math.cos(headSpin);
-          y = 0.24 * effElev * Math.sin(h * Math.PI * 0.5);
-          splitFactor = 0.32 * Math.sin(h * Math.PI);
-          stageLabel = 'INHALE ▲ [5/5] FILLING HEAD WITH VIBRANT ENERGY ✨';
+          y = (0.12 * Y) * Math.pow(h, 0.85);
+          splitFactor = 0.45 * Math.sin(h * Math.PI);
+          stageLabel = 'INHALE ▲ [5/5] HEAD ENERGY EXPLOSION ✨ → READY TO RISE ▲';
         }
       }
     } else if (geom === 'bifurcation5m' || geom === 'bifurcation_random') {
@@ -3411,59 +3411,70 @@ class ConsciousnessAudioEngine {
           // Back (z > 0): shifts to 1050 Hz posterior Blauert band so the brain unmistakably perceives "behind the neck"!
           if (frontness >= 0) {
             v.blauertFilter.frequency.setTargetAtTime(3650, now, spatTc);
-            v.blauertFilter.gain.setTargetAtTime(frontness * 6.5 * auricle, now, spatTc);
+            v.blauertFilter.gain.setTargetAtTime(frontness * 7.2 * auricle, now, spatTc);
           } else {
             v.blauertFilter.frequency.setTargetAtTime(1050, now, spatTc);
-            v.blauertFilter.gain.setTargetAtTime((-frontness) * 5.8 * auricle, now, spatTc);
+            v.blauertFilter.gain.setTargetAtTime((-frontness) * 6.8 * auricle, now, spatTc);
           }
 
-          // 2. Outer Ear Concha Cavity Funnel Resonance (4.5 kHz):
-          const conchaDb = (frontness >= -0.2 ? (frontness + 0.4) * 4.5 : frontness * 4.0) * auricle;
-          v.conchaFilter.gain.setTargetAtTime(conchaDb, now, spatTc);
+          // 2 & 3. Anthropometric CIPIC / DCN Vertical Elevation Model (Coupled Concha Rim Peak P1 + Deep Antihelix Notch N1):
+          // In the human Dorsal Cochlear Nucleus (DCN), vertical elevation is decoded from the sharp rising spectral edge
+          // between the Lower Concha Rim Peak P1 (+8 dB) and the adjacent Deep Antihelix Spectral Notch N1 (-18 dB):
+          // - Below Head / Feet (-90° ▼): P1 = 2,550 Hz (+8 dB) | N1 = 3,550 Hz (-18 dB)
+          // - Ear Level (0°):             P1 = 4,600 Hz (+8 dB) | N1 = 6,400 Hz (-18 dB)
+          // - Above Head / Sky (+90° ▲):  P1 = 8,200 Hz (+8 dB) | N1 = 11,400 Hz (-18 dB)
+          const notchFreq = Math.max(3450, Math.min(12000, 6400 * Math.pow(2, 0.84 * elevNorm) + 450 * Math.abs(sinTheta)));
+          const peakP1Freq = Math.max(2400, Math.min(8800, notchFreq * 0.72));
 
-          // 3. Anthropometric Vertical Elevation Cues (3-stage Pinna Notch + Zenith Peak + Torso/Chest Shelf):
-          // (a) Pinna Antihelix Notch sweeps from 4,250 Hz (-90° Below Chin) -> 6,800 Hz (0° Ear Level) -> 11,100 Hz (+90° Zenith)
-          const notchFreq = Math.max(4100, Math.min(11800, 6800 * Math.pow(2, 0.68 * elevNorm) + 600 * Math.abs(sinTheta)));
+          v.conchaFilter.frequency.setTargetAtTime(peakP1Freq, now, spatTc);
+          v.conchaFilter.Q.setTargetAtTime(2.4, now, spatTc);
+          v.conchaFilter.gain.setTargetAtTime((5.5 + 3.0 * Math.max(0, frontness)) * auricle, now, spatTc);
+
           v.elevFilter.frequency.setTargetAtTime(notchFreq, now, spatTc);
-          v.elevFilter.Q.setTargetAtTime(4.0 + 2.5 * auricle, now, spatTc);
-          v.elevFilter.gain.setTargetAtTime(-13.5 * auricle, now, spatTc);
+          v.elevFilter.Q.setTargetAtTime(5.2 + 2.5 * auricle, now, spatTc);
+          v.elevFilter.gain.setTargetAtTime(-18.0 * auricle, now, spatTc);
 
-          // (b) Blauert Overhead Zenith Peak (8.6 kHz scapha resonance blooms up to +9.5 dB when source is Above Crown y > 0)
-          const zenithDb = (elevNorm >= 0 ? elevNorm * 9.5 : elevNorm * 4.5) * auricle;
+          // (b) Blauert Overhead Zenith Scapha Peak (8.8 kHz blooms up to +11.5 dB Above Head y > 0; cut -9.5 dB Below Head y < 0)
+          const zenithDb = (elevNorm >= 0 ? elevNorm * 11.5 : elevNorm * 9.5) * auricle;
+          v.zenithFilter.frequency.setTargetAtTime(8800, now, spatTc);
           v.zenithFilter.gain.setTargetAtTime(zenithDb, now, spatTc);
 
-          // (c) Torso / Chest Cavity vs. Overhead Weightlessness (320 Hz low-shelf: +6.5 dB Below Chin vs -5.5 dB Above Crown)
-          const torsoDb = (-elevNorm * 6.0) * auricle;
+          // (c) Torso / Chest / Floor Cavity Resonance vs. Overhead Weightlessness (280 Hz low-shelf: +11 dB Below vs -10.5 dB Above)
+          const torsoDb = (-elevNorm * 11.0) * auricle;
+          v.torsoFilter.frequency.setTargetAtTime(280, now, spatTc);
           v.torsoFilter.gain.setTargetAtTime(torsoDb, now, spatTc);
 
-          // Sweep the high-frequency Auricle Velvet Air band (4.5 kHz .. 9.2 kHz) with elevation so the Pinna Notch & Zenith Peak are always vivid
-          v.noiseBand.frequency.setTargetAtTime(6400 + elevNorm * 2400, now, spatTc);
+          // Keep Wideband Pinna Excitation High-Pass open across 1.4-2.4 kHz so P1, N1, and Zenith filters receive full energy
+          v.noiseBand.frequency.setTargetAtTime(1750 + elevNorm * 550, now, spatTc);
 
-          // 4. Pinna Rim Rear Cartilage Shadow & Vertical Shoulder Shadow Low-Pass:
-          // Wide open in front & overhead (up to 15.5 kHz); shadowed behind neck or below torso
-          const elevOpen = 1.0 + 0.22 * elevNorm;
+          // 4. Anatomical Chin/Jaw Below-Head Shadow & Pinna Rear Rim Shadow Low-Pass:
+          // - Above Head (elevNorm > 0 ▲): Pinna opens directly to the sky (up to 16,500 Hz crystal-clear air!)
+          // - Below Head / Feet (elevNorm < 0 ▼): Jaw, chin, and shoulders shadow high frequencies down to ~1,350-1,950 Hz!
+          const elevOpen = elevNorm >= 0
+            ? (1.0 + 0.65 * elevNorm)
+            : Math.pow(0.18, (-elevNorm) * auricle);
           const baseShadow = frontness >= 0
             ? (5800 + frontness * 9200) * elevOpen
-            : 5500 * Math.pow(0.28 + 0.45 * (1 - auricle), -frontness) * elevOpen;
-          v.shadowFilter.frequency.setTargetAtTime(Math.max(650, Math.min(16500, baseShadow * distAirDamp)), now, spatTc);
+            : 5200 * Math.pow(0.25 + 0.45 * (1 - auricle), -frontness) * elevOpen;
+          v.shadowFilter.frequency.setTargetAtTime(Math.max(580, Math.min(16500, baseShadow * distAirDamp)), now, spatTc);
 
-          // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..680 us) — no radial Doppler delay so 0..5m motion never pitch-bends like a siren!
+          // 5. Woodworth Spherical Head Interaural Time Difference (ITD 0..720 us) — no radial Doppler delay so 0..5m motion never pitch-bends like a siren!
           const absSin = Math.abs(sinTheta);
           const woodworth = (absSin + Math.asin(absSin)) / (1 + Math.PI * 0.5); // 0..1
-          const itdSec = 0.00068 * (0.4 + 0.6 * auricle) * woodworth;
+          const itdSec = 0.00072 * (0.4 + 0.6 * auricle) * woodworth;
           const delayL = 0.00008 + (sinTheta > 0 ? itdSec : 0);
           const delayR = 0.00008 + (sinTheta < 0 ? itdSec : 0);
           v.itdDelayL.delayTime.setTargetAtTime(delayL, now, spatTc);
           v.itdDelayR.delayTime.setTargetAtTime(delayR, now, spatTc);
 
-          // 6. Contralateral Cranial Head-Shadow Low-Pass (Near ear = 16 kHz crystal clear; Far ear = shadowed down to ~850 Hz by skull):
-          const shadowExp = 0.35 + 0.65 * auricle;
+          // 6. Contralateral Cranial Head-Shadow Low-Pass (Near ear = 16 kHz crystal clear; Far ear = shadowed down to ~620 Hz by skull):
+          const shadowExp = 0.40 + 0.65 * auricle;
           const cutoffL = sinTheta <= 0
             ? 16000 * distAirDamp
-            : Math.max(780, 15500 * Math.pow(0.055, Math.pow(sinTheta, 0.85) * shadowExp) * distAirDamp);
+            : Math.max(620, 15500 * Math.pow(0.042, Math.pow(sinTheta, 0.82) * shadowExp) * distAirDamp);
           const cutoffR = sinTheta >= 0
             ? 16000 * distAirDamp
-            : Math.max(780, 15500 * Math.pow(0.055, Math.pow(-sinTheta, 0.85) * shadowExp) * distAirDamp);
+            : Math.max(620, 15500 * Math.pow(0.042, Math.pow(-sinTheta, 0.82) * shadowExp) * distAirDamp);
           v.headShadowL.frequency.setTargetAtTime(cutoffL, now, spatTc);
           v.headShadowR.frequency.setTargetAtTime(cutoffR, now, spatTc);
 
@@ -3480,50 +3491,64 @@ class ConsciousnessAudioEngine {
           v.earGainL.gain.setTargetAtTime(gL, now, spatTc);
           v.earGainR.gain.setTargetAtTime(gR, now, spatTc);
 
-          // 8. Continuous Moving Texture Harmonics & Formants:
+          // 8. Continuous Moving Texture Harmonics & Formants (with Direct 3D Elevation-to-Spectrum Coupling!):
           let contMod = continuousLevel;
           if (palette === 'rebal') {
-            // Monroe Gateway REBAL Moving 3D Inhale / Exhale Breath + Resonant Tuning Harmonic Choir:
-            // - On EXHALE ▼ (rebalCycle < 0.50, u in 0..1): Crown Fountain ("HAAA" 690/2280 Hz) -> Turning Torus -> Feet ("OOO" 295/760 Hz)
-            // - On INHALE ▲ (rebalCycle >= 0.50, w in 0..1): Feet ("OOO" 295/760 Hz) -> Body Core ("AHH" 620/1320 Hz) -> Filling Head ("EEE" 430/2640 Hz)
+            // Monroe Gateway REBAL Moving 3D Inhale / Exhale Breath + Elevation-Coupled Resonant Tuning Choir:
+            // Pitch, sub-octave weight, upper pinna harmonics (4f..72f), and vocal breath formants (F1/F2)
+            // track BOTH the Inhale/Exhale breath cycle AND the true 3D vertical height `elevNorm` (-1 Feet ▼ <-> +1 Top Arch ▲):
+            // - Inhale (Feet ▼ -> Body Core -> Head Explosion ✨): climbs from deep sub-bass ("UUU" 250/620 Hz) to radiant Head bloom ("EEE" 520/2250 Hz).
+            // - Exhale Stage 1 (Head -> Going UP & OUT to Top Arch ▲, u in 0..0.25): SOARS HIGHER above the head ("HIII/EEE" up to 2950 Hz + bright sky harmonics)!
+            // - Exhale Stage 2 & 3 (Top Arch ▲ -> Going DOWN Outside Body -> Under Feet ▼, u in 0.25..1.0): sweeps smoothly downward from sky to deep sub-floor!
             const baseF = Math.max(48, Math.min(440, this.params.spatial.baseFreq || 144));
-            const chordRatios = [1.0, 1.25, 1.5, 2.0];
+            const chordRatios = [1.0, 1.25, 1.5, 1.875];
             const branchRatio = chordRatios[i % chordRatios.length];
-            const airFlutter = 0.84 + 0.16 * Math.sin(elapsed * (10.5 + i * 1.9));
+            const airFlutter = 0.80 + 0.20 * Math.sin(elapsed * (11.0 + i * 2.1));
+
+            // Dynamically shift sub-octave body vs. upper pinna harmonics (4f..72f) with true 3D vertical elevation `elevNorm`:
+            const overtoneElevLvl = elevNorm >= 0 ? (0.08 + 0.11 * elevNorm) : Math.max(0.015, 0.08 + 0.065 * elevNorm);
+            v.overtoneGain.gain.setTargetAtTime(overtoneElevLvl, now, spatTc);
+            v.bodyFilter.frequency.setTargetAtTime(elevNorm >= 0 ? 3600 : 480, now, spatTc);
 
             if (rebalCycle < 0.50) {
-              const u = rebalCycle * 2.0; // 0..1 Exhale progress
-              // Downward harmonic & vocal-breath glide from Crown (+85°) around the body down to the Feet (-75°)
-              const fExhale = Math.max(44, baseF * branchRatio * (1.60 - 0.75 * u));
+              const u = rebalCycle * 2.0; // 0..1 Exhale progress along the Apple-Torus
+              // Height curve along the Apple-Torus: climbs from Head (u=0) to Top Arch peak (u=0.24), then descends to Below Feet (u=0.76) and Soles (u=1.0)
+              const pitchHeightMult = Math.pow(2, elevNorm * 0.72); // ~1.65x at Top Arch ▲ (+Y) down to ~0.60x Below Feet ▼ (-Y)!
+              const fExhale = Math.max(40, baseF * branchRatio * pitchHeightMult);
               v.osc.frequency.setTargetAtTime(fExhale, now, spatTc);
-              v.bodyOsc.frequency.setTargetAtTime(fExhale * 2.0, now, spatTc);
+              // When Above Head (elevNorm >= 0), bodyOsc plays 2.0x Octave shimmer; when Below Head (elevNorm < 0), plays 0.5x Sub-Octave floor weight!
+              v.bodyOsc.frequency.setTargetAtTime(elevNorm >= 0 ? fExhale * 2.0 : Math.max(32, fExhale * 0.5), now, spatTc);
               v.overtoneOsc.frequency.setTargetAtTime(fExhale, now, spatTc);
 
-              const f1 = 295 + 395 * Math.pow(1.0 - u, 0.90);
-              const f2 = 760 + 1520 * Math.pow(1.0 - u, 1.20);
+              const elev01 = 0.5 + 0.5 * elevNorm; // 0 (Below Feet ▼) .. 1 (High Above Head ▲)
+              const f1 = 240 + 420 * Math.pow(elev01, 0.85);
+              const f2 = 580 + 2350 * Math.pow(elev01, 1.35);
               v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
               v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
 
-              const exhaleEnv = Math.sin(Math.pow(u, 0.72) * Math.PI);
+              const exhaleEnv = Math.sin(Math.pow(u, 0.75) * Math.PI);
               // Rotating 3D spotlight across the 2 or 4 branches so each turning stream is distinctly localized in 3D!
-              const branchSpotlight = 0.38 + 0.62 * Math.pow(0.5 + 0.5 * Math.sin(u * Math.PI * 4.0 - (i * Math.PI * 2) / Math.max(2, count)), 1.4);
-              contMod = continuousLevel * exhaleEnv * branchSpotlight * airFlutter * 1.35;
+              const branchSpotlight = 0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(u * Math.PI * 4.0 - (i * Math.PI * 2) / Math.max(2, count)), 1.5);
+              contMod = continuousLevel * exhaleEnv * branchSpotlight * airFlutter * 1.38;
             } else {
-              const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale progress
-              // Upward harmonic & vocal-breath glide from Feet (-75°) up through the whole body into the Head (0°..+25°)
-              const fInhale = Math.max(44, baseF * (w < 0.70 ? 1.0 : branchRatio) * (0.85 + 0.95 * Math.pow(w, 1.10)));
+              const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale progress (0..0.72 Rising Up Body, 0.72..1.00 Head Explosion)
+              const isHeadExplosion = w >= 0.72;
+              const pitchClimb = 0.65 + 0.85 * Math.pow(w, 1.15);
+              const fInhale = Math.max(40, baseF * (isHeadExplosion ? branchRatio : 1.0) * pitchClimb);
               v.osc.frequency.setTargetAtTime(fInhale, now, spatTc);
-              v.bodyOsc.frequency.setTargetAtTime(fInhale * 2.0, now, spatTc);
+              v.bodyOsc.frequency.setTargetAtTime(elevNorm >= -0.15 ? fInhale * 2.0 : Math.max(32, fInhale * 0.5), now, spatTc);
               v.overtoneOsc.frequency.setTargetAtTime(fInhale, now, spatTc);
 
-              const f1 = 295 + 340 * Math.sin(w * Math.PI * 0.82);
-              const f2 = 760 + 1880 * Math.pow(w, 1.15);
+              const f1 = 250 + 340 * Math.sin(w * Math.PI * 0.80);
+              const f2 = 600 + 2150 * Math.pow(w, 1.25);
               v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
               v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
 
-              const inhaleEnv = Math.sin(Math.pow(w, 0.85) * Math.PI);
+              // Extra energy surge at w in [0.72..1.00] when the energy reaches the Head and explodes!
+              const baseInhaleEnv = Math.sin(Math.pow(w, 0.82) * Math.PI);
+              const explosionBoost = isHeadExplosion ? (1.0 + 0.35 * Math.sin(((w - 0.72) / 0.28) * Math.PI)) : 1.0;
               const chakraPulse = 0.82 + 0.18 * Math.sin(w * Math.PI * 10.0 + i * 0.7);
-              contMod = continuousLevel * inhaleEnv * chakraPulse * airFlutter * 1.35;
+              contMod = continuousLevel * baseInhaleEnv * explosionBoost * chakraPulse * airFlutter * 1.38;
             }
           } else if (palette === 'water_bowl' || palette === 'rich8d' || palette === 'tapping') {
             v.formantF1.frequency.setTargetAtTime(Math.min(4800, v.freq * 2.0), now, 0.08);
