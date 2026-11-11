@@ -754,11 +754,24 @@ class ConsciousnessAudioEngine {
       v.osc.frequency.setTargetAtTime(f, now, 0.06);
       v.bodyOsc.frequency.setTargetAtTime(f * 2.0, now, 0.06);
 
-      if (palette === 'water_bowl' || palette === 'water_drops' || palette === 'tapping' || palette === 'rich8d') {
+      if (palette === 'rebal') {
+        // Monroe Gateway REBAL (Resonant Energy Balloon):
+        // Silence static droning oscillators; enable Resonant Tuning Inspire/Expire Vocal Formant Breath + 3D Auricle Velvet Halo,
+        // paired with phase-synchronized Pure Harmonic 3D Energy Pulses (`_triggerRebalEnergyOnVoice`)!
+        v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantF1.Q.setTargetAtTime(6.2, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(5.4, now, 0.05);
+        v.formantGain.gain.setTargetAtTime(0.28, now, 0.06);
+        v.noiseGain.gain.setTargetAtTime(0.14, now, 0.06);
+      } else if (palette === 'water_bowl' || palette === 'water_drops' || palette === 'tapping' || palette === 'rich8d') {
         // Silence continuous droning oscillators — replaced by Pure Integer Harmonic 3D Acoustic Pulses!
         v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantF1.Q.setTargetAtTime(4.2, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(3.8, now, 0.05);
         v.formantGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.noiseGain.gain.setTargetAtTime(0.0, now, 0.03);
       } else if (palette === 'crackle') {
@@ -766,6 +779,8 @@ class ConsciousnessAudioEngine {
         v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantF1.Q.setTargetAtTime(4.2, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(3.8, now, 0.05);
         v.formantGain.gain.setTargetAtTime(0.10, now, 0.06);
         v.noiseGain.gain.setTargetAtTime(0.12, now, 0.06);
       } else if (palette === 'whisper') {
@@ -773,6 +788,8 @@ class ConsciousnessAudioEngine {
         v.toneGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.bodyGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.overtoneGain.gain.setTargetAtTime(0.0, now, 0.03);
+        v.formantF1.Q.setTargetAtTime(4.2, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(3.8, now, 0.05);
         v.formantGain.gain.setTargetAtTime(0.24, now, 0.06);
         v.noiseGain.gain.setTargetAtTime(0.14, now, 0.06);
       } else if (palette === 'shamanic') {
@@ -782,10 +799,299 @@ class ConsciousnessAudioEngine {
         v.overtoneOsc.type = 'sine';
         v.overtoneOsc.frequency.setTargetAtTime(Math.min(4800, f * 3.0), now, 0.06);
         v.overtoneGain.gain.setTargetAtTime(0.08, now, 0.06);
+        v.formantF1.Q.setTargetAtTime(4.2, now, 0.05);
+        v.formantF2.Q.setTargetAtTime(3.8, now, 0.05);
         v.formantGain.gain.setTargetAtTime(0.0, now, 0.03);
         v.noiseGain.gain.setTargetAtTime(0.0, now, 0.03);
       }
     });
+  }
+
+  /**
+   * Emits a 3D Phase-Synchronized REBAL (Resonant Energy Balloon) Vibrant Energy Pulse on Voice `v`
+   * inspired by Robert Monroe's Gateway Experience:
+   * - During INHALE (`rebalCycle >= 0.50`, Feet ▼ -> Whole Body -> Filling Head ▲):
+   *   - As energy rises through the body (`w < 0.70`), emits an ascending Just-Intonation Harmonic Chakra Pulse
+   *     with an upward bio-energy shimmer + rising vocal breath sparkle.
+   *   - As energy crosses & fills the head (`w >= 0.70`), emits a luminous Golden Cranial Chord + Hemi-Sync theta bell.
+   * - During EXHALE (`rebalCycle < 0.50`, Head -> Crown Fountain ▲ -> 2/4 Torus Spiral 🌀 -> Feet ▼):
+   *   - At the Crown (`u < 0.16`), emits a radiant overhead fountain burst (+85° Sky ▲).
+   *   - Along the spinning 3D Torus (`u >= 0.16`), emits crisp Pure Harmonic 3D Toroidal Beacons + Turning Breath Vortex
+   *     grains whose pitch and spectral band descend smoothly from Crown (+85°) around the body down to the Feet (-75°)!
+   */
+  _triggerRebalEnergyOnVoice(v, now, rebalCycle, dropLevel = 0.7, continuousLevel = 0.7) {
+    if (!this.ctx || !v || !v.preAuricle) return;
+    const dest = v.preAuricle;
+    const baseF = Math.max(48, Math.min(440, this.params.spatial.baseFreq || 144));
+    const harmAmp = Math.max(0.38, continuousLevel * 0.85 + dropLevel * 0.25);
+    const vortexAmp = Math.max(0.25, dropLevel * 0.75 + continuousLevel * 0.20);
+
+    // Record visual ripple at the exact 3D position of Voice v for the 3D radar canvas
+    const tv = this.telemetry.spatialVoices[v.index];
+    if (tv) {
+      this.telemetry.spatialRipples.push({
+        x: tv.x,
+        y: tv.y,
+        z: tv.z,
+        time: now,
+        voiceIndex: v.index,
+        palette: 'rebal'
+      });
+      if (this.telemetry.spatialRipples.length > 28) {
+        this.telemetry.spatialRipples.shift();
+      }
+    }
+
+    if (rebalCycle >= 0.50) {
+      // =========================================================================
+      // INSPIRATION / INHALE PHASE (Feet ▼ -> Rising Through Body -> Filling Head ▲)
+      // =========================================================================
+      const w = (rebalCycle - 0.50) * 2.0; // 0..1 progress of Inhale
+      if (w < 0.70) {
+        // Stage I1: Ascending through the physical body core (Feet -> Pelvis -> Heart -> Throat -> Head)
+        const c = w / 0.70; // 0 (Feet) -> 1 (Entering Head)
+        // Ascending Just-Intonation Harmonic Ladder (Root -> Maj2 -> Maj3 -> 4th -> 5th -> Maj6 -> Maj7 -> Octave)
+        const ladder = [1.0, 1.125, 1.25, 1.3333, 1.5, 1.6667, 1.875, 2.0];
+        const stepIdx = Math.min(ladder.length - 1, Math.floor(c * ladder.length));
+        const fStart = baseF * ladder[stepIdx];
+        const fEnd = fStart * 1.045; // Subtle upward energy lift during each pulse
+
+        // 1. Warm Ascending Integer Harmonic Pulse (1f..8f)
+        const bodyOsc = this.ctx.createOscillator();
+        const bodyEnv = this.ctx.createGain();
+        if (this.nodes.spatial.warmHarmonicWave && typeof bodyOsc.setPeriodicWave === 'function') {
+          bodyOsc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+        } else {
+          bodyOsc.type = 'sine';
+        }
+        bodyOsc.frequency.setValueAtTime(fStart, now);
+        bodyOsc.frequency.exponentialRampToValueAtTime(fEnd, now + 0.36);
+
+        bodyEnv.gain.setValueAtTime(0.0001, now);
+        bodyEnv.gain.linearRampToValueAtTime(0.58 * harmAmp, now + 0.006);
+        bodyEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.42);
+
+        bodyOsc.connect(bodyEnv);
+        bodyEnv.connect(dest);
+        bodyOsc.start(now);
+        bodyOsc.stop(now + 0.44);
+
+        // 2. Crisp Upper-Harmonic Pinna Elevation Pluck (6f..48f across 1-8.5 kHz so the ear tracks the vertical climb!)
+        const pinnaOsc = this.ctx.createOscillator();
+        const pinnaEnv = this.ctx.createGain();
+        if (this.nodes.spatial.pinnaHarmonicWave && typeof pinnaOsc.setPeriodicWave === 'function') {
+          pinnaOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+          pinnaOsc.frequency.setValueAtTime(fStart, now);
+          pinnaOsc.frequency.exponentialRampToValueAtTime(fEnd, now + 0.085);
+        } else {
+          pinnaOsc.type = 'sine';
+          pinnaOsc.frequency.setValueAtTime(Math.min(5200, fStart * 8.0), now);
+        }
+        pinnaEnv.gain.setValueAtTime(0.0001, now);
+        pinnaEnv.gain.linearRampToValueAtTime(0.32 * harmAmp, now + 0.003);
+        pinnaEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.095);
+
+        pinnaOsc.connect(pinnaEnv);
+        pinnaEnv.connect(dest);
+        pinnaOsc.start(now);
+        pinnaOsc.stop(now + 0.105);
+
+        // 3. Upward "Inspire" Prana Breath Rush Grain (sweeps upward with body elevation)
+        const rushDur = 0.095;
+        const rushLen = Math.floor(this.ctx.sampleRate * rushDur);
+        const rushBuf = this.ctx.createBuffer(1, rushLen, this.ctx.sampleRate);
+        const rd = rushBuf.getChannelData(0);
+        for (let i = 0; i < rushLen; i++) {
+          rd[i] = (Math.random() * 2 - 1) * Math.sin((i / rushLen) * Math.PI);
+        }
+        const rushSrc = this.ctx.createBufferSource();
+        rushSrc.buffer = rushBuf;
+        const rushBP = this.ctx.createBiquadFilter();
+        rushBP.type = 'bandpass';
+        const fLow = 1100 + c * 2200;
+        rushBP.frequency.setValueAtTime(fLow, now);
+        rushBP.frequency.exponentialRampToValueAtTime(fLow * 1.45, now + rushDur);
+        rushBP.Q.value = 3.2;
+        const rushGain = this.ctx.createGain();
+        rushGain.gain.value = 0.34 * vortexAmp;
+        rushSrc.connect(rushBP);
+        rushBP.connect(rushGain);
+        rushGain.connect(dest);
+        rushSrc.start(now);
+        rushSrc.stop(now + rushDur + 0.01);
+      } else {
+        // Stage I2: Crossing & Filling the Head with Vibrant Golden Energy (w in 0.70..1.00)
+        const chordRatios = [2.0, 2.5, 3.0, 4.0]; // Pure Just-Intonation Luminous Major Triad + Double Octave
+        const fChord = baseF * chordRatios[v.index % chordRatios.length];
+
+        // 1. Radiant Cranial Harmonic Bloom
+        const headOsc = this.ctx.createOscillator();
+        const headEnv = this.ctx.createGain();
+        if (this.nodes.spatial.warmHarmonicWave && typeof headOsc.setPeriodicWave === 'function') {
+          headOsc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+        } else {
+          headOsc.type = 'sine';
+        }
+        headOsc.frequency.setValueAtTime(fChord, now);
+
+        // Subtle Hemi-Sync Theta Shimmer Partner (+4.5 Hz Focus-10 beat inside the head)
+        const hemiOsc = this.ctx.createOscillator();
+        hemiOsc.type = 'sine';
+        hemiOsc.frequency.setValueAtTime(fChord + 4.5, now);
+        const hemiGain = this.ctx.createGain();
+        hemiGain.gain.value = 0.35;
+
+        headEnv.gain.setValueAtTime(0.0001, now);
+        headEnv.gain.linearRampToValueAtTime(0.56 * harmAmp, now + 0.010);
+        headEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.62);
+
+        headOsc.connect(headEnv);
+        hemiOsc.connect(hemiGain);
+        hemiGain.connect(headEnv);
+        headEnv.connect(dest);
+        headOsc.start(now);
+        hemiOsc.start(now);
+        headOsc.stop(now + 0.64);
+        hemiOsc.stop(now + 0.64);
+
+        // 2. Crystalline Crown Sparkle (Pinna Harmonic Wave)
+        const sparkOsc = this.ctx.createOscillator();
+        const sparkEnv = this.ctx.createGain();
+        if (this.nodes.spatial.pinnaHarmonicWave && typeof sparkOsc.setPeriodicWave === 'function') {
+          sparkOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+          sparkOsc.frequency.setValueAtTime(fChord, now);
+        } else {
+          sparkOsc.type = 'sine';
+          sparkOsc.frequency.setValueAtTime(Math.min(6400, fChord * 4.0), now);
+        }
+        sparkEnv.gain.setValueAtTime(0.0001, now);
+        sparkEnv.gain.linearRampToValueAtTime(0.30 * harmAmp, now + 0.003);
+        sparkEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.11);
+        sparkOsc.connect(sparkEnv);
+        sparkEnv.connect(dest);
+        sparkOsc.start(now);
+        sparkOsc.stop(now + 0.12);
+      }
+    } else {
+      // =========================================================================
+      // EXPIRATION / EXHALE PHASE (Crown Fountain ▲ -> 2/4 Torus Spiral 🌀 -> Feet ▼)
+      // =========================================================================
+      const u = rebalCycle * 2.0; // 0..1 progress of Exhale
+      if (u < 0.16) {
+        // Stage E1: Crown Fountain Burst (+85° Top of Head ▲)
+        const p = u / 0.16;
+        const fCrown = baseF * (2.0 + 0.5 * p); // Soaring Octave -> 12th fountain
+
+        const fountOsc = this.ctx.createOscillator();
+        const fountEnv = this.ctx.createGain();
+        if (this.nodes.spatial.warmHarmonicWave && typeof fountOsc.setPeriodicWave === 'function') {
+          fountOsc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+        } else {
+          fountOsc.type = 'sine';
+        }
+        fountOsc.frequency.setValueAtTime(fCrown, now);
+        fountOsc.frequency.exponentialRampToValueAtTime(fCrown * 1.12, now + 0.22);
+
+        fountEnv.gain.setValueAtTime(0.0001, now);
+        fountEnv.gain.linearRampToValueAtTime(0.60 * harmAmp, now + 0.004);
+        fountEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.38);
+
+        fountOsc.connect(fountEnv);
+        fountEnv.connect(dest);
+        fountOsc.start(now);
+        fountOsc.stop(now + 0.40);
+
+        // Overhead Zenith Pinna Burst (excites the 8.6 kHz Zenith Scapha Peak & 11 kHz Pinna Notch!)
+        const zenOsc = this.ctx.createOscillator();
+        const zenEnv = this.ctx.createGain();
+        if (this.nodes.spatial.pinnaHarmonicWave && typeof zenOsc.setPeriodicWave === 'function') {
+          zenOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+          zenOsc.frequency.setValueAtTime(fCrown, now);
+        } else {
+          zenOsc.type = 'sine';
+          zenOsc.frequency.setValueAtTime(Math.min(7200, fCrown * 6.0), now);
+        }
+        zenEnv.gain.setValueAtTime(0.0001, now);
+        zenEnv.gain.linearRampToValueAtTime(0.38 * harmAmp, now + 0.003);
+        zenEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.095);
+        zenOsc.connect(zenEnv);
+        zenEnv.connect(dest);
+        zenOsc.start(now);
+        zenOsc.stop(now + 0.105);
+      } else {
+        // Stage E2 & E3: Splitting in 2 or 4 directions & turning down the 3D Torus to merge at the Feet ▼
+        const t = Math.min(1.0, (u - 0.16) / 0.84); // 0 (Crown Split) -> 1 (Merged at Feet)
+        // Each of the 4 toroidal streams carries a pure harmonic ratio (Octave, 6th, 5th, Maj 3rd)
+        // that glides gently downward by an octave as the torus descends from Crown (+85°) to Feet (-75°)!
+        const branchIntervals = [2.0, 1.6667, 1.5, 1.25];
+        const branchMult = branchIntervals[v.index % branchIntervals.length];
+        const elevPitchScale = 1.15 - 0.55 * t; // High overhead at start of torus -> deep grounded root at feet
+        const fTorus = Math.max(48, baseF * branchMult * elevPitchScale);
+
+        // 1. Pure Integer Harmonic 3D Toroidal Beacon (crisp 3.5ms onset for ITD lock + warm 460ms harmonic tail)
+        const torOsc = this.ctx.createOscillator();
+        const torEnv = this.ctx.createGain();
+        if (this.nodes.spatial.warmHarmonicWave && typeof torOsc.setPeriodicWave === 'function') {
+          torOsc.setPeriodicWave(this.nodes.spatial.warmHarmonicWave);
+        } else {
+          torOsc.type = 'sine';
+        }
+        torOsc.frequency.setValueAtTime(fTorus, now);
+        torOsc.frequency.exponentialRampToValueAtTime(fTorus * 0.97, now + 0.42);
+
+        torEnv.gain.setValueAtTime(0.0001, now);
+        torEnv.gain.linearRampToValueAtTime(0.62 * harmAmp, now + 0.004);
+        torEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.46);
+
+        torOsc.connect(torEnv);
+        torEnv.connect(dest);
+        torOsc.start(now);
+        torOsc.stop(now + 0.48);
+
+        // 2. Pinna & Blauert 3D Localization Pluck (6f..48f across 1-8.5 kHz so Front/Right/Back/Left & Elevation are razor-sharp!)
+        const pinnaOsc = this.ctx.createOscillator();
+        const pinnaEnv = this.ctx.createGain();
+        if (this.nodes.spatial.pinnaHarmonicWave && typeof pinnaOsc.setPeriodicWave === 'function') {
+          pinnaOsc.setPeriodicWave(this.nodes.spatial.pinnaHarmonicWave);
+          pinnaOsc.frequency.setValueAtTime(fTorus, now);
+        } else {
+          pinnaOsc.type = 'sine';
+          pinnaOsc.frequency.setValueAtTime(Math.min(5400, fTorus * 8.0), now);
+        }
+        pinnaEnv.gain.setValueAtTime(0.0001, now);
+        pinnaEnv.gain.linearRampToValueAtTime(0.38 * harmAmp, now + 0.003);
+        pinnaEnv.gain.exponentialRampToValueAtTime(0.0005, now + 0.090);
+
+        pinnaOsc.connect(pinnaEnv);
+        pinnaEnv.connect(dest);
+        pinnaOsc.start(now);
+        pinnaOsc.stop(now + 0.10);
+
+        // 3. Toroidal Turning Vortex Breath Grain ("Expire" energy swirl around the body)
+        const swirlDur = 0.090;
+        const swirlLen = Math.floor(this.ctx.sampleRate * swirlDur);
+        const swirlBuf = this.ctx.createBuffer(1, swirlLen, this.ctx.sampleRate);
+        const sd = swirlBuf.getChannelData(0);
+        for (let i = 0; i < swirlLen; i++) {
+          sd[i] = (Math.random() * 2 - 1) * Math.sin((i / swirlLen) * Math.PI);
+        }
+        const swirlSrc = this.ctx.createBufferSource();
+        swirlSrc.buffer = swirlBuf;
+        const swirlBP = this.ctx.createBiquadFilter();
+        swirlBP.type = 'bandpass';
+        const fSwirl = Math.max(700, 4200 * (1.0 - 0.68 * t));
+        swirlBP.frequency.setValueAtTime(fSwirl, now);
+        swirlBP.frequency.exponentialRampToValueAtTime(Math.max(520, fSwirl * 0.72), now + swirlDur);
+        swirlBP.Q.value = 2.8;
+        const swirlGain = this.ctx.createGain();
+        swirlGain.gain.value = 0.36 * vortexAmp;
+        swirlSrc.connect(swirlBP);
+        swirlBP.connect(swirlGain);
+        swirlGain.connect(dest);
+        swirlSrc.start(now);
+        swirlSrc.stop(now + swirlDur + 0.01);
+      }
+    }
   }
 
   /**
@@ -1175,7 +1481,100 @@ class ConsciousnessAudioEngine {
     let splitFactor = 1.0;
     let stageLabel = '';
 
-    if (geom === 'bifurcation5m' || geom === 'bifurcation_random') {
+    if (geom === 'rebal') {
+      // MONROE GATEWAY REBAL (Resonant Energy Balloon) — 5-Stage Breath-Synchronized 3D Toroidal Loop:
+      // - EXHALE PHASE (rebalCycle in [0.00 .. 0.50]):
+      //   1. Starts in the Head, fountains UP through the Top of the Head (Crown Zenith ▲ +85°).
+      //   2. Splits into `count` (2 or 4) symmetric directions (Front/Right/Back/Left).
+      //   3. Turns/spirals downward around the outside of the body along a 3D Torus cocoon and merges at the Feet (Floor ▼ -75°).
+      // - INHALE PHASE (rebalCycle in [0.50 .. 1.00]):
+      //   4. Merged stream enters at the Feet (Floor ▼ -75°) and rises straight UP through the core of the whole body (x~0, z~0).
+      //   5. Crosses into the Head, filling up the entire cranium with vibrant resonant energy before repeating!
+      const R = 2.4 + 2.2 * asym; // ~3.5m - 4.6m toroidal cocoon radius around the body
+      const effElev = Math.max(0.35, elevScale);
+      const rebalCycle = (elapsed * speed * 0.75) % 1.0;
+      const nBranches = Math.max(2, count);
+      const branchAz = (i * Math.PI * 2) / nBranches;
+
+      if (rebalCycle < 0.50) {
+        // =========================================================
+        // EXPIRATION / EXHALE ▼ (0.00 .. 0.50 -> u in 0.00 .. 1.00)
+        // =========================================================
+        const u = rebalCycle * 2.0;
+        const startPoloidal = 0.07 * Math.PI;
+        const endPoloidal = 0.93 * Math.PI;
+        const crownY = R * 0.92 * Math.cos(startPoloidal) * effElev;
+        const crownR = R * Math.sin(startPoloidal);
+
+        if (u < 0.16) {
+          // Stage E1: Head -> Fountain Up Through Top of Head (Crown ▲ +85°) & Begin 2/4-Way Split
+          const p = u / 0.16; // 0..1
+          const bloom = p > 0.55 ? (p - 0.55) / 0.45 : 0.0;
+          const rOut = crownR * bloom;
+          x = rOut * Math.sin(branchAz);
+          z = -rOut * Math.cos(branchAz);
+          y = (0.24 * effElev) + (crownY - 0.24 * effElev) * Math.sin(p * Math.PI * 0.5);
+          splitFactor = bloom * 0.75;
+          stageLabel = p < 0.55
+            ? 'EXHALE ▼ [1/5] HEAD → FOUNTAIN UP CROWN ▲'
+            : `EXHALE ▼ [2/5] CROWN ▲ → SPLIT ${nBranches} DIRECTIONS`;
+        } else if (u < 0.86) {
+          // Stage E2: 2 or 4 Streams Turning Downward Around Outside of Body Along a 3D Torus 🌀
+          const t = (u - 0.16) / 0.70; // 0..1
+          const poloidal = startPoloidal + t * (endPoloidal - startPoloidal);
+          const horizR = R * Math.sin(poloidal);
+          y = R * 0.92 * Math.cos(poloidal) * effElev;
+          // 1.75 full helical turns around the outside of the body during the descent
+          const torusTurn = t * Math.PI * 3.5;
+          const az = branchAz + torusTurn;
+          x = horizR * Math.sin(az);
+          z = -horizR * Math.cos(az);
+          splitFactor = Math.min(1.0, Math.sin(poloidal) * 1.25);
+          stageLabel = t < 0.50
+            ? `EXHALE ▼ [2/5] ${nBranches}-WAY TORUS SPIRAL (UPPER BODY 🌀)`
+            : `EXHALE ▼ [3/5] TURNING DOWN TORUS → TOWARD FEET ▼`;
+        } else {
+          // Stage E3: Converge & Merge Back Together Under the Feet (Floor ▼ -75°)
+          const m = (u - 0.86) / 0.14; // 0..1
+          const remR = R * Math.sin(endPoloidal) * (1.0 - m);
+          const az = branchAz + Math.PI * 3.5 + m * 0.6;
+          x = remR * Math.sin(az);
+          z = -remR * Math.cos(az);
+          y = -R * 0.92 * (Math.cos(startPoloidal) + (1.0 - Math.cos(startPoloidal)) * m) * effElev;
+          splitFactor = (1.0 - m) * 0.25;
+          stageLabel = 'EXHALE ▼ [3/5] MERGE AT FEET ▼ (ROOT CONVERGENCE)';
+        }
+      } else {
+        // =========================================================
+        // INSPIRATION / INHALE ▲ (0.50 .. 1.00 -> w in 0.00 .. 1.00)
+        // =========================================================
+        const w = (rebalCycle - 0.50) * 2.0;
+        if (w < 0.70) {
+          // Stage I1: Merged Stream Enters Through Feet ▼ & Rises Straight Up Through Whole Body to Head ▲
+          const c = w / 0.70; // 0 (Feet) -> 1 (Center of Head)
+          y = -R * 0.92 * effElev * (1.0 - c);
+          // Intimate 11cm internal spinal/chakra micro-vortex right inside the central axis of the body
+          const rCore = 0.11 * Math.sin(c * Math.PI);
+          const coreSpin = c * Math.PI * 4.0;
+          x = rCore * Math.sin(coreSpin);
+          z = -rCore * Math.cos(coreSpin);
+          splitFactor = 0.0; // Merged into ONE core body column!
+          stageLabel = c < 0.48
+            ? 'INHALE ▲ [4/5] FEET ▼ → RISING UP CORE BODY'
+            : 'INHALE ▲ [4/5] HEART & THROAT → ENTERING HEAD ▲';
+        } else {
+          // Stage I2: Crosses the Head & Fills Up the Entire Cranium with Vibrant Energy ✨
+          const h = (w - 0.70) / 0.30; // 0..1
+          const rHead = 0.22 * Math.sin(h * Math.PI); // Swells to 22cm cranial halo then focuses at top of skull
+          const headSpin = branchAz + h * Math.PI * 2.5;
+          x = rHead * Math.sin(headSpin);
+          z = -rHead * Math.cos(headSpin);
+          y = 0.24 * effElev * Math.sin(h * Math.PI * 0.5);
+          splitFactor = 0.32 * Math.sin(h * Math.PI);
+          stageLabel = 'INHALE ▲ [5/5] FILLING HEAD WITH VIBRANT ENERGY ✨';
+        }
+      }
+    } else if (geom === 'bifurcation5m' || geom === 'bifurcation_random') {
       // 6-Stage Choreographed 5m Split & Merge Journeys (Classic + 6 Random Evolving Variations):
       // Every variation starts inside the Head (0,0,0), travels out to 5m, duplicates into two symmetric branches
       // along 5m spherical arcs (Left/Right, Top Zenith ▲, Floor ▼, Front, Back), merges at a 5m pole,
@@ -2832,10 +3231,25 @@ class ConsciousnessAudioEngine {
         const asym = this.params.spatial.asymmetry;
         const rawCount = Math.max(1, Math.min(8, Math.round(this.params.spatial.count || 2)));
         const trajectory = this.params.spatial.trajectory || 'bifurcation_random';
-        const isBifurcationMode = trajectory === 'bifurcation5m' || trajectory === 'bifurcation_random';
-        // Ensure at least 2 voices when using 5m Split & Merge so Left & Right duplication is always active
-        const count = isBifurcationMode ? Math.max(2, rawCount) : rawCount;
         const palette = this.params.spatial.palette || 'water_bowl';
+        const isRebalMode = trajectory === 'rebal';
+        const isBifurcationMode = trajectory === 'bifurcation5m' || trajectory === 'bifurcation_random' || isRebalMode;
+        // Ensure at least 2 voices when using 5m Split & Merge or REBAL so directional splitting is always active
+        const count = isBifurcationMode ? Math.max(2, rawCount) : rawCount;
+        const rebalCycle = (elapsed * speed * 0.75) % 1.0;
+
+        // When REBAL is active, synchronize the global 0.1 Hz Breath telemetry (INHALE ▲ / EXHALE ▼) directly to the REBAL breath loop!
+        if (isRebalMode || palette === 'rebal') {
+          if (rebalCycle < 0.50) {
+            const u = rebalCycle * 2.0; // 0..1 Exhale progress -> breathPhase in (PI/2 .. 3*PI/2) (cos < 0 => EXHALE ▼)
+            this.telemetry.breathPhase = Math.PI * 0.501 + u * Math.PI * 0.998;
+          } else {
+            const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale progress -> breathPhase in (3*PI/2 .. 5*PI/2) (cos > 0 => INHALE ▲)
+            this.telemetry.breathPhase = (Math.PI * 1.501 + w * Math.PI * 0.998) % (Math.PI * 2);
+          }
+          this.telemetry.breathValue = Math.sin(this.telemetry.breathPhase);
+        }
+
         // Crossfade Balance (`pulse` in 0..1):
         //  0.00 = 100% Pure 3D Water Drops / ASMR Triggers Only (0% Continuous Moving Harmonic Pad)
         //  0.50 = Balanced 3D Water Drops + Moving Harmonic Pad
@@ -2862,7 +3276,7 @@ class ConsciousnessAudioEngine {
           this.nodes.spatial.nextOvertoneStepTime = now + (1.1 + Math.random() * 1.3);
         }
 
-        // Schedule 3D Spatialized Water Drops & Pure Integer Harmonic 3D Acoustic Pulses on the active moving 3D sources!
+        // Schedule 3D Spatialized Water Drops, REBAL Toroidal Energy Pulses & Pure Integer Harmonic 3D Acoustic Pulses!
         const effectiveRate = Math.max(0.4, triggerRate || 3.2);
         const curSplit =
           isBifurcationMode && this.telemetry.spatialVoices[0] && this.telemetry.spatialVoices[0].splitFactor !== undefined
@@ -2885,18 +3299,24 @@ class ConsciousnessAudioEngine {
           const vIdx = isMergedBifurcation ? 0 : this.nodes.spatial.lastTriggeredVoice % count;
           this.nodes.spatial.lastTriggeredVoice = (vIdx + 1) % count;
 
-          if (dropLevel > 0.01) {
-            this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
-          }
-          if (continuousLevel > 0.01) {
-            // Pure Integer Harmonic 3D Pluck (slight 18ms offset when blended with water drop so both transients are crystal clear)
-            const hOffset = dropLevel > 0.05 ? 0.018 : 0.0;
-            this._triggerPureHarmonic3DOnVoice(voices[vIdx], now + hOffset, continuousLevel);
+          if (palette === 'rebal') {
+            this._triggerRebalEnergyOnVoice(voices[vIdx], now, rebalCycle, dropLevel, continuousLevel);
+          } else {
+            if (dropLevel > 0.01) {
+              this._triggerSpatialEventOnVoice(voices[vIdx], now, palette, auricle);
+            }
+            if (continuousLevel > 0.01) {
+              // Pure Integer Harmonic 3D Pluck (slight 18ms offset when blended with water drop so both transients are crystal clear)
+              const hOffset = dropLevel > 0.05 ? 0.018 : 0.0;
+              this._triggerPureHarmonic3DOnVoice(voices[vIdx], now + hOffset, continuousLevel);
+            }
           }
 
-          // When split into 2 branches (Left & Right), step cleanly between Left & Right so both 3D trajectories are distinctly localized
-          const splitCadenceBoost = isBifurcationMode && !isMergedBifurcation ? (1.0 + 0.75 * curSplit) : 1.0;
-          const dt = (1.0 / (effectiveRate * splitCadenceBoost)) * (0.78 + Math.random() * 0.44);
+          // When split into 2 or 4 branches, step cleanly across all branches so the 3D torus/arcs are distinctly localized
+          const splitCadenceBoost = isRebalMode && !isMergedBifurcation
+            ? (1.15 + 0.35 * count * curSplit)
+            : (isBifurcationMode && !isMergedBifurcation ? (1.0 + 0.75 * curSplit) : 1.0);
+          const dt = (1.0 / (effectiveRate * splitCadenceBoost)) * (0.80 + Math.random() * 0.40);
           this.nodes.spatial.nextTriggerTime = now + dt;
         }
 
@@ -3033,28 +3453,50 @@ class ConsciousnessAudioEngine {
           v.earGainR.gain.setTargetAtTime(gR, now, spatTc);
 
           // 8. Continuous Moving Texture Harmonics & Formants:
-          // For tonal harmonic palettes ('water_bowl', 'rich8d', 'tapping'), lock resonator filters to pure integer harmonics (2x & 3x) of v.freq!
-          if (palette === 'water_bowl' || palette === 'rich8d' || palette === 'tapping') {
+          let contMod = continuousLevel;
+          if (palette === 'rebal') {
+            // Monroe Gateway REBAL Inspire / Expire Vibrant Breath & Vocal Formant Sweep:
+            // - On EXHALE ▼ (rebalCycle < 0.50, u in 0..1): Crown Fountain ("HAAA" 690/2230 Hz) -> Toroidal Swirl -> Feet ("OOO" 310/780 Hz)
+            // - On INHALE ▲ (rebalCycle >= 0.50, w in 0..1): Feet ("OOO" 300/820 Hz) -> Heart ("AHH" 640/1280 Hz) -> Filling Head ("EEE" 440/2550 Hz)
+            const breathCarrierLvl = Math.max(0.28, continuousLevel);
+            if (rebalCycle < 0.50) {
+              const u = rebalCycle * 2.0; // 0..1 Exhale
+              const f1 = 310 + 380 * (1.0 - u);
+              const f2 = 780 + 1450 * Math.pow(1.0 - u, 1.25);
+              v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
+              v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
+              const exhaleEnv = Math.sin(Math.pow(u, 0.72) * Math.PI);
+              const torusSwirl = 0.72 + 0.28 * Math.sin(u * Math.PI * 7.0 + (i * Math.PI * 2) / Math.max(2, count));
+              contMod = breathCarrierLvl * exhaleEnv * torusSwirl * 1.15;
+            } else {
+              const w = (rebalCycle - 0.50) * 2.0; // 0..1 Inhale
+              const f1 = 300 + 340 * Math.sin(w * Math.PI * 0.85);
+              const f2 = 820 + 1750 * Math.pow(w, 1.15);
+              v.formantF1.frequency.setTargetAtTime(f1, now, spatTc);
+              v.formantF2.frequency.setTargetAtTime(f2, now, spatTc);
+              const inhaleEnv = Math.sin(Math.pow(w, 0.85) * Math.PI);
+              const chakraPulse = 0.82 + 0.18 * Math.sin(w * Math.PI * 10.0);
+              contMod = breathCarrierLvl * inhaleEnv * chakraPulse * 1.20;
+            }
+          } else if (palette === 'water_bowl' || palette === 'rich8d' || palette === 'tapping') {
             v.formantF1.frequency.setTargetAtTime(Math.min(4800, v.freq * 2.0), now, 0.08);
             v.formantF2.frequency.setTargetAtTime(Math.min(6400, v.freq * 3.0), now, 0.08);
+            if (palette === 'water_bowl' || palette === 'rich8d') {
+              const bowlShimmer = 0.88 + 0.12 * Math.sin(elapsed * 1.15 + i * 1.5);
+              contMod = continuousLevel * bowlShimmer;
+            }
           } else {
             const [f1, f2] = this._vowelFormants(elapsed * (0.38 + i * 0.09) + i * 1.3);
             const fScale = palette === 'whisper' ? 1.25 : palette === 'water_drops' ? 1.45 : 1.1;
             v.formantF1.frequency.setTargetAtTime(f1 * fScale, now, 0.06);
             v.formantF2.frequency.setTargetAtTime(f2 * fScale, now, 0.06);
-          }
-
-          // Syllabic / liquid / singing-bowl shimmer modulation on the continuous moving carrier
-          let contMod = continuousLevel;
-          if (palette === 'water_bowl' || palette === 'rich8d') {
-            const bowlShimmer = 0.88 + 0.12 * Math.sin(elapsed * 1.15 + i * 1.5);
-            contMod = continuousLevel * bowlShimmer;
-          } else if (palette === 'whisper') {
-            const syllable = 0.60 + 0.40 * Math.sin(elapsed * 2.4 + i) * Math.cos(elapsed * 3.9 - i);
-            contMod = continuousLevel * syllable;
-          } else if (palette === 'water_drops') {
-            const streamRipple = 0.72 + 0.28 * Math.sin(elapsed * 4.5 + i * 1.7) * Math.cos(elapsed * 7.1);
-            contMod = continuousLevel * streamRipple;
+            if (palette === 'whisper') {
+              const syllable = 0.60 + 0.40 * Math.sin(elapsed * 2.4 + i) * Math.cos(elapsed * 3.9 - i);
+              contMod = continuousLevel * syllable;
+            } else if (palette === 'water_drops') {
+              const streamRipple = 0.72 + 0.28 * Math.sin(elapsed * 4.5 + i * 1.7) * Math.cos(elapsed * 7.1);
+              contMod = continuousLevel * streamRipple;
+            }
           }
           v.pulseGain.gain.setTargetAtTime(contMod, now, spatTc);
           v.triggerInput.gain.setTargetAtTime(dropLevel, now, spatTc);

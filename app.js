@@ -263,6 +263,35 @@ document.addEventListener('DOMContentLoaded', () => {
       sub: { enabled: true, gain: 0.32, freq: 36.0, pulse: 0.8, warmth: 0.40 },
       ganzfeld: { enabled: false, gain: 0.18, color: 0.60, sweep: 0.40 },
       asmr: { enabled: false }
+    },
+    rebalGateway: {
+      name: 'REBAL // MONROE GATEWAY',
+      mechTitle: 'Neuro-Mechanism: Monroe Gateway REBAL (Resonant Energy Balloon) & 3D Toroidal Breath Entrainment',
+      mechText:
+        'Inspired by Robert Monroe’s Gateway Experience: on Expiration (Exhale ▼), vibrant resonant breath and pure harmonic beacons fountain out the top of the head (+85° Crown ▲), split into 4 directions, and spiral down a 3D Torus around your body to merge at your feet (-75° Floor ▼). On Inspiration (Inhale ▲), the merged energy rises straight up through your whole body core into the cranium, filling your head with golden Hemi-Sync resonance.',
+      reverbMix: 0.44,
+      spatial: {
+        enabled: true,
+        palette: 'rebal',
+        trajectory: 'rebal',
+        count: 4,
+        baseFreq: 144,
+        gain: 0.92,
+        speed: 0.12,
+        pulse: 0.58,
+        rate: 4.2,
+        auricle: 0.95,
+        elevation: 0.95,
+        collapse: 0.0,
+        asymmetry: 0.85,
+        tuning: 'just'
+      },
+      chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.50 },
+      pac: { enabled: true, baseFreq: 144, gain: 0.46, harmonics: 0.42, theta: 4.5, gamma: 40, depth: 0.58, breath: 0.90 },
+      fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 144 },
+      sub: { enabled: true, gain: 0.48, freq: 36.0, pulse: 0.9, warmth: 0.52 },
+      ganzfeld: { enabled: false, gain: 0.18, color: 0.65, sweep: 0.45 },
+      asmr: { enabled: false }
     }
   };
 
@@ -638,6 +667,27 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSelect('spatialPalette', 'spatial', 'palette');
   bindSelect('spatialTrajectory', 'spatial', 'trajectory');
   bindSelect('spatialTuning', 'spatial', 'tuning');
+
+  // When selecting REBAL in the Palette dropdown, automatically pair it with the REBAL Toroidal Breath Trajectory & 4 Directions
+  const spatialPaletteSelect = document.getElementById('spatialPalette');
+  if (spatialPaletteSelect) {
+    spatialPaletteSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'rebal') {
+        const trajEl = document.getElementById('spatialTrajectory');
+        if (trajEl && trajEl.value !== 'rebal') {
+          trajEl.value = 'rebal';
+          engine.updateModule('spatial', 'trajectory', 'rebal');
+        }
+        const countEl = document.getElementById('spatialCount');
+        const countValEl = document.getElementById('spatialCountVal');
+        if (countEl && Number(countEl.value) < 4) {
+          countEl.value = 4;
+          if (countValEl) countValEl.textContent = '4 Sources';
+          engine.updateModule('spatial', 'count', 4);
+        }
+      }
+    });
+  }
 
   bindSlider('spatialCount', 'spatial', 'count', (v) => `${Math.round(v)} ${Math.round(v) === 1 ? 'Source' : 'Sources'}`);
   bindSlider('spatialBaseFreq', 'spatial', 'baseFreq', (v) => {
@@ -1402,18 +1452,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
     const rawCount = engine.params.spatial.count || 2;
+    const isRebal = engine.params.spatial.trajectory === 'rebal';
     const isBifurcation =
       engine.params.spatial.trajectory === 'bifurcation5m' ||
-      engine.params.spatial.trajectory === 'bifurcation_random';
+      engine.params.spatial.trajectory === 'bifurcation_random' ||
+      isRebal;
     const activeCount = isBifurcation ? Math.max(2, rawCount) : rawCount;
     const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
 
-    // Show live 6-Stage Choreography Banner when in 5m Split & Merge mode
+    // Draw REBAL Toroidal Cocoon Meridians & Cranial/Core Energy Glow when in REBAL mode
+    if (isRebal && voices[0]) {
+      const stageTxt = voices[0].stageLabel || '';
+      const isInhalePhase = stageTxt.startsWith('INHALE');
+      const isFillingHead = stageTxt.includes('FILLING HEAD');
+
+      // Subtle 4-quadrant Toroidal Meridian Rings around the body
+      ctx2d.save();
+      ctx2d.strokeStyle = isInhalePhase ? 'rgba(56, 189, 248, 0.14)' : 'rgba(167, 139, 250, 0.18)';
+      ctx2d.lineWidth = 1.2;
+      for (let m = 0; m < 4; m++) {
+        const ang = (m * Math.PI) / 4 + nowMs * 0.0003;
+        ctx2d.beginPath();
+        ctx2d.ellipse(cx, cy, scale * 1.38, scale * 0.62, ang, 0, Math.PI * 2);
+        ctx2d.stroke();
+      }
+      ctx2d.restore();
+
+      // Golden-Cyan Cranial Energy Aura when Inhale fills the head with energy
+      if (isInhalePhase) {
+        const headGlowRad = isFillingHead ? 38 + Math.sin(nowMs * 0.012) * 8 : 24;
+        const headGrad = ctx2d.createRadialGradient(cx, cy, 2, cx, cy, headGlowRad);
+        headGrad.addColorStop(0, isFillingHead ? 'rgba(251, 191, 36, 0.65)' : 'rgba(56, 189, 248, 0.45)');
+        headGrad.addColorStop(0.55, isFillingHead ? 'rgba(56, 189, 248, 0.32)' : 'rgba(167, 139, 250, 0.18)');
+        headGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx2d.fillStyle = headGrad;
+        ctx2d.beginPath();
+        ctx2d.arc(cx, cy, headGlowRad, 0, Math.PI * 2);
+        ctx2d.fill();
+      }
+    }
+
+    // Show live Stage Choreography Banner when in REBAL or 5m Split & Merge mode
     if (isBifurcation && voices[0] && voices[0].stageLabel) {
-      ctx2d.fillStyle = 'rgba(56, 189, 248, 0.88)';
+      const prefix = isRebal ? 'REBAL TORUS' : '5m SPLIT & MERGE';
+      const isInhale = voices[0].stageLabel.startsWith('INHALE');
+      ctx2d.fillStyle = isRebal
+        ? (isInhale ? 'rgba(251, 191, 36, 0.95)' : 'rgba(167, 139, 250, 0.95)')
+        : 'rgba(56, 189, 248, 0.88)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
       ctx2d.textAlign = 'center';
-      ctx2d.fillText(`5m SPLIT & MERGE // ${voices[0].stageLabel}`, cx, 36);
+      ctx2d.fillText(`${prefix} // ${voices[0].stageLabel}`, cx, 36);
       ctx2d.textAlign = 'left';
     }
 
@@ -1421,8 +1509,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const energy = v.activeEnergy !== undefined ? v.activeEnergy : 1.0;
       if (energy < 0.01) return;
 
-      // When paired voices are merged into ONE sound in 'bifurcation5m', skip drawing the duplicate odd voice label/orb overlap
-      const isMergedOdd = isBifurcation && (v.index % 2 === 1) && v.splitFactor !== undefined && v.splitFactor < 0.06;
+      // When voices are merged into ONE stream (in 'rebal' core ascent/feet or 'bifurcation5m'), skip drawing duplicate overlapping labels
+      const isMergedOdd = isRebal
+        ? (v.index > 0 && v.splitFactor !== undefined && v.splitFactor < 0.08)
+        : (isBifurcation && (v.index % 2 === 1) && v.splitFactor !== undefined && v.splitFactor < 0.06);
 
       const palette = [
         '56, 189, 248',  // Cyan
