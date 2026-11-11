@@ -1,872 +1,904 @@
 /**
- * AETHER // MODULE 1 — High-Precision 3D Binaural Spatializer & REBAL Energy Torus
+ * AETHER // MODULE 01 — 3D sound space and REBAL (Resonant Energy Balloon)
  *
- * Implements an explicit, psychoacoustically validated dual-ear binaural engine:
- *  1. Left / Right Localization:
- *     - Exact spherical Woodworth ITD (Interaural Time Difference): 0 to 660 µs delay
- *     - Acoustic Head Shadow ILD (Interaural Level Difference): up to -18 dB high-frequency attenuation
- *     - Contralateral head-shadow low-pass filter (20 kHz down to 1.6 kHz)
- *     - Dedicated ChannelMerger(2) ensuring 100% pure stereo channel isolation
- *  2. Front / Back Discrimination:
- *     - Front (+Z < 0): concha resonance boost (+3.5 dB at 3.6 kHz), open air up to 18 kHz
- *     - Back (+Z > 0): pinna flap obstruction filter (steep 2nd-order low-pass down to 3.5 kHz, -8 dB notch at 7 kHz)
- *  3. Up (Zenith / Crown) vs. Down (Ground / Feet):
- *     - Up (+Y > 0): open-sky zenith brilliance (+8 dB at 8 kHz), low-frequency chest decoupling (-6 dB),
- *       vocal formant ascent ("oo" -> "aa" -> "ee"), and Pratt pitch-height elevation lift (+2 semitones)
- *     - Down (-Y < 0): torso/jaw acoustic shadow (low-pass down to 1.8 kHz), chest cavity resonance (+8 dB at 180 Hz),
- *       dark "oo/om" vowel formant, and grounded pitch anchoring (-2 semitones)
- *  4. Monroe Gateway REBAL Apple-Torus Trajectory:
- *     - Exhale (0 -> 50% cycle): Energy bursts out of the crown (+Y), arcs HIGH above the head (+1.5m),
- *       splits left & right, spirals DOWN outside the body passing ear level to below the feet (-Y).
- *     - Inhale (50 -> 100% cycle): Merged energy enters the soles of the feet, rises straight UP the body core
- *       through the spine into the cranium, building in luminance and radiance!
+ * Sound generators + trajectories. Every stream is a mono source rendered by the binaural renderer
+ * (binaural-renderer.js) at a scheduled 3-D position. Positions and sound parameters are computed for
+ * `now + LOOKAHEAD` and scheduled as linear ramps, so motion stays smooth even with an irregular UI frame rate.
+ *
+ * Coordinates (metres, head-centred): +x right ear, +y up (crown), -z in front of the nose.
+ *
+ * REBAL, after the Gateway Experience manual (Discovery #3, "Advanced Focus 10"):
+ *   "Create a flow pattern with your breath by letting energy flow out of the top of your head like a
+ *    fountain, allowing it to continue flowing gently down and around you, and then reentering your body
+ *    through the bottoms of your feet. Then shift the flow pattern into a spiral, winding the energy down
+ *    around you and coiling it back up inside you."
+ *
+ *   inhale  : the energy rises inside the body, from the soles to the crown (heard inside the head);
+ *   exhale  : it leaves the crown upwards (fountain), arcs over, flows down around the body on the outside
+ *             of an apple-shaped torus, curls under the feet and re-enters through the soles;
+ *   spiral  : same torus, but the outer flow winds around you and the inner flow coils back up;
+ *   balloon : the streams keep circulating around the torus with staggered phases (the sustained field).
  */
+(function (global) {
+  'use strict';
 
-(function () {
-  const MAX_VOICES = 4;
-  const SPEED_OF_SOUND = 343; // m/s
-  const HEAD_RADIUS = 0.0875; // average human head radius (8.75 cm)
-  const LOOKAHEAD = 0.12;
-
-  // REBAL body geometry (metres, listener's ears at origin [0, 0, 0])
-  const REBAL_CROWN_Y = 0.22;   // top of the head
-  const REBAL_FEET_Y = -1.65;   // ground/feet level
-
-  const PALETTES = ['energy', 'bowl', 'drops', 'chimes'];
-  const TRAJECTORIES = ['rebal', 'orbit', 'vertical', 'sphere', 'manual'];
-
-  const PALETTE_ALIASES = {
-    rebal: 'energy', whisper: 'energy', rich8d: 'energy',
-    water_bowl: 'bowl', shamanic: 'bowl',
-    water_drops: 'drops',
-    crackle: 'chimes', tapping: 'chimes'
-  };
-  const TRAJECTORY_ALIASES = {
-    orbit8d: 'orbit', circle: 'orbit', spiral: 'orbit', torus: 'orbit', peripersonal: 'orbit',
-    zenith_arch: 'vertical', radial: 'vertical',
-    helix3d: 'sphere', infinity: 'sphere', mixed: 'sphere', bifurcation5m: 'sphere', bifurcation_random: 'sphere'
-  };
-
-  // Consonant sacred ratios (Root 108 Hz foundation: Root, 5th, Octave, 12th)
-  const REBAL_ROOT = 108.0;
-  const REBAL_RATIOS = [1.0, 1.5, 2.0, 3.0];
-  const BOWL_FREQS = [216.0, 270.0, 324.0, 432.0];
-  const CHIME_FREQS = [540.0, 648.0, 756.0, 864.0, 1080.0, 1296.0, 1512.0, 1728.0];
-
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const TAU = Math.PI * 2;
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const lerp = (a, b, t) => a + (b - a) * t;
+  const smooth = (e0, e1, v) => {
+    const t = clamp((v - e0) / (e1 - e0), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(u, 0, 1));
 
+  const MAX_STREAMS = 6;
+  const LOOKAHEAD = 0.15; // seconds: audio parameters are scheduled this far ahead
+  const UPDATE_DT = 0.024; // seconds between scheduled control points
+
+  // Body / torus geometry (head frame, metres)
+  const Y_CROWN = 0.13; // top of the head above the ear canals
+  const Y_FEET = -1.62; // soles of the feet
+  // Meridian (r = horizontal distance from the body axis, y = height) of the outer flow for a 1.9 m balloon:
+  // crown -> fountain jet -> apex -> over -> widest beside the body -> under the feet -> into the soles.
+  const MERIDIAN = [
+    [0.0, 0.13], [0.02, 0.5], [0.12, 0.95], [0.45, 1.28], [1.05, 1.18], [1.62, 0.55],
+    [1.9, -0.45], [1.7, -1.35], [1.1, -1.98], [0.4, -2.05], [0.05, -1.78], [0.0, -1.62]
+  ];
+  const SEG_TIME = [1.0, 1.0, 1.05, 1.05, 1.0, 1.0, 1.0, 1.0, 0.95, 0.85, 0.6]; // relative time per segment
+  const BASE_RADIUS = 1.9;
+
+  // Musical material: stream roots form an open major chord over the tonal centre
+  const STREAM_RATIOS = [1, 1.5, 2, 2.5, 3, 4];
+  const PENTA = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2]; // just pentatonic (+ octave)
+
+  const PALETTES = ['breath', 'choir', 'water', 'bowl', 'chimes'];
+  const TRAJECTORIES = ['rebal', 'orbit', 'vertical', 'sphere', 'test', 'manual'];
+  const REBAL_MODES = ['program', 'fountain', 'spiral', 'balloon'];
+  const PALETTE_ALIASES = { energy: 'breath', rebal: 'breath', drops: 'water', water_drops: 'water', whisper: 'breath', crackle: 'chimes', tapping: 'chimes' };
+  const TRAJECTORY_ALIASES = { orbit8d: 'orbit', circle: 'orbit', zenith_arch: 'vertical', helix3d: 'sphere', infinity: 'sphere', mixed: 'sphere' };
+
+  const TEST_POINTS = [
+    { name: 'FRONT', az: 0, el: 0 }, { name: 'RIGHT', az: 90, el: 0 }, { name: 'BEHIND', az: 180, el: 0 },
+    { name: 'LEFT', az: -90, el: 0 }, { name: 'ABOVE', az: 0, el: 80 }, { name: 'BELOW', az: 0, el: -60 },
+    { name: 'FRONT-RIGHT, UP', az: 45, el: 40 }, { name: 'BEHIND-LEFT, DOWN', az: -135, el: -35 },
+    { name: 'FRONT-LEFT', az: -45, el: 0 }, { name: 'BEHIND-RIGHT', az: 135, el: 0 }
+  ];
+
+  // ===========================================================================================
+  // Breath clock (shared by every module)
+  // ===========================================================================================
+  class BreathClock {
+    constructor(params) {
+      this.params = params;
+      this.phase = 0; // in breaths (cycles)
+      this.t = null;
+      this.hist = [];
+    }
+
+    durations() {
+      const p = this.params || {};
+      const cycleT = 60 / clamp(p.rate || 6, 2, 20);
+      const holdIn = clamp(p.holdIn || 0, 0, 10);
+      const holdOut = clamp(p.holdOut || 0, 0, 10);
+      const active = Math.max(2, cycleT - holdIn - holdOut);
+      const share = clamp(p.inhale !== undefined ? p.inhale : 0.45, 0.25, 0.65);
+      return { inhale: active * share, holdIn, exhale: active * (1 - share), holdOut, cycle: active + holdIn + holdOut };
+    }
+
+    advance(t) {
+      if (this.t === null) {
+        this.t = t;
+      } else {
+        const dt = clamp(t - this.t, 0, 0.5);
+        if (dt > 0) {
+          this.phase += dt / this.durations().cycle;
+          this.t = t;
+        }
+      }
+      const h = this.hist;
+      if (!h.length || t > h[h.length - 1][0]) {
+        h.push([t, this.phase]);
+        if (h.length > 400) h.shift();
+      }
+      return this.phase;
+    }
+
+    /** breath phase heard at audio time t (the clock itself runs LOOKAHEAD ahead) */
+    phaseAt(t) {
+      const h = this.hist;
+      if (!h.length) return this.phase;
+      if (t >= h[h.length - 1][0]) return h[h.length - 1][1];
+      for (let i = h.length - 1; i > 0; i--) {
+        if (h[i - 1][0] <= t) {
+          const [t0, p0] = h[i - 1];
+          const [t1, p1] = h[i];
+          return p0 + (p1 - p0) * ((t - t0) / Math.max(1e-6, t1 - t0));
+        }
+      }
+      return h[0][1];
+    }
+
+    state(phase) {
+      const d = this.durations();
+      const cycle = Math.floor(phase);
+      let tt = (phase - cycle) * d.cycle;
+      let stage;
+      let p;
+      if (tt < d.inhale) {
+        stage = 'inhale'; p = tt / d.inhale;
+      } else if ((tt -= d.inhale) < d.holdIn) {
+        stage = 'holdIn'; p = tt / d.holdIn;
+      } else if ((tt -= d.holdIn) < d.exhale) {
+        stage = 'exhale'; p = tt / d.exhale;
+      } else {
+        tt -= d.exhale; stage = 'holdOut'; p = d.holdOut > 0 ? tt / d.holdOut : 1;
+      }
+      const lung = stage === 'inhale' ? ease(p) : stage === 'holdIn' ? 1 : stage === 'exhale' ? 1 - ease(p) : 0;
+      return { cycle, stage, p: clamp(p, 0, 1), lung, d };
+    }
+  }
+
+  // ===========================================================================================
+  // REBAL geometry (pure functions; exported for tests and for the visualiser)
+  // ===========================================================================================
+  const meridianCache = new Map();
+
+  function scaledMeridian(L) {
+    const key = Math.round(L * 100);
+    if (meridianCache.has(key)) return meridianCache.get(key);
+    const k = L / BASE_RADIUS;
+    const vs = 0.55 + 0.45 * k;
+    const pts = MERIDIAN.map(([r, y]) => {
+      let yy = y;
+      if (y > Y_CROWN) yy = Y_CROWN + (y - Y_CROWN) * vs;
+      else if (y < Y_FEET) yy = Y_FEET + (y - Y_FEET) * vs;
+      return [r * k, yy];
+    });
+    const cum = [0];
+    SEG_TIME.forEach((w) => cum.push(cum[cum.length - 1] + w));
+    const res = { pts, cum, total: cum[cum.length - 1] };
+    meridianCache.set(key, res);
+    if (meridianCache.size > 64) meridianCache.delete(meridianCache.keys().next().value);
+    return res;
+  }
+
+  // Centripetal Catmull-Rom between p1 and p2
+  function catmull(p0, p1, p2, p3, u) {
+    const tj = (ti, a, b) => ti + Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]) + 1e-9, 0.5);
+    const t0 = 0;
+    const t1 = tj(t0, p0, p1);
+    const t2 = tj(t1, p1, p2);
+    const t3 = tj(t2, p2, p3);
+    const t = t1 + (t2 - t1) * u;
+    const mix = (a, b, ta, tb) => [((tb - t) * a[0] + (t - ta) * b[0]) / (tb - ta), ((tb - t) * a[1] + (t - ta) * b[1]) / (tb - ta)];
+    const A1 = mix(p0, p1, t0, t1);
+    const A2 = mix(p1, p2, t1, t2);
+    const A3 = mix(p2, p3, t2, t3);
+    const B1 = mix(A1, A2, t0, t2);
+    const B2 = mix(A2, A3, t1, t3);
+    return mix(B1, B2, t1, t2);
+  }
+
+  /** position on the outer (exhale) meridian, s in [0, 1] (time-uniform per SEG_TIME) */
+  function meridianAt(s, L) {
+    const m = scaledMeridian(L);
+    const P = m.pts;
+    const n = P.length;
+    const x = clamp(s, 0, 1) * m.total;
+    let i = 0;
+    while (i < n - 2 && m.cum[i + 1] < x) i++;
+    const u = clamp((x - m.cum[i]) / (m.cum[i + 1] - m.cum[i]), 0, 1);
+    const get = (j) => {
+      if (j < 0) return [2 * P[0][0] - P[1][0], 2 * P[0][1] - P[1][1]];
+      if (j > n - 1) return [2 * P[n - 1][0] - P[n - 2][0], 2 * P[n - 1][1] - P[n - 2][1]];
+      return P[j];
+    };
+    const q = catmull(get(i - 1), get(i), get(i + 1), get(i + 2), u);
+    return { r: Math.max(0, q[0]), y: q[1] };
+  }
+
+  /** interior weight along the outer path: inside the head at the start, partly inside at the soles */
+  function exhaleInterior(s) {
+    return 1 - smooth(0.0, 0.16, s) + 0.3 * smooth(0.9, 1.0, s);
+  }
+  function inhaleInterior(y) {
+    return 0.3 + 0.7 * smooth(Y_FEET, -0.35, y);
+  }
+
+  /** fraction of the spiral winding done at exhale progress s: trapezoidal angular speed (gentle start/stop) */
+  function windFrac(s) {
+    const a = 0.06, b = 0.97, q = 0.15;
+    const u = clamp((s - a) / (b - a), 0, 1);
+    const A = 1 - q;
+    let F;
+    if (u < q) F = (u * u) / (2 * q);
+    else if (u <= 1 - q) F = q / 2 + (u - q);
+    else F = A - ((1 - u) * (1 - u)) / (2 * q);
+    return F / A;
+  }
+
+  /** azimuth of stream k (0 = front, +pi/2 = right) */
+  function baseAzimuth(k, n, cycle) {
+    if (n === 1) return (Math.PI / 2) * (cycle % 4) + Math.PI / 2; // rotates 90° per breath: right, back, left, front
+    return Math.PI / 2 + (TAU * k) / n;
+  }
+
+  /**
+   * REBAL position of stream k for breath state st.
+   * mode: 'fountain' | 'spiral' | 'balloon'; opts: { L, turns, twist, n, offset }
+   * returns { x, y, z, w, path: 'core'|'outer'|'head'|'feet', s }
+   */
+  function rebalPosition(st, k, mode, opts) {
+    const L = opts.L;
+    const n = opts.n;
+    let az0 = baseAzimuth(k, n, st.cycle) + (opts.rotate || 0);
+    const turns = opts.turns || 0;
+    const out = { x: 0, y: 0, z: 0, w: 0, path: 'core', s: 0 };
+    if (st.stage === 'exhale') {
+      const s = st.p;
+      const m = meridianAt(s, L);
+      let az = az0 + (opts.twist || 0) * TAU * s;
+      if (mode === 'spiral') az += turns * TAU * windFrac(s);
+      out.x = m.r * Math.sin(az);
+      out.z = -m.r * Math.cos(az);
+      out.y = m.y;
+      out.w = exhaleInterior(s);
+      out.path = 'outer';
+      out.s = s;
+      out.az = az;
+      return out;
+    }
+    if (st.stage === 'inhale') {
+      const p = st.p;
+      const y = Y_FEET + (Y_CROWN - Y_FEET) * (p * p * (3 - 2 * p));
+      let r = 0;
+      let az = az0;
+      if (mode === 'spiral') {
+        r = 0.17 * Math.pow(Math.sin(Math.PI * p), 0.8) * (1 - smooth(0.8, 1.0, p));
+        az = az0 + turns * TAU + 2 * TAU * p; // keeps turning the same way, coiling up inside
+      }
+      out.x = r * Math.sin(az);
+      out.z = -r * Math.cos(az);
+      out.y = y;
+      out.w = inhaleInterior(y);
+      out.path = 'core';
+      out.s = p;
+      out.az = az;
+      return out;
+    }
+    if (st.stage === 'holdIn') {
+      const a = az0 + TAU * 0.6 * st.p;
+      out.x = 0.05 * Math.sin(a);
+      out.z = -0.05 * Math.cos(a);
+      out.y = Y_CROWN - 0.03;
+      out.w = 1;
+      out.path = 'head';
+      return out;
+    }
+    out.x = 0;
+    out.z = 0;
+    out.y = Y_FEET;
+    out.w = 0.3;
+    out.path = 'feet';
+    return out;
+  }
+
+  // ===========================================================================================
+  // Module
+  // ===========================================================================================
   class Spatial3DModule {
     constructor(engine) {
       this.engine = engine;
       this.ctx = engine.ctx;
       this.params = engine.params.spatial;
+      this.renderer = engine.renderer;
+      this.breath = engine.breath;
       this.telemetry = engine.telemetry;
-      this._normalizeParams();
+      this._normalize();
 
-      this.phase = 0;
-      this.lastNow = 0;
-      this.lastCycleIdx = -1;
-      this.lastChime = -1;
-
-      this._build();
+      this.phase = 0; // free-running trajectory phase (cycles) for non-REBAL movements
+      this.lastSched = 0;
+      this.lastTick = null;
+      this.grainClock = 0;
+      this.prevStage = null;
+      this.rebalStart = null;
+      this.frames = [];
+      this.slots = [];
+      for (let i = 0; i < MAX_STREAMS; i++) this.slots.push(i); // renderer slots 0..5
+      this.noiseBuf = this._pinkNoise(6);
+      this.wave = this._harmonicWave(32, 1.0);
+      this.streams = [];
+      for (let k = 0; k < MAX_STREAMS; k++) this.streams.push(this._buildStream(k));
+      this.telemetry.spatialVoices = this.streams.map((_, k) => ({ index: k, x: 0, y: 0, z: -1, w: 0, active: false, level: 0 }));
+      this.telemetry.spatialStage = { active: false, label: '' };
+      this._applyPalette(true);
     }
 
-    _normalizeParams() {
+    _normalize() {
       const p = this.params;
       if (PALETTE_ALIASES[p.palette]) p.palette = PALETTE_ALIASES[p.palette];
-      if (!PALETTES.includes(p.palette)) p.palette = 'energy';
+      if (!PALETTES.includes(p.palette)) p.palette = 'breath';
       if (TRAJECTORY_ALIASES[p.trajectory]) p.trajectory = TRAJECTORY_ALIASES[p.trajectory];
       if (!TRAJECTORIES.includes(p.trajectory)) p.trajectory = 'rebal';
-      p.count = clamp(Math.round(p.count || 2), 1, MAX_VOICES);
-      p.gain = clamp(p.gain !== undefined ? p.gain : 0.85, 0, 1);
-      p.speed = clamp(p.speed !== undefined ? p.speed : 0.1, 0.02, 0.5);
-      p.distance = clamp(p.distance !== undefined ? p.distance : 1.8, 0.5, 4);
-      p.room = clamp(p.room !== undefined ? p.room : 0.15, 0, 1); // pristine direct sound default
-      p.spiral = clamp(p.spiral !== undefined ? p.spiral : 0, 0, 2);
+      if (!REBAL_MODES.includes(p.rebalMode)) p.rebalMode = 'program';
+      p.count = clamp(Math.round(p.count || 4), 1, MAX_STREAMS);
+      p.gain = clamp(p.gain !== undefined ? p.gain : 0.8, 0, 1.5);
+      p.speed = clamp(p.speed !== undefined ? p.speed : 0.08, 0.01, 0.6);
+      p.distance = clamp(p.distance !== undefined ? p.distance : 1.9, 0.6, 3.5);
+      p.room = clamp(p.room !== undefined ? p.room : 0.45, 0, 1);
+      p.cue = clamp(p.cue !== undefined ? p.cue : 1, 0, 2);
+      p.turns = clamp(p.turns !== undefined ? p.turns : 1.25, 0, 3);
+      p.twist = clamp(p.twist || 0, -1, 1);
+      p.fountainBreaths = clamp(Math.round(p.fountainBreaths || 6), 1, 40);
+      p.spiralBreaths = clamp(Math.round(p.spiralBreaths || 6), 1, 40);
+      if (p.renderer !== 'hrtf') p.renderer = 'structural';
     }
 
-    _build() {
+    // ---------------------------------------------------------------- buffers & waves
+    _pinkNoise(seconds) {
       const ctx = this.ctx;
-      const p = this.params;
-
-      // Master output of spatial module
-      this.out = ctx.createGain();
-      this.out.gain.value = p.enabled ? p.gain : 0;
-
-      // Stereo bus summing all 3D voices
-      this.sumL = ctx.createGain();
-      this.sumR = ctx.createGain();
-      this.merger = ctx.createChannelMerger(2);
-
-      this.sumL.connect(this.merger, 0, 0); // Left channel
-      this.sumR.connect(this.merger, 0, 1); // Right channel
-      this.merger.connect(this.out);
-      this.out.connect(this.engine.spatialDryBus);
-
-      // Clean, subtle early-reflection room for externalization
-      this.roomIn = ctx.createGain();
-      this.roomIn.gain.value = p.room * 0.25;
-      this.room = ctx.createConvolver();
-      this.room.normalize = false;
-      this.room.buffer = this._createRoomImpulse(0.5);
-      this.roomIn.connect(this.room);
-      this.room.connect(this.out);
-
-      this.noiseBuf = this._createNoiseBuffer(3);
-      this.voiceWave = this._createVoiceWave();
-
-      this.voices = [];
-      this.telemetry.spatialVoices = [];
-      this.telemetry.spatialRipples = this.telemetry.spatialRipples || [];
-      this.telemetry.spatialStage = { active: false, phase: 'exhale', u: 0, label: '', energy: 0 };
-
-      for (let i = 0; i < MAX_VOICES; i++) {
-        this.voices.push(this._buildVoice(i));
-        this.telemetry.spatialVoices.push({
-          index: i, x: 0, y: 0, z: -1, dist: 1, active: false, activeEnergy: 0, trail: [], stageLabel: ''
-        });
+      const len = Math.floor(ctx.sampleRate * seconds);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + w * 0.0555179;
+        b1 = 0.99332 * b1 + w * 0.0750759;
+        b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856;
+        b4 = 0.55 * b4 + w * 0.5329522;
+        b5 = -0.7616 * b5 - w * 0.016898;
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+        b6 = w * 0.115926;
       }
-      this._applyPalette();
+      // cross-fade the loop point
+      const fade = Math.floor(ctx.sampleRate * 0.05);
+      for (let i = 0; i < fade; i++) {
+        const a = i / fade;
+        d[i] = d[i] * a + d[len - fade + i] * (1 - a);
+      }
+      return buf;
     }
 
-    _buildVoice(i) {
+    _harmonicWave(n, tilt) {
+      const real = new Float32Array(n + 1);
+      const imag = new Float32Array(n + 1);
+      for (let h = 1; h <= n; h++) imag[h] = 1 / Math.pow(h, tilt);
+      return this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    }
+
+    // ---------------------------------------------------------------- per-stream generator graph
+    _buildStream(k) {
       const ctx = this.ctx;
-      const v = { index: i, nextEvt: 0 };
+      const s = { k, nextGrain: 0, lastPos: { x: 0, y: 0, z: -1.5, w: 0 } };
+      s.out = ctx.createGain();
+      s.out.gain.value = 0;
+      s.out.connect(this.renderer.input(this.slots[k]));
 
-      // Voice core input (all sound generators for this source feed into here)
-      v.input = ctx.createGain();
-      v.input.gain.value = 0;
+      // breath / air (pink noise through formant-like resonances)
+      s.noise = ctx.createBufferSource();
+      s.noise.buffer = this.noiseBuf;
+      s.noise.loop = true;
+      s.nHP = ctx.createBiquadFilter();
+      s.nHP.type = 'highpass';
+      s.nHP.frequency.value = 140;
+      s.nF1 = ctx.createBiquadFilter();
+      s.nF1.type = 'bandpass';
+      s.nF1.frequency.value = 600;
+      s.nF1.Q.value = 1.4;
+      s.nF2 = ctx.createBiquadFilter();
+      s.nF2.type = 'bandpass';
+      s.nF2.frequency.value = 1500;
+      s.nF2.Q.value = 2.0;
+      s.nAir = ctx.createBiquadFilter();
+      s.nAir.type = 'bandpass';
+      s.nAir.frequency.value = 4500;
+      s.nAir.Q.value = 0.8;
+      s.nG1 = ctx.createGain(); s.nG1.gain.value = 1.0;
+      s.nG2 = ctx.createGain(); s.nG2.gain.value = 0.7;
+      s.nG3 = ctx.createGain(); s.nG3.gain.value = 0.35;
+      s.breathVCA = ctx.createGain();
+      s.breathVCA.gain.value = 0;
+      s.noise.connect(s.nHP);
+      s.nHP.connect(s.nF1); s.nF1.connect(s.nG1); s.nG1.connect(s.breathVCA);
+      s.nHP.connect(s.nF2); s.nF2.connect(s.nG2); s.nG2.connect(s.breathVCA);
+      s.nHP.connect(s.nAir); s.nAir.connect(s.nG3); s.nG3.connect(s.breathVCA);
+      s.breathVCA.connect(s.out);
 
-      // 1. Distance Attenuation & Air Absorption
-      v.distGain = ctx.createGain();
-      v.distGain.gain.value = 1.0;
-      v.airLP = ctx.createBiquadFilter();
-      v.airLP.type = 'lowpass';
-      v.airLP.frequency.value = 18000;
-      v.airLP.Q.value = 0.5;
+      // harmonic source (overtone selector / vowel formants / warm body)
+      s.osc = ctx.createOscillator();
+      s.osc.setPeriodicWave(this.wave);
+      s.osc.frequency.value = this._root() * STREAM_RATIOS[k];
+      s.vib = ctx.createOscillator();
+      s.vib.frequency.value = 4.6 + 0.37 * k;
+      s.vibDepth = ctx.createGain();
+      s.vibDepth.gain.value = 0;
+      s.vib.connect(s.vibDepth);
+      s.vibDepth.connect(s.osc.detune);
+      s.sel = ctx.createBiquadFilter(); // overtone selector (moves with height)
+      s.sel.type = 'bandpass';
+      s.sel.frequency.value = 800;
+      s.sel.Q.value = 11;
+      s.selG = ctx.createGain(); s.selG.gain.value = 0;
+      s.vF1 = ctx.createBiquadFilter();
+      s.vF1.type = 'bandpass';
+      s.vF1.frequency.value = 500;
+      s.vF1.Q.value = 5;
+      s.vF2 = ctx.createBiquadFilter();
+      s.vF2.type = 'bandpass';
+      s.vF2.frequency.value = 1200;
+      s.vF2.Q.value = 7;
+      s.vG1 = ctx.createGain(); s.vG1.gain.value = 0;
+      s.vG2 = ctx.createGain(); s.vG2.gain.value = 0;
+      s.body = ctx.createBiquadFilter();
+      s.body.type = 'lowpass';
+      s.body.frequency.value = 400;
+      s.body.Q.value = 0.5;
+      s.bodyG = ctx.createGain(); s.bodyG.gain.value = 0;
+      s.harmVCA = ctx.createGain();
+      s.harmVCA.gain.value = 0;
+      s.osc.connect(s.sel); s.sel.connect(s.selG); s.selG.connect(s.harmVCA);
+      s.osc.connect(s.vF1); s.vF1.connect(s.vG1); s.vG1.connect(s.harmVCA);
+      s.osc.connect(s.vF2); s.vF2.connect(s.vG2); s.vG2.connect(s.harmVCA);
+      s.osc.connect(s.body); s.body.connect(s.bodyG); s.bodyG.connect(s.harmVCA);
+      s.harmVCA.connect(s.out);
 
-      // 2. Front vs. Back Spectral Shaping (Pinna Obstruction)
-      v.frontBackLP = ctx.createBiquadFilter();
-      v.frontBackLP.type = 'lowpass';
-      v.frontBackLP.frequency.value = 18000;
-      v.frontBackLP.Q.value = 0.707;
-
-      v.frontPeak = ctx.createBiquadFilter();
-      v.frontPeak.type = 'peaking';
-      v.frontPeak.frequency.value = 3600;
-      v.frontPeak.Q.value = 1.2;
-      v.frontPeak.gain.value = 0;
-
-      v.backNotch = ctx.createBiquadFilter();
-      v.backNotch.type = 'peaking';
-      v.backNotch.frequency.value = 7200;
-      v.backNotch.Q.value = 2.0;
-      v.backNotch.gain.value = 0;
-
-      // 3. Up (Zenith) vs. Down (Floor / Feet) Elevation Shaping
-      v.zenithShelf = ctx.createBiquadFilter();
-      v.zenithShelf.type = 'highshelf';
-      v.zenithShelf.frequency.value = 7500;
-      v.zenithShelf.gain.value = 0;
-
-      v.torsoLP = ctx.createBiquadFilter();
-      v.torsoLP.type = 'lowpass';
-      v.torsoLP.frequency.value = 18000;
-      v.torsoLP.Q.value = 0.707;
-
-      v.chestBoost = ctx.createBiquadFilter();
-      v.chestBoost.type = 'lowshelf';
-      v.chestBoost.frequency.value = 200;
-      v.chestBoost.gain.value = 0;
-
-      // Chain common processing
-      v.input.connect(v.distGain);
-      v.distGain.connect(v.airLP);
-      v.airLP.connect(v.frontBackLP);
-      v.frontBackLP.connect(v.frontPeak);
-      v.frontPeak.connect(v.backNotch);
-      v.backNotch.connect(v.zenithShelf);
-      v.zenithShelf.connect(v.torsoLP);
-      v.torsoLP.connect(v.chestBoost);
-
-      // 4. Dedicated Dual-Ear Binaural Branches (Guaranteed Left/Right Separation)
-      // Left Ear Branch:
-      v.leftDelay = ctx.createDelay(0.01);
-      v.leftDelay.delayTime.value = 0;
-      v.leftShadowLP = ctx.createBiquadFilter();
-      v.leftShadowLP.type = 'lowpass';
-      v.leftShadowLP.frequency.value = 18000;
-      v.leftShadowLP.Q.value = 0.707;
-      v.leftGain = ctx.createGain();
-      v.leftGain.gain.value = 1.0;
-
-      v.chestBoost.connect(v.leftDelay);
-      v.leftDelay.connect(v.leftShadowLP);
-      v.leftShadowLP.connect(v.leftGain);
-      v.leftGain.connect(this.sumL);
-
-      // Right Ear Branch:
-      v.rightDelay = ctx.createDelay(0.01);
-      v.rightDelay.delayTime.value = 0;
-      v.rightShadowLP = ctx.createBiquadFilter();
-      v.rightShadowLP.type = 'lowpass';
-      v.rightShadowLP.frequency.value = 18000;
-      v.rightShadowLP.Q.value = 0.707;
-      v.rightGain = ctx.createGain();
-      v.rightGain.gain.value = 1.0;
-
-      v.chestBoost.connect(v.rightDelay);
-      v.rightDelay.connect(v.rightShadowLP);
-      v.rightShadowLP.connect(v.rightGain);
-      v.rightGain.connect(this.sumR);
-
-      // Room send (subtle, natural)
-      v.chestBoost.connect(this.roomIn);
-
-      // 5. Sound Generators: Breath-Voice & Harmonics (for 'energy' palette)
-      v.osc = ctx.createOscillator();
-      v.osc.setPeriodicWave(this.voiceWave);
-      v.osc.frequency.value = REBAL_ROOT * REBAL_RATIOS[i];
-
-      v.vib = ctx.createOscillator();
-      v.vib.frequency.value = 4.8 + i * 0.4;
-      v.vibDepth = ctx.createGain();
-      v.vibDepth.gain.value = 4;
-      v.vib.connect(v.vibDepth);
-      v.vibDepth.connect(v.osc.detune);
-
-      v.toneGain = ctx.createGain();
-      v.toneGain.gain.value = 0;
-
-      // Vocal Formants ("oo" -> "aa" -> "ee")
-      v.formant1 = ctx.createBiquadFilter();
-      v.formant1.type = 'bandpass';
-      v.formant1.frequency.value = 450;
-      v.formant1.Q.value = 6;
-      v.formant2 = ctx.createBiquadFilter();
-      v.formant2.type = 'bandpass';
-      v.formant2.frequency.value = 1100;
-      v.formant2.Q.value = 9;
-
-      const f1Gain = ctx.createGain();
-      f1Gain.gain.value = 0.9;
-      const f2Gain = ctx.createGain();
-      f2Gain.gain.value = 0.6;
-
-      v.osc.connect(v.formant1);
-      v.formant1.connect(f1Gain);
-      f1Gain.connect(v.toneGain);
-
-      v.osc.connect(v.formant2);
-      v.formant2.connect(f2Gain);
-      f2Gain.connect(v.toneGain);
-
-      // Fundamental warm body
-      v.warmth = ctx.createBiquadFilter();
-      v.warmth.type = 'lowpass';
-      v.warmth.frequency.value = 300;
-      v.warmthGain = ctx.createGain();
-      v.warmthGain.gain.value = 0.28;
-      v.osc.connect(v.warmth);
-      v.warmth.connect(v.warmthGain);
-      v.warmthGain.connect(v.toneGain);
-      v.toneGain.connect(v.input);
-
-      // Organic breath air flow
-      v.noise = ctx.createBufferSource();
-      v.noise.buffer = this.noiseBuf;
-      v.noise.loop = true;
-      v.airBP = ctx.createBiquadFilter();
-      v.airBP.type = 'bandpass';
-      v.airBP.frequency.value = 1800;
-      v.airBP.Q.value = 0.8;
-      v.airGain = ctx.createGain();
-      v.airGain.gain.value = 0;
-
-      v.noise.connect(v.airBP);
-      v.airBP.connect(v.airGain);
-      v.airGain.connect(v.input);
+      // one-shot grains (sparkles, droplets, strikes, bursts)
+      s.grains = ctx.createGain();
+      s.grains.gain.value = 1;
+      s.grains.connect(s.out);
 
       const t = ctx.currentTime;
-      v.osc.start(t);
-      v.vib.start(t);
-      v.noise.start(t, Math.random() * 2.0);
-
-      return v;
+      s.noise.start(t, Math.random() * 5);
+      s.osc.start(t);
+      s.vib.start(t);
+      return s;
     }
 
-    _createNoiseBuffer(seconds) {
-      const rate = this.ctx.sampleRate;
-      const buf = this.ctx.createBuffer(1, Math.floor(rate * seconds), rate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      return buf;
+    _root() {
+      return this.engine.params.root || 108;
     }
 
-    _createVoiceWave() {
-      // Harmonic series with natural 1/n rolloff (rich in upper partials for pinna decoding)
-      const N = 40;
-      const real = new Float32Array(N + 1);
-      const imag = new Float32Array(N + 1);
-      for (let n = 1; n <= N; n++) {
-        imag[n] = 1.0 / Math.pow(n, 1.05);
-      }
-      return this.ctx.createPeriodicWave(real, imag);
-    }
-
-    _createRoomImpulse(seconds) {
-      const rate = this.ctx.sampleRate;
-      const len = Math.floor(rate * seconds);
-      const buf = this.ctx.createBuffer(2, len, rate);
-      for (let ch = 0; ch < 2; ch++) {
-        const d = buf.getChannelData(ch);
-        // Early reflections
-        for (let k = 0; k < 10; k++) {
-          const tMs = 4 + Math.pow(Math.random(), 1.4) * 32;
-          const idx = Math.floor((tMs / 1000) * rate);
-          const amp = (0.4 - 0.25 * (tMs / 36)) * (Math.random() < 0.5 ? -1 : 1);
-          if (idx < len) d[idx] += amp;
-        }
-        // Soft diffuse tail
-        let lp = 0;
-        const start = Math.floor(0.015 * rate);
-        for (let i = start; i < len; i++) {
-          const t = (i - start) / rate;
-          const env = Math.exp(-t / 0.12);
-          lp = lp * 0.4 + (Math.random() * 2 - 1) * 0.6;
-          d[i] += lp * env * 0.18;
-        }
-      }
-      return buf;
-    }
-
-    _applyPalette() {
+    _applyPalette(initial) {
+      const p = this.params;
       const now = this.ctx.currentTime;
-      const isEnergy = this.params.palette === 'energy';
-      this.voices.forEach((v, i) => {
-        v.nextEvt = 0;
-        v.osc.frequency.setTargetAtTime(REBAL_ROOT * REBAL_RATIOS[i], now, 0.05);
-        if (!isEnergy) {
-          v.toneGain.gain.setTargetAtTime(0, now, 0.1);
-          v.airGain.gain.setTargetAtTime(0, now, 0.1);
-        }
+      const choir = p.palette === 'choir';
+      this.streams.forEach((s, k) => {
+        s.nextGrain = 0;
+        s.osc.frequency.setTargetAtTime(this._root() * STREAM_RATIOS[k], now, initial ? 0.001 : 0.08);
+        s.vibDepth.gain.setTargetAtTime(choir ? 9 : 2.5, now, 0.1);
+        s.sel.Q.setTargetAtTime(p.palette === 'breath' ? 11 : 6, now, 0.1);
+        s.vF1.Q.value = 5;
+        s.vF2.Q.value = 8;
       });
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Trajectories: REBAL Apple-Torus, Orbit, Vertical, Sphere, Manual
-    // ---------------------------------------------------------------------------------------------
-    _rebalPosition(i, n, cycle, cycleIdx) {
-      const R = clamp(this.params.distance * 1.1, 1.2, 3.8); // torus horizontal width
-      const crownY = REBAL_CROWN_Y;
-      const feetY = REBAL_FEET_Y;
-
-      if (cycle < 0.50) {
-        // =========================================================
-        // EXHALE ▼ (cycle 0.00 .. 0.50 -> u in 0.00 .. 1.00)
-        // 1. Fountains UP out of top of head (+0.22m) up to apex (+1.5m)
-        // 2. Arcs over the top arch and spirals DOWN wide around the body (passing ear level y=0)
-        // 3. Curves underneath the feet (-1.9m) and sweeps into the soles of the feet (-1.65m)
-        // =========================================================
-        const u = cycle / 0.50; // 0..1
-        const pol = u * Math.PI; // 0..PI
-        const horizR = R * Math.sin(pol);
-        // Dipole torus curve: climbs strongly UP first (+1.45m), then goes DOWN to -1.9m
-        const y = 0.22 + 1.25 * Math.sin(pol) - 2.05 * Math.pow(u, 1.35);
-
-        // Branch azimuth: 2 branches split Left (-90°) & Right (+90°); 4 branches split evenly
-        let branchAz;
-        if (n === 1) branchAz = (cycleIdx % 2 === 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
-        else if (n === 2) branchAz = (i === 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
-        else branchAz = [Math.PI * 0.5, -Math.PI * 0.5, 0, Math.PI][i % 4];
-
-        const spiralAngle = this.params.spiral * Math.PI * 2 * u;
-        const totalAz = branchAz + spiralAngle;
-        const x = horizR * Math.sin(totalAz);
-        const z = -horizR * Math.cos(totalAz);
-
-        return { x, y, z, phase: 'exhale', u };
-      }
-
-      // =========================================================
-      // INHALE ▲ (cycle 0.50 .. 1.00 -> u in 0.00 .. 1.00)
-      // Enters soles of feet (-1.65m), rises straight UP the body core
-      // (spine/throat) into the head (+0.1m .. +0.22m), filling the cranium!
-      // =========================================================
-      const u = (cycle - 0.50) / 0.50; // 0..1
-      if (u < 0.80) {
-        // Ascending spine from feet to head (x=0, z=0)
-        const s = u / 0.80;
-        const y = lerp(feetY, crownY - 0.08, s);
-        return { x: 0, y, z: -0.05, phase: 'inhale', u };
-      }
-
-      // Filling head with energy: glowing resonant swirl inside the skull
-      const w = (u - 0.80) / 0.20;
-      const swirlAz = (w * 2.5 + i / n) * Math.PI * 2;
-      const r = 0.08 * (1 - w * 0.5);
-      return { x: r * Math.sin(swirlAz), y: crownY + 0.04 * w, z: -r * Math.cos(swirlAz), phase: 'inhale', u };
-    }
-
-    _rebalLabel(phase, u) {
-      if (phase === 'exhale') {
-        if (u < 0.12) return 'EXHALE ▼ · Bursting out crown of head ▲';
-        if (u < 0.35) return 'EXHALE ▼ · Fountaining high overhead & splitting outward';
-        if (u < 0.72) return 'EXHALE ▼ · Spiraling down outside your body';
-        return 'EXHALE ▼ · Curving underneath the feet';
-      }
-      if (u < 0.15) return 'INHALE ▲ · Entering soles of the feet ▼';
-      if (u < 0.80) return 'INHALE ▲ · Rising up spine & body core ▲';
-      return 'INHALE ▲ · Filling head with radiant resonance ✨';
-    }
-
-    _position(i, n, t) {
+    // ---------------------------------------------------------------- trajectories
+    _rebalState(phase) {
       const p = this.params;
-      const R = p.distance;
-      const TAU = Math.PI * 2;
-      const P = t;
-
-      switch (p.trajectory) {
-        case 'orbit': {
-          // Horizontal ear-level orbit: sweeps Left, Front, Right, Back
-          const th = TAU * (P + i / n);
-          const el = 0.10 * Math.sin(TAU * 0.35 * P + i * 1.5);
-          return {
-            x: R * Math.cos(el) * Math.sin(th),
-            y: R * Math.sin(el),
-            z: -R * Math.cos(el) * Math.cos(th)
-          };
-        }
-        case 'vertical': {
-          // Vertical loop: Front -> Zenith (Above) -> Back -> Nadir (Below)
-          const ph = TAU * (P + i / (2 * n));
-          const planeAz = [0, Math.PI * 0.5, Math.PI * 0.25, -Math.PI * 0.25][i % 4];
-          const horiz = R * Math.cos(ph);
-          return {
-            x: horiz * Math.sin(planeAz),
-            y: R * Math.sin(ph),
-            z: -horiz * Math.cos(planeAz)
-          };
-        }
-        case 'sphere': {
-          // Full 3D sphere wander
-          const az = TAU * (P + i / n) + 0.8 * Math.sin(TAU * 0.5 * P + i);
-          const el = 0.25 + 0.9 * Math.sin(TAU * 0.7 * P + i * 2);
-          const r = R * (0.85 + 0.25 * Math.sin(TAU * 0.3 * P));
-          return {
-            x: r * Math.cos(el) * Math.sin(az),
-            y: r * Math.sin(el),
-            z: -r * Math.cos(el) * Math.cos(az)
-          };
-        }
-        case 'manual': {
-          const m = p.manualPos || this.lastManual || { x: 0.0, y: 0.0, z: -R };
-          return { x: m.x, y: m.y, z: m.z };
-        }
-        default:
-          return { x: 0, y: 0, z: -R };
-      }
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    // Real-Time 60 FPS Audio & Spatial Modulation Update
-    // ---------------------------------------------------------------------------------------------
-    tick(now, elapsed, isBg) {
-      const p = this.params;
-      if (!p.enabled) {
-        this.telemetry.spatialVoices.forEach((tv) => { tv.active = false; tv.activeEnergy = 0; });
-        this.telemetry.spatialStage.active = false;
-        return;
-      }
-
-      // Smooth phase accumulator (speed changes never cause jumps)
-      const dtTick = clamp(now - (this.lastNow || now), 0, 0.25);
-      this.lastNow = now;
-      this.phase = (this.phase || 0) + dtTick * p.speed;
-      const t = this.phase;
-
-      const traj = p.trajectory;
-      const isManual = traj === 'manual';
-      const n = isManual ? 1 : p.count;
-      const tc = isBg ? 0.08 : 0.025; // responsive, glitch-free audio param time constant
-      const isEnergy = p.palette === 'energy';
-
-      // REBAL cycle
-      let cycle = 0;
-      let cycleIdx = 0;
-      if (traj === 'rebal') {
-        cycleIdx = Math.floor(t);
-        cycle = t - cycleIdx;
-        if (cycleIdx !== this.lastCycleIdx) {
-          if (this.lastCycleIdx >= 0) this._crownBurst(now);
-          this.lastCycleIdx = cycleIdx;
-        }
-      }
-
-      let stage = null;
-      for (let i = 0; i < MAX_VOICES; i++) {
-        const v = this.voices[i];
-        const tv = this.telemetry.spatialVoices[i];
-        const active = i < n;
-
-        // Voice active gain
-        v.input.gain.setTargetAtTime(active ? (1.0 / Math.sqrt(n)) * 0.95 : 0, now, 0.15);
-        tv.active = active;
-        if (!active) {
-          tv.activeEnergy = 0;
-          if (tv.trail.length) tv.trail = [];
-          continue;
-        }
-
-        // Compute 3D Coordinates
-        let pos;
-        if (p.manualPos && i === 0) {
-          pos = { x: p.manualPos.x, y: p.manualPos.y, z: p.manualPos.z };
-          this.lastManual = pos;
-        } else if (traj === 'rebal') {
-          pos = this._rebalPosition(i, n, cycle, cycleIdx);
-          if (!stage) stage = pos;
+      const st = this.breath.state(phase);
+      let mode = p.rebalMode;
+      let offset = 0;
+      let label = '';
+      if (mode === 'program') {
+        if (this.rebalStart === null) this.rebalStart = Math.floor(phase);
+        const c = st.cycle - this.rebalStart;
+        const nf = p.fountainBreaths, ns = p.spiralBreaths;
+        if (c < nf) {
+          mode = 'fountain';
+          label = `Fountain ${c + 1}/${nf}`;
+        } else if (c < nf + ns) {
+          mode = 'spiral';
+          label = `Spiral ${c - nf + 1}/${ns}`;
         } else {
-          pos = this._position(i, n, t);
+          mode = 'balloon';
+          offset = smooth(0, 2, phase - (this.rebalStart + nf + ns));
+          label = 'Balloon (sustained)';
         }
-
-        const { x, y, z } = pos;
-        const d = Math.max(0.08, Math.sqrt(x * x + y * y + z * z));
-        const horizDist = Math.max(0.04, Math.sqrt(x * x + z * z));
-
-        // Azimuth theta: -PI (back-left) .. 0 (front) .. +PI (back-right)
-        const az = Math.atan2(x, -z);
-        // Elevation phi: -PI/2 (floor) .. 0 (ear) .. +PI/2 (zenith)
-        const elevRad = Math.atan2(y, horizDist);
-        const elevNorm = clamp(elevRad / (Math.PI * 0.5), -1, 1);
-        const frontNorm = clamp(-z / d, -1, 1); // +1 = Front, -1 = Back
-
-        // =========================================================================
-        // 1. DISTANCE ATTENUATION & HIGH-FREQUENCY AIR ROLLOFF
-        // =========================================================================
-        const distAtten = 1.0 / (1.0 + 0.45 * Math.max(0, d - 1.0));
-        v.distGain.gain.setTargetAtTime(distAtten, now, tc);
-        const airFreq = clamp(19000 / (1.0 + 0.3 * Math.max(0, d - 1.0)), 6000, 20000);
-        v.airLP.frequency.setTargetAtTime(airFreq, now, tc);
-
-        // =========================================================================
-        // 2. FRONT vs. BACK DISCRIMINATION (Pinna Diffraction & Obstruction)
-        // =========================================================================
-        if (frontNorm >= 0) {
-          // Front: Crisp presence and concha boost
-          v.frontBackLP.frequency.setTargetAtTime(19000, now, tc);
-          v.frontPeak.gain.setTargetAtTime(3.8 * frontNorm, now, tc);
-          v.backNotch.gain.setTargetAtTime(0, now, tc);
-        } else {
-          // Back: Pinna physically shadows high frequencies!
-          const backWeight = -frontNorm; // 0..1
-          const backCutoff = lerp(18000, 3200, Math.pow(backWeight, 0.8));
-          v.frontBackLP.frequency.setTargetAtTime(backCutoff, now, tc);
-          v.frontPeak.gain.setTargetAtTime(0, now, tc);
-          v.backNotch.gain.setTargetAtTime(-8.5 * backWeight, now, tc);
-        }
-
-        // =========================================================================
-        // 3. UP (Zenith) vs. DOWN (Floor / Feet) ELEVATION
-        // =========================================================================
-        if (elevNorm >= 0) {
-          // Zenith / Overhead: Open sky high-shelf lift + chest cut
-          v.zenithShelf.gain.setTargetAtTime(8.5 * elevNorm, now, tc);
-          v.torsoLP.frequency.setTargetAtTime(19000, now, tc);
-          v.chestBoost.gain.setTargetAtTime(-6.0 * elevNorm, now, tc);
-        } else {
-          // Floor / Feet: Torso and jaw shadow highs, boost deep chest warmth
-          const downWeight = -elevNorm; // 0..1
-          v.zenithShelf.gain.setTargetAtTime(-4.0 * downWeight, now, tc);
-          const torsoCutoff = lerp(18000, 1600, Math.pow(downWeight, 0.75));
-          v.torsoLP.frequency.setTargetAtTime(torsoCutoff, now, tc);
-          v.chestBoost.gain.setTargetAtTime(8.5 * downWeight, now, tc);
-        }
-
-        // =========================================================================
-        // 4. GUARANTEED DUAL-EAR ITD & ILD (Left / Right Separation)
-        // =========================================================================
-        // Woodworth formula for spherical head delay:
-        const sinAz = Math.sin(Math.abs(az));
-        const maxItd = (HEAD_RADIUS / SPEED_OF_SOUND) * (sinAz + Math.abs(az)); // up to 0.66 ms
-
-        let leftDelayTime = 0;
-        let rightDelayTime = 0;
-        let leftShadowFreq = 19000;
-        let rightShadowFreq = 19000;
-        let leftGainVal = 1.0;
-        let rightGainVal = 1.0;
-
-        if (x > 0) {
-          // Sound is to the RIGHT (+X):
-          // Right ear is ipsilateral (near): 0 delay, full bandwidth, 0 dB
-          // Left ear is contralateral (far): delayed by ITD, shadowed, attenuated by up to -18 dB
-          const lat = clamp(x / horizDist, 0, 1);
-          leftDelayTime = maxItd * lat;
-          leftShadowFreq = lerp(19000, 1500, Math.pow(lat, 0.7));
-          leftGainVal = Math.pow(1.0 - 0.75 * lat, 1.3); // down to 0.12 (-18.4 dB)
-          rightGainVal = 1.0 + 0.15 * lat; // subtle head-facing lift
-        } else if (x < 0) {
-          // Sound is to the LEFT (-X):
-          // Left ear is ipsilateral (near)
-          // Right ear is contralateral (far)
-          const lat = clamp(-x / horizDist, 0, 1);
-          rightDelayTime = maxItd * lat;
-          rightShadowFreq = lerp(19000, 1500, Math.pow(lat, 0.7));
-          rightGainVal = Math.pow(1.0 - 0.75 * lat, 1.3);
-          leftGainVal = 1.0 + 0.15 * lat;
-        }
-
-        v.leftDelay.delayTime.setTargetAtTime(leftDelayTime, now, tc);
-        v.rightDelay.delayTime.setTargetAtTime(rightDelayTime, now, tc);
-        v.leftShadowLP.frequency.setTargetAtTime(leftShadowFreq, now, tc);
-        v.rightShadowLP.frequency.setTargetAtTime(rightShadowFreq, now, tc);
-        v.leftGain.gain.setTargetAtTime(leftGainVal, now, tc);
-        v.rightGain.gain.setTargetAtTime(rightGainVal, now, tc);
-
-        // =========================================================================
-        // 5. PALETTE AUDIO MODULATION & ENERGY SWELL
-        // =========================================================================
-        let energy = 0.65;
-        if (isEnergy) {
-          let airLevel = 0.5;
-          let pitchMult = 1.0;
-
-          if (traj === 'rebal' && !(p.manualPos && i === 0)) {
-            const u = pos.u;
-            const inhale = pos.phase === 'inhale';
-            if (!inhale) {
-              // Exhale: starts explosive at crown, energetic arc over top, smooth flow down
-              energy = 1.0 - 0.5 * u;
-              airLevel = (1.0 - Math.exp(-u * 8)) * Math.pow(1 - u, 0.6) * 1.2;
-              pitchMult = 1.0 + 0.20 * Math.max(0, y / 1.5); // ascends with apex height
-            } else {
-              // Inhale: starts deep and quiet at feet, builds straight up spine to third eye
-              energy = 0.4 + 0.6 * Math.pow(u, 1.5);
-              airLevel = Math.pow(u, 1.2) * 1.1;
-              pitchMult = 0.85 + 0.35 * Math.pow(u, 1.3); // deep pitch rising up the body
-            }
-          } else {
-            // General breath wave
-            const breathPh = (elapsed * 0.1 * Math.PI * 2) % (Math.PI * 2);
-            const slope = Math.cos(breathPh + i * 0.7);
-            energy = 0.55 + 0.42 * Math.sin(breathPh + i * 0.7);
-            airLevel = Math.pow(Math.abs(slope), 1.2) * 0.9;
-            pitchMult = 1.0 + 0.12 * elevNorm;
-          }
-
-          // Pitch tracking & elevation coupling (Pratt effect)
-          const targetFreq = REBAL_ROOT * REBAL_RATIOS[i] * pitchMult;
-          v.osc.frequency.setTargetAtTime(targetFreq, now, 0.06);
-
-          // Vocal Formant sweep with elevation ("oo" [below] -> "aa" [ear] -> "ee" [above])
-          const normH = clamp((elevNorm + 1) * 0.5, 0, 1);
-          const f1 = lerp(320, 680, normH);
-          const f2 = lerp(850, 2400, normH);
-          v.formant1.frequency.setTargetAtTime(f1, now, 0.08);
-          v.formant2.frequency.setTargetAtTime(f2, now, 0.08);
-
-          v.toneGain.gain.setTargetAtTime(0.68 * (0.35 + 0.65 * energy), now, 0.08);
-          v.airGain.gain.setTargetAtTime(0.48 * airLevel, now, 0.05);
-        }
-
-        tv.activeEnergy = energy;
-
-        // Schedule vibrant energy sparkles / bowls / drops / chimes
-        this._scheduleEvents(v, i, n, now, energy, pos);
-
-        tv.x = x; tv.y = y; tv.z = z; tv.dist = d;
-        tv.stageLabel = pos.phase ? this._rebalLabel(pos.phase, pos.u) : '';
-        if (!isBg) {
-          tv.trail.push({ x, y, z });
-          if (tv.trail.length > 70) tv.trail.shift();
-        }
-      }
-
-      const st = this.telemetry.spatialStage;
-      if (stage) {
-        st.active = true;
-        st.phase = stage.phase;
-        st.u = stage.u;
-        st.label = this._rebalLabel(stage.phase, stage.u);
-        st.energy = this.telemetry.spatialVoices[0].activeEnergy;
       } else {
-        st.active = false;
+        label = mode === 'fountain' ? 'Fountain' : mode === 'spiral' ? 'Spiral' : 'Balloon (sustained)';
+        if (mode === 'balloon') offset = 1;
       }
+      return { st, mode, offset, label };
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Acoustic Sparkles, Bowls, Drops & Chimes (Pinpoint Transients for Auditory Localization)
-    // ---------------------------------------------------------------------------------------------
-    _scheduleEvents(v, i, n, now, energy, pos) {
-      const palette = this.params.palette;
-      if (v.nextEvt === 0 || v.nextEvt < now - 0.5) {
-        v.nextEvt = now + 0.04 + i * (palette === 'bowl' ? 1.2 : 0.15);
-      }
-
-      let guard = 0;
-      while (v.nextEvt < now + LOOKAHEAD && guard++ < 24) {
-        const t = Math.max(v.nextEvt, now + 0.005);
-        let dt;
-        if (palette === 'energy') {
-          // Vibrant energy sparkle: high-frequency grains that give pinpoint directional ITD/ILD
-          const rate = 3 + 14 * energy * energy;
-          this._sparkle(v, t, 0.5 + 0.5 * energy);
-          dt = (-Math.log(1 - Math.random() * 0.98) / rate);
-        } else if (palette === 'bowl') {
-          this._bowl(v, t, i);
-          this._ripple(pos, t, i);
-          dt = 4.8 + Math.random() * 3.5;
-        } else if (palette === 'drops') {
-          this._drop(v, t);
-          if (Math.random() < 0.2) this._drop(v, t + 0.06 + Math.random() * 0.07);
-          this._ripple(pos, t, i);
-          dt = 0.16 + (-Math.log(1 - Math.random() * 0.97)) * 0.28;
-        } else {
-          this._chime(v, t);
-          this._ripple(pos, t, i);
-          dt = 0.3 + (-Math.log(1 - Math.random() * 0.97)) * 0.6;
+    _streamPositions(t, phase) {
+      const p = this.params;
+      const n = p.trajectory === 'manual' || p.trajectory === 'test' ? 1 : p.count;
+      const L = p.distance;
+      const res = { n, streams: [], label: '', stage: null, mode: null, st: null };
+      if (p.trajectory === 'rebal') {
+        const rs = this._rebalState(phase);
+        res.mode = rs.mode;
+        res.st = rs.st;
+        res.label = rs.label;
+        for (let k = 0; k < n; k++) {
+          let st = rs.st;
+          let rotate = 0;
+          if (rs.mode === 'balloon') {
+            st = this.breath.state(phase + (rs.offset * k) / n);
+            rotate = 0.07 * TAU * phase; // slow drift of the whole field
+          }
+          const pos = rebalPosition(st, k, rs.mode === 'balloon' ? 'fountain' : rs.mode, {
+            L, n, turns: p.turns, twist: p.twist, rotate
+          });
+          pos.st = st;
+          res.streams.push(pos);
         }
-        v.nextEvt = t + dt;
+        res.stage = rs.st.stage;
+        return res;
       }
+      const P = this.phase;
+      for (let k = 0; k < n; k++) {
+        let x = 0, y = 0, z = -L;
+        if (p.trajectory === 'orbit') {
+          const th = TAU * (P + k / n);
+          const el = 0.12 * Math.sin(TAU * 0.37 * P + k * 1.7);
+          x = L * Math.cos(el) * Math.sin(th);
+          y = L * Math.sin(el);
+          z = -L * Math.cos(el) * Math.cos(th);
+        } else if (p.trajectory === 'vertical') {
+          const ph = TAU * (P + k / (2 * n));
+          const planeAz = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4, Math.PI / 8, -Math.PI / 8][k];
+          const horiz = L * Math.cos(ph);
+          x = horiz * Math.sin(planeAz);
+          y = L * Math.sin(ph);
+          z = -horiz * Math.cos(planeAz);
+        } else if (p.trajectory === 'sphere') {
+          const az = TAU * (0.6 * P + k / n) + 0.9 * Math.sin(TAU * 0.23 * P + k);
+          const el = 1.05 * Math.sin(TAU * 0.31 * P + 2.1 * k);
+          const r = L * (0.8 + 0.25 * Math.sin(TAU * 0.17 * P + k));
+          x = r * Math.cos(el) * Math.sin(az);
+          y = r * Math.sin(el);
+          z = -r * Math.cos(el) * Math.cos(az);
+        } else if (p.trajectory === 'test') {
+          const idx = Math.floor(t / 2.6) % TEST_POINTS.length;
+          const tp = TEST_POINTS[idx];
+          const a = (tp.az * Math.PI) / 180, e = (tp.el * Math.PI) / 180;
+          const d = Math.max(1.2, L);
+          x = d * Math.cos(e) * Math.sin(a);
+          y = d * Math.sin(e);
+          z = -d * Math.cos(e) * Math.cos(a);
+          res.label = `Localisation check: ${tp.name}`;
+          res.testIndex = idx;
+        } else if (p.trajectory === 'manual') {
+          const m = p.manualPos || this.lastManual || { x: 0, y: 0, z: -L };
+          x = m.x; y = m.y; z = m.z;
+          this.lastManual = { x, y, z };
+          res.label = 'Hold still: drag on the views to move the source';
+        }
+        res.streams.push({ x, y, z, w: 0, path: 'free', s: 0 });
+      }
+      return res;
     }
 
-    _ripple(pos, t, i) {
-      const r = this.telemetry.spatialRipples;
-      r.push({ x: pos.x, y: pos.y, z: pos.z, time: t, voiceIndex: i });
-      if (r.length > 40) r.shift();
+    // ---------------------------------------------------------------- sound modulation
+    _brightness(y) {
+      return clamp((y + 2.1) / 3.5, 0, 1); // 0 under the feet .. 1 high above the head
     }
 
-    _noiseBurst(dest, t, dur, type, freq, q, level) {
+    _modulate(s, k, pos, res, t, gate) {
+      const p = this.params;
+      const pal = p.palette;
+      const root = this._root() * STREAM_RATIOS[k];
+      const b = this._brightness(pos.y);
+      const isRebal = p.trajectory === 'rebal';
+      const st = pos.st || null;
+      const lung = isRebal && st ? st.lung : this.breath.state(this.breath.phase).lung;
+      // breath envelope & overall energy
+      let breathLvl = 0.35 + 0.25 * lung;
+      let harmLvl = 0.55;
+      let bright = b;
+      if (isRebal && st) {
+        const balloon = res.mode === 'balloon';
+        if (st.stage === 'exhale') {
+          const a = (1 - Math.exp(-10 * st.p)) * (1 - 0.55 * st.p);
+          breathLvl = balloon ? 0.32 + 0.12 * a : 0.15 + 0.7 * a;
+          harmLvl = 0.45 + 0.35 * (1 - st.p);
+        } else if (st.stage === 'inhale') {
+          const a = Math.pow(Math.sin(Math.PI * st.p), 0.9);
+          breathLvl = balloon ? 0.32 + 0.12 * a : 0.12 + 0.75 * a;
+          harmLvl = 0.3 + 0.7 * st.p;
+          bright = clamp(0.25 + 0.75 * st.p, b, 1);
+        } else if (st.stage === 'holdIn') {
+          breathLvl = 0.06;
+          harmLvl = 0.85;
+        } else {
+          breathLvl = 0.04;
+          harmLvl = 0.25;
+        }
+        if (balloon) {
+          const swell = 0.75 + 0.25 * this.breath.state(this.breath.phase).lung;
+          breathLvl *= swell;
+          harmLvl *= swell;
+        }
+      }
+      // palette-specific gains
+      let gBreath = 0, gSel = 0, gV1 = 0, gV2 = 0, gBody = 0;
+      if (pal === 'breath') {
+        gBreath = 0.55 * breathLvl;
+        gSel = 1.0;
+        gBody = 0.07;
+      } else if (pal === 'choir') {
+        gBreath = 0.12 * breathLvl;
+        gV1 = 0.9; gV2 = 0.55; gBody = 0.1;
+      } else if (pal === 'water') {
+        gBreath = 0.22 * (0.5 + 0.5 * breathLvl);
+        harmLvl = 0;
+      } else if (pal === 'bowl') {
+        gBreath = 0.03;
+        harmLvl = 0;
+      } else {
+        gBreath = 0.06 * breathLvl;
+        harmLvl = 0;
+      }
+      // filters follow height: dark & low under the feet, bright & high above the head
+      const f1 = pal === 'water' ? 900 + 2600 * bright : 380 + 520 * bright;
+      const f2 = pal === 'water' ? 2400 + 3000 * bright : 950 + 1750 * bright;
+      const fAir = 2400 + 5200 * bright;
+      const sel = clamp(180 * Math.pow(3600 / 180, bright), 120, 4200);
+      const selGain = gSel * 3.2 * Math.pow(Math.max(1, sel / root), 0.55);
+      // vowel: "oo" below -> "ah" at ear level -> "ee" above
+      const v1 = bright < 0.5 ? lerp(320, 720, bright * 2) : lerp(720, 330, (bright - 0.5) * 2);
+      const v2 = bright < 0.5 ? lerp(780, 1150, bright * 2) : lerp(1150, 2350, (bright - 0.5) * 2);
+
+      const R = (prm, v) => prm.linearRampToValueAtTime(v, t);
+      R(s.nF1.frequency, f1);
+      R(s.nF2.frequency, f2);
+      R(s.nAir.frequency, fAir);
+      R(s.nG3.gain, pal === 'water' ? 0.15 : 0.12 + 0.45 * bright);
+      R(s.breathVCA.gain, gBreath * gate);
+      R(s.sel.frequency, sel);
+      R(s.selG.gain, selGain);
+      R(s.vF1.frequency, v1);
+      R(s.vF2.frequency, v2);
+      R(s.vG1.gain, gV1 * 2.2);
+      R(s.vG2.gain, gV2 * 2.8);
+      R(s.body.frequency, root * (1.5 + 2 * bright));
+      R(s.bodyG.gain, gBody);
+      R(s.harmVCA.gain, 0.42 * harmLvl * gate);
+      return { breathLvl, harmLvl, bright };
+    }
+
+    // ---------------------------------------------------------------- one-shot grains
+    _ping(dest, t, f, lvl, attack, decay) {
+      const ctx = this.ctx;
+      if (f > ctx.sampleRate * 0.45) return;
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(lvl, t + attack);
+      g.gain.setTargetAtTime(0, t + attack, decay);
+      o.connect(g);
+      g.connect(dest);
+      o.start(t);
+      o.stop(t + attack + decay * 7);
+    }
+
+    _noiseBurst(dest, t, dur, f, q, lvl) {
       const ctx = this.ctx;
       const src = ctx.createBufferSource();
       src.buffer = this.noiseBuf;
-      const f = ctx.createBiquadFilter();
-      f.type = type;
-      f.frequency.value = freq;
-      f.Q.value = q;
+      const flt = ctx.createBiquadFilter();
+      flt.type = 'bandpass';
+      flt.frequency.value = f;
+      flt.Q.value = q;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(level, t + 0.001);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f);
-      f.connect(g);
+      g.gain.linearRampToValueAtTime(lvl, t + 0.004);
+      g.gain.setValueAtTime(lvl, t + Math.max(0.005, dur - 0.03));
+      g.gain.linearRampToValueAtTime(0, t + dur);
+      src.connect(flt);
+      flt.connect(g);
       g.connect(dest);
-      src.start(t, Math.random() * 2.0, dur + 0.015);
+      src.start(t, Math.random() * 4, dur + 0.05);
     }
 
-    _ping(dest, t, freq, level, tau, attack = 0.002) {
-      const ctx = this.ctx;
-      const o = ctx.createOscillator();
-      o.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(level, t + attack);
-      g.gain.setTargetAtTime(0, t + attack, tau);
-      o.connect(g);
-      g.connect(dest);
-      o.start(t);
-      o.stop(t + attack + tau * 6);
-      return o;
+    _nearestHarmonic(root, f) {
+      return root * Math.max(1, Math.round(f / root));
     }
 
-    _sparkle(v, t, level) {
-      if (Math.random() < 0.6) {
-        // High-frequency burst across 4-12 kHz (activates human pinna elevation decoding)
-        const f = 3800 * Math.pow(12000 / 3800, Math.random());
-        this._noiseBurst(v.input, t, 0.005 + Math.random() * 0.012, 'bandpass', f, 1.8 + Math.random() * 1.5, 0.28 * level);
+    _grain(s, k, t, pos, info, res) {
+      const pal = this.params.palette;
+      const root = this._root() * STREAM_RATIOS[k];
+      const b = info.bright;
+      if (this.params.trajectory === 'test') {
+        this._noiseBurst(s.grains, t, 0.16, 2500, 0.35, 0.9);
+        return 0.25;
+      }
+      if (pal === 'breath' || pal === 'choir') {
+        const target = 600 * Math.pow(9, b) * (Math.random() < 0.5 ? 1 : 1.5);
+        const f = this._nearestHarmonic(root, target);
+        this._ping(s.grains, t, f, 0.05 + 0.05 * Math.random(), 0.003, 0.08 + 0.18 * Math.random());
+        const rate = pal === 'choir' ? 0.6 : 1.2 + 9 * Math.pow(info.energy, 2);
+        return -Math.log(1 - Math.random() * 0.97) / rate;
+      }
+      if (pal === 'water') {
+        // Minnaert bubble: exponentially rising sine, pitch follows height
+        const ctx = this.ctx;
+        const f0 = (500 + 2200 * b) * Math.pow(1.6, Math.random() - 0.5);
+        const dur = clamp(0.06 * (1500 / f0), 0.02, 0.09);
+        const o = ctx.createOscillator();
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(f0 * (1.35 + 0.4 * Math.random()), t + dur);
+        const g = ctx.createGain();
+        const lvl = 0.12 + 0.12 * Math.random();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(lvl, t + 0.0008);
+        g.gain.setTargetAtTime(0, t + 0.001, dur / 3);
+        o.connect(g);
+        g.connect(s.grains);
+        o.start(t);
+        o.stop(t + dur * 2.5);
+        const rate = 3 + 10 * info.energy;
+        return -Math.log(1 - Math.random() * 0.97) / rate;
+      }
+      if (pal === 'bowl') {
+        const f0 = root * 2;
+        [[1, 0.5, 5.5, 0.55], [2.71, 0.2, 3.0, 1.1], [5.15, 0.08, 1.6, 0], [8.43, 0.035, 0.8, 0]].forEach(([r, a, d, beat]) => {
+          this._ping(s.grains, t, f0 * r, a * 0.6, 0.004, d);
+          if (beat) this._ping(s.grains, t, f0 * r + beat, a * 0.4, 0.004, d * 0.9);
+        });
+        this._noiseBurst(s.grains, t, 0.012, 2500, 0.7, 0.2);
+        return 5 + Math.random() * 4;
+      }
+      // chimes: just-pentatonic glass, register follows height
+      const oct = b < 0.33 ? 2 : b < 0.66 ? 4 : 8;
+      const f = this._root() * oct * PENTA[Math.floor(Math.random() * PENTA.length)];
+      const lvl = 0.08 + 0.05 * Math.random();
+      [[1, 1, 1.3], [2.0, 0.3, 0.6], [3.01, 0.12, 0.35], [4.2, 0.05, 0.2]].forEach(([r, a, d]) => this._ping(s.grains, t, f * r, lvl * a, 0.0015, d));
+      return 0.35 + -Math.log(1 - Math.random() * 0.97) * 0.7;
+    }
+
+    _bloom(s, k, t) {
+      // soft chord swell as the energy leaves the crown
+      const root = this._root();
+      [4, 5, 6, 8].forEach((h, i) => this._ping(s.grains, t + i * 0.03, root * h, 0.035, 0.12, 1.4));
+    }
+
+    _ground(s, t) {
+      const root = this._root();
+      this._ping(s.grains, t, root / 2, 0.22, 0.05, 0.6);
+      this._ping(s.grains, t, root, 0.1, 0.04, 0.5);
+    }
+
+    // ---------------------------------------------------------------- main update
+    tick(now, elapsed, isBg) {
+      const p = this.params;
+      const tSched = now + LOOKAHEAD;
+      const dt = this.lastTick === null ? 0 : clamp(now - this.lastTick, 0, 0.25);
+      this.lastTick = now;
+      this.phase += dt * p.speed;
+
+      if (!p.enabled) {
+        if (!this._muted) {
+          this.streams.forEach((s) => s.out.gain.setTargetAtTime(0, now, 0.08));
+          this._muted = true;
+        }
+        this.telemetry.spatialVoices.forEach((v) => { v.active = false; });
+        this.telemetry.spatialStage.active = false;
+        return;
+      }
+      this._muted = false;
+      if (tSched - this.lastSched < UPDATE_DT) return;
+      this.lastSched = tSched;
+
+      const phase = this.breath.phase; // clock already advanced to tSched by the engine
+      const res = this._streamPositions(tSched, phase);
+      const n = res.n;
+      const norm = 1 / Math.sqrt(n);
+      const stageNow = res.stage;
+
+      for (let k = 0; k < MAX_STREAMS; k++) {
+        const s = this.streams[k];
+        const active = k < n;
+        const gate = active ? 1 : 0;
+        if (!active) {
+          s.out.gain.setTargetAtTime(0, now, 0.25);
+          continue;
+        }
+        const pos = res.streams[k];
+        // keep part of the 1/r distance cue but stop sources near the head from jumping 6-8 dB louder
+        const dist = Math.hypot(pos.x, pos.y, pos.z);
+        const ext = Math.cos(clamp(pos.w, 0, 1) * Math.PI / 2);
+        const nearComp = lerp(1, clamp(Math.pow(dist / 1.0, 0.6), 0.5, 1), ext);
+        s.out.gain.linearRampToValueAtTime(p.gain * norm * nearComp, tSched);
+        this.renderer.setPosition(this.slots[k], pos.x, pos.y, pos.z, pos.w, tSched);
+        const info = this._modulate(s, k, pos, res, tSched, gate);
+        info.energy = clamp(0.35 * info.breathLvl + 0.65 * info.harmLvl, 0, 1);
+        if (pos.st && pos.st.stage === 'exhale') info.energy = clamp(1.1 - pos.st.p, 0.2, 1);
+        // grains for the window (lastGrain, tSched]
+        if (s.nextGrain < now - 0.5 || s.nextGrain === 0) s.nextGrain = now + 0.05 + 0.13 * k;
+        let guard = 0;
+        while (s.nextGrain < tSched && guard++ < 16) {
+          const tg = Math.max(s.nextGrain, now + 0.01);
+          s.nextGrain = tg + this._grain(s, k, tg, pos, info, res);
+        }
+        s.lastPos = pos;
+      }
+
+      // stage transitions (REBAL): bloom at the crown, grounding at the soles
+      if (p.trajectory === 'rebal' && res.st) {
+        if (this.prevStage && this.prevStage !== stageNow) {
+          if (stageNow === 'exhale' && (p.palette === 'breath' || p.palette === 'choir')) this._bloom(this.streams[0], 0, tSched);
+          if (stageNow === 'inhale' && this.prevStage !== 'inhale' && p.palette !== 'chimes') this._ground(this.streams[0], tSched);
+        }
+        this.prevStage = stageNow;
       } else {
-        // Harmonic glass chime glint
-        const harm = [12, 16, 18, 20, 24, 27, 32][Math.floor(Math.random() * 7)];
-        this._ping(v.input, t, REBAL_ROOT * harm, 0.07 * level, 0.035 + Math.random() * 0.05);
+        this.prevStage = null;
       }
+
+      // display frame (heard LOOKAHEAD seconds from now)
+      this.frames.push({
+        t: tSched,
+        label: res.label,
+        mode: res.mode,
+        stage: res.st ? res.st.stage : null,
+        p: res.st ? res.st.p : 0,
+        cycle: res.st ? res.st.cycle : 0,
+        testIndex: res.testIndex,
+        streams: res.streams.map((q) => ({ x: q.x, y: q.y, z: q.z, w: q.w }))
+      });
+      if (this.frames.length > 60) this.frames.shift();
     }
 
-    _crownBurst(now) {
-      if (this.params.palette !== 'energy') return;
-      const n = this.params.count;
-      for (let k = 0; k < 24; k++) {
-        const v = this.voices[k % n];
-        const t = now + 0.01 + Math.pow(Math.random(), 1.5) * 0.45;
-        this._sparkle(v, t, 1.25);
+    /** state heard at audio time t (interpolated between scheduled frames) */
+    getDisplay(t) {
+      const f = this.frames;
+      if (!f.length) return null;
+      let a = f[0], b = f[0];
+      for (let i = f.length - 1; i >= 0; i--) {
+        if (f[i].t <= t) { a = f[i]; b = f[Math.min(f.length - 1, i + 1)]; break; }
       }
-      const tv = this.telemetry.spatialVoices[0];
-      this._ripple({ x: 0, y: REBAL_CROWN_Y, z: 0 }, now, 0);
-      tv.burstTime = now;
-    }
-
-    _bowl(v, t, i) {
-      const f0 = BOWL_FREQS[i % BOWL_FREQS.length];
-      const partials = [
-        [1.0, 0.55, 6.0, 0.6],
-        [2.71, 0.22, 3.2, 1.2],
-        [5.15, 0.09, 1.7, 0],
-        [8.43, 0.04, 0.8, 0]
-      ];
-      partials.forEach(([ratio, amp, tau, beat]) => {
-        this._ping(v.input, t, f0 * ratio, amp, tau, 0.003);
-        if (beat > 0) this._ping(v.input, t, f0 * ratio + beat, amp * 0.7, tau * 0.9, 0.003);
+      const u = b.t > a.t ? clamp((t - a.t) / (b.t - a.t), 0, 1) : 0;
+      const streams = a.streams.map((s, k) => {
+        const q = b.streams[k] || s;
+        return { x: lerp(s.x, q.x, u), y: lerp(s.y, q.y, u), z: lerp(s.z, q.z, u), w: lerp(s.w, q.w, u) };
       });
-      this._noiseBurst(v.input, t, 0.01, 'lowpass', 3200, 0.7, 0.28);
-      this._noiseBurst(v.input, t, 0.003, 'highpass', 6500, 0.7, 0.1);
+      return { label: a.label, mode: a.mode, stage: a.stage, p: lerp(a.p, b.stage === a.stage ? b.p : a.p, u), cycle: a.cycle, testIndex: a.testIndex, streams };
     }
 
-    _drop(v, t) {
-      const ctx = this.ctx;
-      const f0 = 700 * Math.pow(3.5, Math.random());
-      const dur = clamp(0.045 * (1500 / f0), 0.02, 0.09);
-      const o = ctx.createOscillator();
-      o.frequency.setValueAtTime(f0, t);
-      o.frequency.exponentialRampToValueAtTime(f0 * (1.4 + Math.random() * 0.6), t + dur);
-      const g = ctx.createGain();
-      const lvl = 0.25 + Math.random() * 0.2;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(lvl, t + 0.0006);
-      g.gain.setTargetAtTime(0, t + 0.0012, dur / 3);
-      o.connect(g);
-      g.connect(v.input);
-      o.start(t);
-      o.stop(t + dur * 2.0);
-      this._noiseBurst(v.input, t, 0.0025, 'highpass', 3000, 0.7, lvl * 0.4);
-    }
-
-    _chime(v, t) {
-      let idx;
-      do { idx = Math.floor(Math.random() * CHIME_FREQS.length); } while (idx === this.lastChime && CHIME_FREQS.length > 1);
-      this.lastChime = idx;
-      const f = CHIME_FREQS[idx];
-      const lvl = 0.15 + Math.random() * 0.08;
-      [[1, 1, 1.4], [2, 0.32, 0.7], [3, 0.12, 0.4], [4.2, 0.05, 0.2]].forEach(([r, a, tau]) => {
-        this._ping(v.input, t, f * r, lvl * a, tau, 0.0012);
-      });
-      this._noiseBurst(v.input, t, 0.0025, 'bandpass', 7500, 1.2, lvl * 0.65);
+    meridian(steps = 64) {
+      const L = this.params.distance;
+      const pts = [];
+      for (let i = 0; i <= steps; i++) pts.push(meridianAt(i / steps, L));
+      return pts;
     }
 
     update(key, val) {
       const now = this.ctx.currentTime;
-      this._normalizeParams();
+      this._normalize();
       const p = this.params;
-      this.out.gain.setTargetAtTime(p.enabled ? p.gain : 0, now, 0.05);
-
-      if (key === 'room') {
-        this.roomIn.gain.setTargetAtTime(p.room * 0.25, now, 0.06);
-      } else if (key === 'palette') {
-        this._applyPalette();
-      } else if (key === 'trajectory' || key === 'count') {
-        if (key === 'trajectory') {
-          this.phase = 0;
-          this.lastCycleIdx = -1;
-        }
-        this.telemetry.spatialVoices.forEach((tv) => { tv.trail = []; });
+      if (key === 'palette' || key === 'root') this._applyPalette(false);
+      if (key === 'trajectory' || key === 'rebalMode' || key === 'count') {
+        this.rebalStart = null;
+        this.prevStage = null;
+        this.frames.length = 0;
+        if (key !== 'count') this.renderer.unprime();
       }
+      if (key === 'renderer') this.renderer.setMode(p.renderer);
+      if (key === 'room' || key === 'cue' || key === 'enabled') this.applyRendererConfig();
+      if (key === 'enabled' && !p.enabled) this.streams.forEach((s) => s.out.gain.setTargetAtTime(0, now, 0.08));
+    }
+
+    applyRendererConfig() {
+      const p = this.params;
+      this.renderer.setConfig({ cue: p.cue, pinna: Math.min(1.3, 0.5 + 0.5 * p.cue), er: 0.25 + 1.1 * p.room, reverb: 0.08 + 0.55 * p.room, roomSize: 0.8 + 0.6 * p.room });
     }
   }
 
   Spatial3DModule.PALETTES = PALETTES;
   Spatial3DModule.TRAJECTORIES = TRAJECTORIES;
-  Spatial3DModule.REBAL_CROWN_Y = REBAL_CROWN_Y;
-  Spatial3DModule.REBAL_FEET_Y = REBAL_FEET_Y;
+  Spatial3DModule.REBAL_MODES = REBAL_MODES;
+  Spatial3DModule.Y_CROWN = Y_CROWN;
+  Spatial3DModule.Y_FEET = Y_FEET;
+  Spatial3DModule.MAX_STREAMS = MAX_STREAMS;
+  Spatial3DModule.LOOKAHEAD = LOOKAHEAD;
+  Spatial3DModule.TEST_POINTS = TEST_POINTS;
+  Spatial3DModule.geometry = { meridianAt, rebalPosition, exhaleInterior, inhaleInterior, baseAzimuth, windFrac, MERIDIAN, Y_CROWN, Y_FEET };
 
-  window.Spatial3DModule = Spatial3DModule;
-})();
+  global.Spatial3DModule = Spatial3DModule;
+  global.AetherBreathClock = BreathClock;
+})(typeof window !== 'undefined' ? window : globalThis);

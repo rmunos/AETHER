@@ -7,459 +7,566 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AETHER // WebAudio Neurophenomenology & Consciousness Remi Lab</title>
+  <title>AETHER // 3D sound for meditation and expanded states</title>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="apple-touch-icon" href="icon-512.png" />
-  <link rel="stylesheet" href="styles.css?v=2.9" />
+  <link rel="stylesheet" href="styles.css?v=6.0" />
 </head>
 <body>
   <div class="app-shell">
-    <!-- Top Telemetry & Master Transport Bar -->
     <header class="topbar">
       <div class="brand">
         <div class="brand-glyph" id="statusOrb"></div>
         <div>
-          <h1>AETHER <span class="brand-sub">// PSYCHOACOUSTIC CONSCIOUSNESS REMI LAB</span></h1>
-          <p class="brand-tagline">Real-time WebAudio synthesis for neural entrainment, DMN suppression &amp; spatial ego unbinding</p>
+          <h1>AETHER <span class="brand-sub">// 3D SOUND FOR MEDITATION</span></h1>
+          <p class="brand-tagline">Breath-paced binaural soundscapes · REBAL energy balloon · use stereo headphones</p>
         </div>
       </div>
 
+      <div class="breath-pill" title="Breath pacer shared by every module">
+        <div class="breath-row">
+          <span class="telemetry-label">BREATH</span>
+          <span class="telemetry-value" id="telemetryBreath">—</span>
+          <span class="mono-dim" id="telemetryBreathTimes"></span>
+        </div>
+        <div class="breath-bar"><div class="breath-fill" id="breathFill"></div></div>
+      </div>
+
       <div class="telemetry-strip">
-        <div class="telemetry-item" title="Dominant target neural oscillation band">
-          <span class="telemetry-label">TARGET STATE</span>
+        <div class="telemetry-item">
+          <span class="telemetry-label">PRESET</span>
           <span class="telemetry-value accent-cyan" id="telemetryState">STANDBY</span>
         </div>
-        <div class="telemetry-item" title="Real-time Bayesian surprise metric of the Edge-of-Chaos engine (bits)">
-          <span class="telemetry-label">BAYESIAN SURPRISE</span>
-          <span class="telemetry-value accent-violet" id="telemetrySurprise">0.00 bits</span>
+        <div class="telemetry-item" title="Binaural renderer in use">
+          <span class="telemetry-label">3D RENDERER</span>
+          <span class="telemetry-value accent-violet" id="telemetryRenderer">—</span>
         </div>
-        <div class="telemetry-item" title="Cross-frequency Theta-Gamma phase-amplitude coupling index">
-          <span class="telemetry-label">PAC INDEX (θ–γ)</span>
-          <span class="telemetry-value accent-amber" id="telemetryPAC">0.00</span>
-        </div>
-        <div class="telemetry-item" title="0.1 Hz autonomic heart-brain coherence breath phase">
-          <span class="telemetry-label">0.1 Hz BREATH</span>
-          <span class="telemetry-value" id="telemetryBreath">INHALE</span>
-        </div>
-        <div class="telemetry-item" title="Android background audio focus and lock-screen playback status">
-          <span class="telemetry-label">LOCK-SCREEN PLAY</span>
-          <span class="telemetry-value accent-cyan" id="telemetryBgAudio">STANDBY</span>
+        <div class="telemetry-item" title="Background / lock-screen playback status">
+          <span class="telemetry-label">BACKGROUND</span>
+          <span class="telemetry-value" id="telemetryBgAudio">STANDBY</span>
         </div>
       </div>
 
       <div class="master-controls">
         <div class="master-top-row">
-          <a href="docs.html" class="btn-docs" title="Open Full Feature &amp; Neuroscience Documentation">
-            <span>📖</span>
-            <span>DOCUMENTATION</span>
-          </a>
-          <div class="master-Gain-wrap">
-            <label for="masterGain">MASTER</label>
+          <a href="docs.html" class="btn-docs" title="How it works, references and safety">📖 GUIDE</a>
+          <div class="master-gain-wrap">
+            <label for="masterGain">VOLUME</label>
             <input type="range" id="masterGain" min="0" max="1" step="0.01" value="0.7" />
             <span id="masterGainVal" class="mono-val">70%</span>
           </div>
         </div>
         <button id="powerBtn" class="btn-power" aria-pressed="false">
           <span class="power-icon">⏻</span>
-          <span id="powerBtnText">INITIALIZE AUDIO ENGINE</span>
+          <span id="powerBtnText">START AUDIO</span>
         </button>
       </div>
     </header>
 
-    <!-- Main Workspace Grid -->
     <main class="workspace">
-      <!-- Left / Center Column: Visualizer & Presets + Journey Engine -->
       <section class="left-panel">
-        <!-- Multi-Mode Real-Time Visualizer -->
         <div class="visualizer-card">
           <div class="visualizer-header">
             <div class="viz-tabs" role="tablist">
-              <button class="viz-tab active" data-viz="spatial" role="tab">3D Sound Space</button>
-              <button class="viz-tab" data-viz="pac" role="tab">θ–γ PAC &amp; Binaural Lissajous</button>
-              <button class="viz-tab" data-viz="chaos" role="tab">Edge-of-Chaos &amp; Fractal Spectrum</button>
+              <button class="viz-tab active" data-viz="spatial" role="tab">3D space</button>
+              <button class="viz-tab" data-viz="pac" role="tab">Binaural beat</button>
+              <button class="viz-tab" data-viz="chaos" role="tab">Spectrum &amp; melody</button>
             </div>
+            <button class="btn-mini" id="fullscreenBtn" title="Full-screen visual (tap to exit)">⛶</button>
           </div>
-
-          <div class="canvas-container">
+          <div class="canvas-container" id="canvasContainer">
             <canvas id="neuroCanvas"></canvas>
             <div class="viz-hud">
-              <div class="hud-pill" id="hudLeft">HRTF 3D · drag to place a source</div>
-              <div class="hud-pill" id="hudRight">0.1 Hz Vagal Coherence Guide</div>
+              <div class="hud-pill" id="hudLeft"></div>
+              <div class="hud-pill" id="hudRight"></div>
             </div>
           </div>
         </div>
 
-        <!-- Phenomenological State Presets & Custom User Config -->
+        <div class="presets-card journey-card">
+          <div class="section-header">
+            <h2>Guided sessions</h2>
+            <span class="mono-dim" id="journeyClock"></span>
+          </div>
+          <div class="journey-row">
+            <select id="journeySelect" class="select-input">
+              <option value="rebalSession">REBAL session · 20 min (settle → fountain → spiral → balloon → return)</option>
+              <option value="deepRelax">Deep relaxation · 15 min (surf, heartbeat, bowls, slow theta)</option>
+              <option value="expansion">Expansion · 28 min (REBAL → horizon → open space → return)</option>
+            </select>
+            <button type="button" id="journeyBtn" class="btn-config">▶ Start session</button>
+          </div>
+          <div class="journey-progress"><div class="journey-fill" id="journeyFill"></div></div>
+          <div class="journey-step" id="journeyStep">Sessions change every module gradually, with spoken-free cues in the sound itself. Lie down or sit comfortably, eyes closed.</div>
+        </div>
+
         <div class="presets-card">
           <div class="section-header">
-            <h2>Phenomenological State Presets</h2>
+            <h2>Presets</h2>
             <div class="custom-config-controls">
-              <button type="button" id="saveConfigBtn" class="btn-config" title="Save your current hand-tuned configuration of all modules">
-                💾 Save Config
-              </button>
-              <button type="button" id="restoreConfigBtn" class="btn-config btn-config-restore" title="Restore your previously saved custom configuration" disabled>
-                ↺ Restore Saved
-              </button>
+              <button type="button" id="saveConfigBtn" class="btn-config" title="Save the current settings of all modules">💾 Save</button>
+              <button type="button" id="restoreConfigBtn" class="btn-config btn-config-restore" title="Restore your saved settings" disabled>↺ Restore</button>
             </div>
           </div>
-
-          <div class="preset-grid">
-            <button class="preset-btn active" data-preset="egoDissolution">
-              <span class="preset-title">1. 8D Singing Bowls &amp; Water Drops</span>
-              <span class="preset-desc">8D Binaural Auricle orbits with crystal water droplets &amp; moving singing bowls around the pinna</span>
-            </button>
-            <button class="preset-btn" data-preset="dmnQuieting">
-              <span class="preset-title">2. DMN Quieting (Edge of Chaos)</span>
-              <span class="preset-desc">Logistic-map (r = 3.74) 12-TET motifs &amp; non-repeating timbres that suspend predictive self-talk</span>
-            </button>
-            <button class="preset-btn" data-preset="lucidHypnagogia">
-              <span class="preset-title">3. Lucid Hypnagogia (θ–γ PAC)</span>
-              <span class="preset-desc">40 Hz Gamma bursts nested on 6 Hz Theta peaks + 0.1 Hz breath swell for awake dream states</span>
-            </button>
-            <button class="preset-btn" data-preset="timelessFractal">
-              <span class="preset-title">4. Timeless Fractal Horizon</span>
-              <span class="preset-desc">Infinite Shepard-Risset glissando + 1/f multi-scale modulation to dissolve linear time</span>
-            </button>
-            <button class="preset-btn" data-preset="somaticVagal">
-              <span class="preset-title">5. Somatic Vagal Infrasound</span>
-              <span class="preset-desc">32 Hz sub-bass + 1.8 Hz vestibular pulse &amp; missing-fundamental warmth for deep visceral presence</span>
-            </button>
-            <button class="preset-btn" data-preset="auditoryGanzfeld">
-              <span class="preset-title">6. Auditory Ganzfeld Void</span>
-              <span class="preset-desc">Decorrelated 3D 1/f pink/brown cavern resonance for stochastic internal imagery</span>
-            </button>
-            <button class="preset-btn" data-preset="shamanicTrance">
-              <span class="preset-title">7. 8D Shamanic &amp; Tibetan Overtones</span>
-              <span class="preset-desc">Orbiting 110 Hz Tibetan throat overtones + 4.5 Hz spatialized theta skin drum &amp; seed rattle</span>
-            </button>
-            <button class="preset-btn" data-preset="somaticTingles">
-              <span class="preset-title">8. 8D Peripersonal ASMR &amp; Silk</span>
-              <span class="preset-desc">Close-ear binaural silk brushing, whispers, water drops &amp; bamboo taps sculpting the ear auricle</span>
-            </button>
-            <button class="preset-btn" data-preset="rebalGateway">
-              <span class="preset-title">9. REBAL Energy Balloon (Monroe Gateway)</span>
-              <span class="preset-desc">Expire: Head → Crown ▲ → 4-Way Spinning Torus → Feet ▼ // Inspire: Feet → Body Core → Filling Head ✨</span>
-            </button>
-          </div>
-
-          <!-- Active Phenomenology Mechanism Note -->
-          <div class="mechanism-banner" id="mechanismBanner">
-            <div class="mech-title" id="mechTitle">Neuro-Mechanism: 8D Auricle (Pinna) Localization &amp; Parietal De-Anchoring</div>
-            <p class="mech-text" id="mechText">
-              True 3D/8D localization combines Interaural Time Difference (ITD 0–700 µs), contralateral cranial head-shadowing, Blauert front/back bands (1.1 kHz rear vs 3.7 kHz front), and the ear auricle (pinna) elevation spectral notch (5–11 kHz) on rich moving sources and water droplets.
-            </p>
+          <div class="preset-grid" id="presetGrid"></div>
+          <div class="mechanism-banner">
+            <div class="mech-title" id="mechTitle"></div>
+            <p class="mech-text" id="mechText"></p>
           </div>
         </div>
       </section>
 
-      <!-- Right Column: 6 Real-Time Synthesis Modules -->
       <section class="modules-grid">
+        <!-- GLOBAL: breath, tuning, space -->
+        <article class="module-card active-module global-card" data-module="global">
+          <div class="module-header">
+            <div>
+              <span class="module-tag tag-amber">00 // BREATH · TUNING · SPACE</span>
+              <h3>Breath pacer &amp; tonal centre</h3>
+            </div>
+          </div>
+          <p class="module-subtitle">Every module follows this breath: the REBAL flow, the surf, the binaural swell and the sub-bass. Breathe with the sound.</p>
+          <div class="control-list">
+            <div class="control-row">
+              <div class="control-label"><span>Breaths per minute</span><span class="mono-val" id="breathRateVal">6.0 /min</span></div>
+              <input type="range" id="breathRate" min="3" max="12" step="0.5" value="6" />
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Inhale share</span><span class="mono-val" id="breathInhaleVal">45 %</span></div>
+              <input type="range" id="breathInhale" min="0.3" max="0.6" step="0.01" value="0.45" />
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Hold after inhale</span><span class="mono-val" id="breathHoldInVal">0.0 s</span></div>
+                <input type="range" id="breathHoldIn" min="0" max="6" step="0.5" value="0" />
+              </div>
+              <div>
+                <div class="control-label"><span>Hold after exhale</span><span class="mono-val" id="breathHoldOutVal">0.0 s</span></div>
+                <input type="range" id="breathHoldOut" min="0" max="6" step="0.5" value="0" />
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Tonal centre</span></div>
+              <select id="rootSelect" class="select-input">
+                <option value="108" selected>A · 108 Hz (A4 = 432 Hz tuning)</option>
+                <option value="110">A · 110 Hz (A4 = 440 Hz)</option>
+                <option value="128">C · 128 Hz (C4 = 256 Hz)</option>
+                <option value="136.1">136.1 Hz ("Om", Earth-year tone)</option>
+                <option value="96">G · 96 Hz (432 tuning)</option>
+              </select>
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Hall reverb &amp; shimmer</span><span class="mono-val" id="reverbMixVal">40%</span></div>
+              <input type="range" id="reverbMix" min="0" max="1" step="0.01" value="0.4" />
+            </div>
+          </div>
+        </article>
 
-        <!-- MODULE 1: Unified 8D Binaural Auricle & Spatial ASMR -->
+        <!-- MODULE 01 -->
         <article class="module-card active-module" data-module="spatial">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-cyan">01 // BINAURAL 3D SOUND SPACE</span>
-              <h3>3D Sound Space &amp; REBAL Energy Torus</h3>
+              <span class="module-tag tag-cyan">01 // 3D SOUND SPACE</span>
+              <h3>REBAL energy balloon &amp; 3D movement</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloSpatialBtn" class="btn-solo" title="Mute all other modules to hear the 3D sound space alone">SOLO 3D</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="spatialEnabled" checked />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="spatial">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="spatialEnabled" checked /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Measured-HRTF binaural rendering with floor reflection &amp; room for out-of-head 3D localization. Use headphones. Drag on the canvas (top or front view) to place a source.</p>
-
+          <p class="module-subtitle">Tip: click or drag on the 3D views to place a source by hand. Each stream is rendered binaurally (head shadow, interaural delay, pinna notches, shoulder and room reflections). Inhale: energy rises inside you from the soles to the crown. Exhale: it fountains out of the crown, over and down around you, back into the soles.</p>
           <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Sound</span></div>
-              <select id="spatialPalette" class="select-input">
-                <option value="energy" selected>⚡ Breath Energy (voice + breath + sparkle)</option>
-                <option value="bowl">🥣 Singing Bowls</option>
-                <option value="drops">💧 Water Drops</option>
-                <option value="chimes">✨ Crystal Chimes</option>
-              </select>
-            </div>
             <div class="control-row">
               <div class="control-label"><span>Movement</span></div>
               <select id="spatialTrajectory" class="select-input">
-                <option value="rebal">REBAL Energy Torus (exhale: crown → around → feet · inhale: feet → head)</option>
-                <option value="orbit" selected>Horizontal Orbit (ear level)</option>
-                <option value="vertical">Vertical Loops (front → above → behind → below)</option>
-                <option value="sphere">Free 3D Wander (whole sphere)</option>
-                <option value="manual">Hold Still (drag to place)</option>
+                <option value="rebal" selected>REBAL energy balloon (breath-coupled torus)</option>
+                <option value="orbit">Horizontal orbit (ear level)</option>
+                <option value="vertical">Vertical loop (front → above → behind → below)</option>
+                <option value="sphere">Free wander over the whole sphere</option>
+                <option value="test">Localisation check (fixed points, noise bursts)</option>
+                <option value="manual">Hold still (drag on the views)</option>
+              </select>
+            </div>
+            <div class="control-row rebal-only">
+              <div class="control-label"><span>REBAL pattern</span></div>
+              <select id="spatialRebalMode" class="select-input">
+                <option value="program" selected>Guided: fountain → spiral → sustained balloon</option>
+                <option value="fountain">Fountain (out of the crown, down around you, in at the feet)</option>
+                <option value="spiral">Spiral (winding down around you, coiling up inside)</option>
+                <option value="balloon">Sustained balloon (continuous circulation)</option>
               </select>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Sources</span><span class="mono-val" id="spatialCountVal">2</span></div>
-              <input type="range" id="spatialCount" min="1" max="4" step="1" value="2" />
+              <div class="control-label"><span>Sound</span></div>
+              <select id="spatialPalette" class="select-input">
+                <option value="breath" selected>Breath + harmonics (overtones follow height)</option>
+                <option value="choir">Resonant voice (vowel opens with height)</option>
+                <option value="water">Water fountain (stream + droplets)</option>
+                <option value="bowl">Singing bowls</option>
+                <option value="chimes">Crystal chimes</option>
+              </select>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Streams</span><span class="mono-val" id="spatialCountVal">4</span></div>
+                <input type="range" id="spatialCount" min="1" max="6" step="1" value="4" />
+              </div>
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="spatialGainVal">85%</span></div>
+                <input type="range" id="spatialGain" min="0" max="1.2" step="0.01" value="0.85" />
+              </div>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Balloon size</span><span class="mono-val" id="spatialDistanceVal">1.9 m</span></div>
+                <input type="range" id="spatialDistance" min="0.8" max="3.5" step="0.1" value="1.9" />
+              </div>
+              <div>
+                <div class="control-label"><span>Spiral turns</span><span class="mono-val" id="spatialTurnsVal">1.25</span></div>
+                <input type="range" id="spatialTurns" min="0" max="3" step="0.25" value="1.25" />
+              </div>
+            </div>
+            <div class="control-row rebal-only">
+              <div class="control-label"><span>Guided pattern: breaths per stage</span><span class="mono-val" id="spatialStageBreathsVal">6</span></div>
+              <input type="range" id="spatialStageBreaths" min="2" max="20" step="1" value="6" />
+            </div>
+            <div class="control-row free-only">
+              <div class="control-label"><span>Movement speed</span><span class="mono-val" id="spatialSpeedVal">0.08 Hz</span></div>
+              <input type="range" id="spatialSpeed" min="0.02" max="0.5" step="0.01" value="0.08" />
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Room / externalisation</span><span class="mono-val" id="spatialRoomVal">45%</span></div>
+                <input type="range" id="spatialRoom" min="0" max="1" step="0.01" value="0.45" />
+              </div>
+              <div>
+                <div class="control-label"><span>Spectral cue strength</span><span class="mono-val" id="spatialCueVal">1.00</span></div>
+                <input type="range" id="spatialCue" min="0" max="2" step="0.05" value="1" />
+              </div>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Level</span><span class="mono-val" id="spatialGainVal">80%</span></div>
-              <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.8" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Speed (cycles / s)</span><span class="mono-val" id="spatialSpeedVal">0.10 Hz · 10.0 s</span></div>
-              <input type="range" id="spatialSpeed" min="0.02" max="0.5" step="0.01" value="0.1" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Distance</span><span class="mono-val" id="spatialDistanceVal">1.8 m</span></div>
-              <input type="range" id="spatialDistance" min="0.5" max="4" step="0.1" value="1.8" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Room / Externalization</span><span class="mono-val" id="spatialRoomVal">45%</span></div>
-              <input type="range" id="spatialRoom" min="0" max="1" step="0.01" value="0.45" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>REBAL Torus Twist</span><span class="mono-val" id="spatialSpiralVal">0.00 (pure loop)</span></div>
-              <input type="range" id="spatialSpiral" min="0" max="2" step="0.05" value="0" />
+              <div class="control-label"><span>Renderer</span></div>
+              <select id="spatialRenderer" class="select-input">
+                <option value="structural" selected>Structural binaural model (recommended)</option>
+                <option value="hrtf">Browser measured HRTF (for comparison)</option>
+              </select>
             </div>
           </div>
         </article>
 
-        <!-- MODULE 2: Predictive-Coding Edge of Chaos -->
+        <!-- MODULE 02 -->
         <article class="module-card" data-module="chaos">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-violet">02 // DEFAULT MODE NETWORK</span>
-              <h3>Predictive-Coding "Edge of Chaos"</h3>
+              <span class="module-tag tag-violet">02 // EDGE OF CHAOS</span>
+              <h3>Non-repeating melody in 3D</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloChaosBtn" class="btn-solo" title="Mute all other modules to isolate Edge of Chaos sounds &amp; rhythms">SOLO CHAOS</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="chaosEnabled" />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="chaos">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="chaosEnabled" /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Multi-archetype synthesis (FM bells, sub-drops, modal wood, reverse swells, bio-formants) driven by chaotic rhythms.</p>
-
+          <p class="module-subtitle">A logistic map near the edge of chaos chooses notes, timbres and places; short motifs form and mutate before they can loop.</p>
           <div class="control-list">
             <div class="control-row">
-              <div class="control-label"><span>Sonic Archetype Palette</span></div>
+              <div class="control-label"><span>Timbre</span></div>
               <select id="chaosPalette" class="select-input">
-                <option value="hybrid" selected>All Archetypes (Strange-Attractor Mutation)</option>
-                <option value="metallic">Inharmonic FM Bells, Singing Bowls &amp; Gongs</option>
-                <option value="liquid">Liquid Formant Vowels &amp; Bio-Acoustic Calls</option>
-                <option value="plucked">Modal Wood, Koto Plucks &amp; Bowed Glass</option>
-                <option value="subglitch">Deep Tectonic Sub-Drops &amp; Microsound Clicks</option>
-                <option value="breath">Reverse Envelope Swells &amp; Throat Overtones</option>
+                <option value="hybrid" selected>All timbres (chosen by the attractor)</option>
+                <option value="metallic">FM bells</option>
+                <option value="liquid">Liquid vowels</option>
+                <option value="plucked">Wood &amp; glass plucks</option>
+                <option value="subglitch">Deep drops</option>
+                <option value="breath">Swelling reeds</option>
               </select>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Rhythmic &amp; Temporal Engine</span></div>
-              <select id="chaosRhythm" class="select-input">
-                <option value="avalanche" selected>Neuronal Avalanche (Rapid Flurries &amp; Silences)</option>
-                <option value="lorenz">Strange-Attractor Syncopated Groove (Bifurcating)</option>
-                <option value="polyrhythm">Golden-Ratio (φ) &amp; Prime Polyrhythm (3:5:7)</option>
-                <option value="elastic">Elastic Time Gravity (Accelerando ↔ Ritardando)</option>
-                <option value="stochastic">Logistic Cloud (r-Controlled Periodicity)</option>
-              </select>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Rhythm</span></div>
+                <select id="chaosRhythm" class="select-input">
+                  <option value="avalanche" selected>Avalanches &amp; silences</option>
+                  <option value="lorenz">Shifting subdivisions</option>
+                  <option value="polyrhythm">1 : φ : 7/3 streams</option>
+                  <option value="elastic">Accelerando ↔ ritardando</option>
+                  <option value="stochastic">Logistic cloud</option>
+                </select>
+              </div>
+              <div>
+                <div class="control-label"><span>Scale</span></div>
+                <select id="chaosScale" class="select-input">
+                  <option value="pentatonic" selected>Major pentatonic</option>
+                  <option value="dorian">Dorian</option>
+                  <option value="lydian">Lydian</option>
+                  <option value="phrygian">Phrygian dominant</option>
+                  <option value="chromatic12">Chromatic</option>
+                </select>
+              </div>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Musical Notes (12-Tone Multi-Octave)</span></div>
-              <select id="chaosScale" class="select-input">
-                <option value="chromatic12" selected>All 12 Chromatic Notes (Motif + Mutation)</option>
-                <option value="dorian">Dorian Mode (12-TET Minor/Modal)</option>
-                <option value="lydian">Lydian Dream Scale (12-TET #4)</option>
-                <option value="pentatonic">Suspended Pentatonic (Consonant 12-TET)</option>
-                <option value="phrygian">Phrygian Dominant (Mystic 12-TET)</option>
-              </select>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="chaosGainVal">55%</span></div>
+                <input type="range" id="chaosGain" min="0" max="1" step="0.01" value="0.55" />
+              </div>
+              <div>
+                <div class="control-label"><span>Chaos r</span><span class="mono-val" id="chaosRVal">3.74 (edge)</span></div>
+                <input type="range" id="chaosR" min="2.8" max="3.99" step="0.01" value="3.74" />
+              </div>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="chaosGainVal">65%</span></div>
-              <input type="range" id="chaosGain" min="0" max="1" step="0.01" value="0.65" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Events / s</span><span class="mono-val" id="chaosRateVal">2.6</span></div>
+                <input type="range" id="chaosRate" min="0.3" max="10" step="0.1" value="2.6" />
+              </div>
+              <div>
+                <div class="control-label"><span>Register</span><span class="mono-val" id="chaosRegisterVal">45%</span></div>
+                <input type="range" id="chaosRegister" min="0" max="1" step="0.01" value="0.45" />
+              </div>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Chaos Parameter (r)</span><span class="mono-val" id="chaosRVal">3.74 (Edge)</span></div>
-              <input type="range" id="chaosR" min="2.80" max="3.99" step="0.01" value="3.74" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Tempo / Event Density</span><span class="mono-val" id="chaosRateVal">3.8 /s</span></div>
-              <input type="range" id="chaosRate" min="0.5" max="12" step="0.1" value="3.8" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Pitch Register (Sub ↔ Crystalline)</span><span class="mono-val" id="chaosRegisterVal">45% (Wide)</span></div>
-              <input type="range" id="chaosRegister" min="0" max="1" step="0.01" value="0.45" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Timbral Mutation &amp; Envelope Skew</span><span class="mono-val" id="chaosMorphVal">72%</span></div>
-              <input type="range" id="chaosMorph" min="0" max="1" step="0.01" value="0.72" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Timbre mutation</span><span class="mono-val" id="chaosMorphVal">60%</span></div>
+                <input type="range" id="chaosMorph" min="0" max="1" step="0.01" value="0.6" />
+              </div>
+              <label class="check-row"><input type="checkbox" id="chaosSpace3d" checked /> Place events in 3D</label>
             </div>
           </div>
         </article>
 
-        <!-- MODULE 3: Cross-Frequency PAC Audio -->
+        <!-- MODULE 03 -->
         <article class="module-card" data-module="pac">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-amber">03 // THALAMOCORTICAL BINDING</span>
-              <h3>Cross-Frequency PAC (θ–γ Coupling)</h3>
+              <span class="module-tag tag-amber">03 // BINAURAL BEAT</span>
+              <h3>Binaural beat &amp; θ–γ shimmer</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloPacBtn" class="btn-solo" title="Mute all other modules to isolate Cross-Frequency PAC &amp; Binaural Phase">SOLO PAC</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="pacEnabled" />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="pac">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="pacEnabled" /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Multi-harmonic binaural carrier with phase-locked overtones + silk crystalline shimmer gated by Theta peaks &amp; 10s vagal breath.</p>
-
+          <p class="module-subtitle">Left ear: partials k·f − b/2, right ear: k·f + b/2, so every partial beats at b Hz between the ears. A shimmer of overtones flutters at γ on the crests of the beat and swells with the breath.</p>
           <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="pacGainVal">55%</span></div>
-              <input type="range" id="pacGain" min="0" max="1" step="0.01" value="0.55" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="pacGainVal">45%</span></div>
+                <input type="range" id="pacGain" min="0" max="1" step="0.01" value="0.45" />
+              </div>
+              <div>
+                <div class="control-label"><span>Carrier</span><span class="mono-val" id="pacBaseFreqVal">108 Hz</span></div>
+                <input type="range" id="pacBaseFreq" min="40" max="432" step="1" value="108" />
+              </div>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Beat b</span><span class="mono-val" id="pacThetaVal">6.0 Hz θ</span></div>
+                <input type="range" id="pacTheta" min="1" max="14" step="0.1" value="6" />
+              </div>
+              <div>
+                <div class="control-label"><span>Harmonics</span><span class="mono-val" id="pacHarmonicsVal">35%</span></div>
+                <input type="range" id="pacHarmonics" min="0" max="1" step="0.01" value="0.35" />
+              </div>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>γ flutter</span><span class="mono-val" id="pacGammaVal">40 Hz</span></div>
+                <input type="range" id="pacGamma" min="25" max="75" step="1" value="40" />
+              </div>
+              <div>
+                <div class="control-label"><span>Shimmer depth</span><span class="mono-val" id="pacDepthVal">50%</span></div>
+                <input type="range" id="pacDepth" min="0" max="1" step="0.01" value="0.5" />
+              </div>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Base Carrier Frequency</span><span class="mono-val" id="pacBaseFreqVal">136 Hz (Low)</span></div>
-              <input type="range" id="pacBaseFreq" min="40" max="432" step="1" value="136" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Binaural Harmonics (Rich Drone)</span><span class="mono-val" id="pacHarmonicsVal">45% (Warm Tone)</span></div>
-              <input type="range" id="pacHarmonics" min="0" max="1" step="0.01" value="0.45" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Slow Phase Rhythm (δ / θ / α)</span><span class="mono-val" id="pacThetaVal">6.0 Hz (Theta)</span></div>
-              <input type="range" id="pacTheta" min="1.5" max="12.0" step="0.1" value="6.0" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Silk Gamma Flutter Rate (γ)</span><span class="mono-val" id="pacGammaVal">40 Hz</span></div>
-              <input type="range" id="pacGamma" min="25" max="75" step="1" value="40" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>PAC Silk Shimmer (θ-Peak Bloom)</span><span class="mono-val" id="pacDepthVal">70%</span></div>
-              <input type="range" id="pacDepth" min="0" max="1" step="0.01" value="0.70" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>0.1 Hz Coherent Breath Swell (10s)</span><span class="mono-val" id="pacBreathVal">65%</span></div>
-              <input type="range" id="pacBreath" min="0" max="1" step="0.01" value="0.65" />
+              <div class="control-label"><span>Breath swell</span><span class="mono-val" id="pacBreathVal">60%</span></div>
+              <input type="range" id="pacBreath" min="0" max="1" step="0.01" value="0.6" />
             </div>
           </div>
         </article>
 
-        <!-- MODULE 4: Fractal & Scale-Invariant Landscapes -->
+        <!-- MODULE 04 -->
         <article class="module-card" data-module="fractal">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-emerald">04 // TEMPORAL SUSPENSION</span>
-              <h3>Fractal &amp; Shepard-Risset Horizon</h3>
+              <span class="module-tag tag-emerald">04 // ENDLESS HORIZON</span>
+              <h3>Shepard–Risset glissando</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloFractalBtn" class="btn-solo" title="Mute all other modules to isolate Fractal &amp; Shepard-Risset Horizon">SOLO FRACTAL</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="fractalEnabled" />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="fractal">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="fractalEnabled" /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">8-octave Shepard-Risset glissando with pure Just-Intonation Major 3rd (5:4) &amp; 5th (3:2) multi-scale harmonic cascades.</p>
-
+          <p class="module-subtitle">Eight voices exactly one octave apart glide forever under a fixed spectral envelope: the pitch keeps rising (or falling) without ever arriving. Thirds and fifths bloom at several time scales.</p>
           <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="fractalGainVal">40%</span></div>
-              <input type="range" id="fractalGain" min="0" max="1" step="0.01" value="0.40" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="fractalGainVal">40%</span></div>
+                <input type="range" id="fractalGain" min="0" max="1" step="0.01" value="0.4" />
+              </div>
+              <div>
+                <div class="control-label"><span>Drift</span><span class="mono-val" id="fractalSpeedVal">+0.04 oct/s</span></div>
+                <input type="range" id="fractalSpeed" min="-0.25" max="0.25" step="0.01" value="0.04" />
+              </div>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Shepard Drift Velocity</span><span class="mono-val" id="fractalSpeedVal">+0.06 oct/s</span></div>
-              <input type="range" id="fractalSpeed" min="-0.25" max="0.25" step="0.01" value="0.06" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Multi-Scale 1/f Self-Similarity</span><span class="mono-val" id="fractalDepthVal">65%</span></div>
-              <input type="range" id="fractalDepth" min="0" max="1" step="0.01" value="0.65" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Spectral Bell Center</span><span class="mono-val" id="fractalCenterVal">220 Hz</span></div>
-              <input type="range" id="fractalCenter" min="65" max="528" step="1" value="220" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Harmonic bloom</span><span class="mono-val" id="fractalDepthVal">55%</span></div>
+                <input type="range" id="fractalDepth" min="0" max="1" step="0.01" value="0.55" />
+              </div>
+              <div>
+                <div class="control-label"><span>Spectral centre</span><span class="mono-val" id="fractalCenterVal">216 Hz</span></div>
+                <input type="range" id="fractalCenter" min="65" max="528" step="1" value="216" />
+              </div>
             </div>
           </div>
         </article>
 
-        <!-- MODULE 5: Infrasound & Somatic Sub-Bass -->
+        <!-- MODULE 05 -->
         <article class="module-card" data-module="sub">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-rose">05 // VESTIBULAR &amp; VAGAL</span>
-              <h3>Infrasound &amp; Somatic Sub-Bass</h3>
+              <span class="module-tag tag-rose">05 // SOMATIC</span>
+              <h3>Sub-bass &amp; heartbeat</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloSubBtn" class="btn-solo" title="Mute all other modules to isolate Infrasound &amp; Sub-Bass">SOLO SUB</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="subEnabled" />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="sub">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="subEnabled" /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Sub-45 Hz bone/vestibular carrier with 1.8 Hz trance pulse &amp; missing-fundamental harmonics.</p>
-
+          <p class="module-subtitle">A low tone felt in the body, with 2nd and 3rd harmonics so small headphones still convey it.</p>
           <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="subGainVal">50%</span></div>
-              <input type="range" id="subGain" min="0" max="1" step="0.01" value="0.50" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Pattern</span></div>
+                <select id="subPattern" class="select-input">
+                  <option value="breath" selected>Swells with each exhale</option>
+                  <option value="heartbeat">Slow heartbeat</option>
+                  <option value="pulse">Smooth pulse</option>
+                  <option value="steady">Steady</option>
+                </select>
+              </div>
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="subGainVal">45%</span></div>
+                <input type="range" id="subGain" min="0" max="1" step="0.01" value="0.45" />
+              </div>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Frequency</span><span class="mono-val" id="subFreqVal">27.0 Hz</span></div>
+                <input type="range" id="subFreq" min="24" max="60" step="0.5" value="27" />
+              </div>
+              <div>
+                <div class="control-label"><span>Pulse / heart rate</span><span class="mono-val" id="subPulseVal">1.00 Hz</span></div>
+                <input type="range" id="subPulse" min="0.2" max="4" step="0.05" value="1" />
+              </div>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Sub-Bass Fundamental</span><span class="mono-val" id="subFreqVal">34 Hz</span></div>
-              <input type="range" id="subFreq" min="24" max="60" step="0.5" value="34" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Infrasonic Pulse (Trance Meter)</span><span class="mono-val" id="subPulseVal">1.6 Hz</span></div>
-              <input type="range" id="subPulse" min="0.2" max="5.0" step="0.1" value="1.6" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Missing-Fundamental Warmth</span><span class="mono-val" id="subWarmthVal">45%</span></div>
+              <div class="control-label"><span>Harmonic warmth</span><span class="mono-val" id="subWarmthVal">45%</span></div>
               <input type="range" id="subWarmth" min="0" max="1" step="0.01" value="0.45" />
             </div>
           </div>
         </article>
 
-        <!-- MODULE 6: Auditory Ganzfeld & Stochastic Resonance -->
+        <!-- MODULE 06 -->
         <article class="module-card" data-module="ganzfeld">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-sky">06 // STOCHASTIC RESONANCE</span>
-              <h3>Auditory Ganzfeld (1/f Sonic Void)</h3>
+              <span class="module-tag tag-sky">06 // TEXTURES</span>
+              <h3>Surf, cavern, rain &amp; wind</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloGanzfeldBtn" class="btn-solo" title="Mute all other modules to isolate the Auditory Ganzfeld">SOLO GANZFELD</button>
-              <label class="toggle-switch">
-                <input type="checkbox" id="ganzfeldEnabled" />
-                <span class="slider"></span>
-              </label>
+              <button type="button" class="btn-solo" data-solo="ganzfeld">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="ganzfeldEnabled" /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Binaurally decorrelated pink/brown noise &amp; cavernous formant sweeps to amplify inner signal detection.</p>
-
+          <p class="module-subtitle">Decorrelated noise textures. The surf breaks once per breath: it draws back while you inhale and washes in while you exhale.</p>
           <div class="control-list">
-            <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="ganzfeldGainVal">30%</span></div>
-              <input type="range" id="ganzfeldGain" min="0" max="1" step="0.01" value="0.30" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Texture</span></div>
+                <select id="ganzfeldTexture" class="select-input">
+                  <option value="surf" selected>Ocean surf (breath-paced)</option>
+                  <option value="cavern">Pink-noise cavern (drifting vowels)</option>
+                  <option value="rain">Rain</option>
+                  <option value="wind">Wind</option>
+                </select>
+              </div>
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="ganzfeldGainVal">35%</span></div>
+                <input type="range" id="ganzfeldGain" min="0" max="1" step="0.01" value="0.35" />
+              </div>
             </div>
-            <div class="control-row">
-              <div class="control-label"><span>Color (1/f Pink ↔ 1/f² Brown)</span><span class="mono-val" id="ganzfeldColorVal">62% Brown</span></div>
-              <input type="range" id="ganzfeldColor" min="0" max="1" step="0.01" value="0.62" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Cavern Formant Sweep</span><span class="mono-val" id="ganzfeldSweepVal">55%</span></div>
-              <input type="range" id="ganzfeldSweep" min="0" max="1" step="0.01" value="0.55" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Cathedral Shimmer Space</span><span class="mono-val" id="reverbMixVal">55%</span></div>
-              <input type="range" id="reverbMix" min="0" max="1" step="0.01" value="0.55" />
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Darkness</span><span class="mono-val" id="ganzfeldColorVal">55%</span></div>
+                <input type="range" id="ganzfeldColor" min="0" max="1" step="0.01" value="0.55" />
+              </div>
+              <div>
+                <div class="control-label"><span>Intensity</span><span class="mono-val" id="ganzfeldSweepVal">50%</span></div>
+                <input type="range" id="ganzfeldSweep" min="0" max="1" step="0.01" value="0.5" />
+              </div>
             </div>
           </div>
         </article>
 
+        <!-- MODULE 07 -->
+        <article class="module-card" data-module="asmr">
+          <div class="module-header">
+            <div>
+              <span class="module-tag tag-fuchsia">07 // CLOSE-UP &amp; RITUAL</span>
+              <h3>Whisper, taps, drum, overtone chant</h3>
+            </div>
+            <div class="header-actions">
+              <button type="button" class="btn-solo" data-solo="asmr">SOLO</button>
+              <label class="toggle-switch"><input type="checkbox" id="asmrEnabled" /><span class="slider"></span></label>
+            </div>
+          </div>
+          <p class="module-subtitle">Rendered binaurally close to the head (near-field cues: strong level difference between the ears).</p>
+          <div class="control-list">
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Sound</span></div>
+                <select id="asmrPalette" class="select-input">
+                  <option value="whisper" selected>Whisper circling the head</option>
+                  <option value="crackle">Soft crackles</option>
+                  <option value="tapping">Wood taps, ear to ear</option>
+                  <option value="shamanic">Frame drum &amp; rattle</option>
+                  <option value="throat">Overtone chant</option>
+                </select>
+              </div>
+              <div>
+                <div class="control-label"><span>Level</span><span class="mono-val" id="asmrGainVal">50%</span></div>
+                <input type="range" id="asmrGain" min="0" max="1" step="0.01" value="0.5" />
+              </div>
+            </div>
+            <div class="control-row two-col">
+              <div>
+                <div class="control-label"><span>Distance</span><span class="mono-val" id="asmrProximityVal">0.51 m</span></div>
+                <input type="range" id="asmrProximity" min="0" max="1" step="0.01" value="0.3" />
+              </div>
+              <div>
+                <div class="control-label"><span>Rate (events or beats / s)</span><span class="mono-val" id="asmrRateVal">3.0</span></div>
+                <input type="range" id="asmrRate" min="0.5" max="8" step="0.1" value="3" />
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control-label"><span>Resonance / brightness</span><span class="mono-val" id="asmrResonanceVal">60%</span></div>
+              <input type="range" id="asmrResonance" min="0" max="1" step="0.01" value="0.6" />
+            </div>
+          </div>
+        </article>
       </section>
     </main>
+    <footer class="footer-note">Use headphones at a moderate volume. Do not listen while driving or operating machinery. These sounds are designed to support relaxation, imagery and meditation; they are not a medical treatment.</footer>
   </div>
 
-  <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="spatial-engine.js?v=5.1"></script>
-  <script src="audio-engine.js?v=5.1"></script>
-  <script src="app.js?v=5.1"></script>
+  <script src="binaural-renderer.js?v=6.0"></script>
+  <script src="spatial-engine.js?v=6.0"></script>
+  <script src="modules-a.js?v=6.0"></script>
+  <script src="modules-b.js?v=6.0"></script>
+  <script src="audio-engine.js?v=6.0"></script>
+  <script src="presets.js?v=6.0"></script>
+  <script src="visualizer.js?v=6.0"></script>
+  <script src="app.js?v=6.0"></script>
 </body>
 </html>

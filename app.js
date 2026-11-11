@@ -1,1838 +1,529 @@
 /**
- * AETHER // Interactive Controller, Presets, Auto-Journey & Multi-Mode Canvas Visualizer
+ * AETHER // UI controller: controls, presets, guided sessions (morphing), background playback, canvas.
  */
-
 document.addEventListener('DOMContentLoaded', () => {
   const engine = new window.ConsciousnessAudioEngine();
+  const PRESETS = window.AETHER_PRESETS;
+  const JOURNEYS = window.AETHER_JOURNEYS;
+  const MODULES = window.ConsciousnessAudioEngine.MODULES;
+  const $ = (id) => document.getElementById(id);
+  const DEFAULTS = JSON.parse(JSON.stringify(engine.params));
+  const STORAGE_KEY = 'aether_custom_config_v6';
 
-  // DOM References
-  const powerBtn = document.getElementById('powerBtn');
-  const powerBtnText = document.getElementById('powerBtnText');
-  const statusOrb = document.getElementById('statusOrb');
+  // ------------------------------------------------------------------ control table
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const CONTROLS = [
+    ['breathRate', 'breath', 'rate', (v) => `${v.toFixed(1)} /min`],
+    ['breathInhale', 'breath', 'inhale', (v) => `${Math.round(v * 100)} %`],
+    ['breathHoldIn', 'breath', 'holdIn', (v) => `${v.toFixed(1)} s`],
+    ['breathHoldOut', 'breath', 'holdOut', (v) => `${v.toFixed(1)} s`],
+    ['reverbMix', 'global', 'reverbMix', pct],
+    ['spatialCount', 'spatial', 'count', (v) => `${Math.round(v)}`],
+    ['spatialGain', 'spatial', 'gain', pct],
+    ['spatialDistance', 'spatial', 'distance', (v) => `${v.toFixed(1)} m`],
+    ['spatialTurns', 'spatial', 'turns', (v) => v.toFixed(2)],
+    ['spatialStageBreaths', 'spatial', 'fountainBreaths', (v) => `${Math.round(v)}`],
+    ['spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`],
+    ['spatialRoom', 'spatial', 'room', pct],
+    ['spatialCue', 'spatial', 'cue', (v) => v.toFixed(2)],
+    ['chaosGain', 'chaos', 'gain', pct],
+    ['chaosR', 'chaos', 'r', (v) => `${v.toFixed(2)} (${v < 3.45 ? 'periodic' : v < 3.83 ? 'edge' : 'chaotic'})`],
+    ['chaosRate', 'chaos', 'rate', (v) => v.toFixed(1)],
+    ['chaosRegister', 'chaos', 'register', pct],
+    ['chaosMorph', 'chaos', 'morph', pct],
+    ['pacGain', 'pac', 'gain', pct],
+    ['pacBaseFreq', 'pac', 'baseFreq', (v) => `${Math.round(v)} Hz`],
+    ['pacTheta', 'pac', 'theta', (v) => `${v.toFixed(1)} Hz ${v < 4 ? 'δ' : v < 8 ? 'θ' : v < 13 ? 'α' : 'β'}`],
+    ['pacHarmonics', 'pac', 'harmonics', pct],
+    ['pacGamma', 'pac', 'gamma', (v) => `${Math.round(v)} Hz`],
+    ['pacDepth', 'pac', 'depth', pct],
+    ['pacBreath', 'pac', 'breath', pct],
+    ['fractalGain', 'fractal', 'gain', pct],
+    ['fractalSpeed', 'fractal', 'speed', (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} oct/s`],
+    ['fractalDepth', 'fractal', 'depth', pct],
+    ['fractalCenter', 'fractal', 'center', (v) => `${Math.round(v)} Hz`],
+    ['subGain', 'sub', 'gain', pct],
+    ['subFreq', 'sub', 'freq', (v) => `${v.toFixed(1)} Hz`],
+    ['subPulse', 'sub', 'pulse', (v) => `${v.toFixed(2)} Hz`],
+    ['subWarmth', 'sub', 'warmth', pct],
+    ['ganzfeldGain', 'ganzfeld', 'gain', pct],
+    ['ganzfeldColor', 'ganzfeld', 'color', pct],
+    ['ganzfeldSweep', 'ganzfeld', 'sweep', pct],
+    ['asmrGain', 'asmr', 'gain', pct],
+    ['asmrProximity', 'asmr', 'proximity', (v) => `${(0.12 + 1.3 * v).toFixed(2)} m`],
+    ['asmrRate', 'asmr', 'rate', (v) => v.toFixed(1)],
+    ['asmrResonance', 'asmr', 'resonance', pct]
+  ];
+  const SELECTS = [
+    ['spatialTrajectory', 'spatial', 'trajectory'], ['spatialRebalMode', 'spatial', 'rebalMode'],
+    ['spatialPalette', 'spatial', 'palette'], ['spatialRenderer', 'spatial', 'renderer'],
+    ['chaosPalette', 'chaos', 'palette'], ['chaosRhythm', 'chaos', 'rhythm'], ['chaosScale', 'chaos', 'scale'],
+    ['subPattern', 'sub', 'pattern'], ['ganzfeldTexture', 'ganzfeld', 'texture'], ['asmrPalette', 'asmr', 'palette']
+  ];
 
-  const telemetryState = document.getElementById('telemetryState');
-  const telemetrySurprise = document.getElementById('telemetrySurprise');
-  const telemetryPAC = document.getElementById('telemetryPAC');
-  const telemetryBreath = document.getElementById('telemetryBreath');
-
-  const hudLeft = document.getElementById('hudLeft');
-  const hudRight = document.getElementById('hudRight');
-
-  const mechTitle = document.getElementById('mechTitle');
-  const mechText = document.getElementById('mechText');
-
-  const saveConfigBtn = document.getElementById('saveConfigBtn');
-  const restoreConfigBtn = document.getElementById('restoreConfigBtn');
-  const CUSTOM_CONFIG_STORAGE_KEY = 'aether_custom_config_v1';
-
-  const canvas = document.getElementById('neuroCanvas');
-  const ctx2d = canvas.getContext('2d');
-
-  let activeVizMode = 'spatial'; // 'spatial' | 'pac' | 'chaos'
-
-  // Phenomenological Presets Definition
-  const PRESETS = {
-    egoDissolution: {
-      name: '3D SINGING BOWLS',
-      mechTitle: 'Neuro-Mechanism: Binaural HRTF Localization & Parietal De-Anchoring',
-      mechText:
-        'Struck singing bowls wander slowly over the whole sphere around you. Each source is rendered through a measured head-related transfer function (interaural time/level differences + pinna spectral cues), with a physically delayed floor reflection and a short room, so the sounds are heard outside the head at a precise place in space.',
-      reverbMix: 0.38,
-      spatial: {
-        enabled: true,
-        palette: 'bowl',
-        trajectory: 'sphere',
-        count: 3,
-        gain: 0.85,
-        speed: 0.05,
-        distance: 2.0,
-        room: 0.5,
-        spiral: 0
-      },
-      chaos: { enabled: false, scale: 'pentatonic', gain: 0.22, r: 3.68, rate: 2.0, morph: 0.75 },
-      pac: { enabled: false, baseFreq: 110, gain: 0.38, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
-      fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.60, center: 220 },
-      sub: { enabled: false, gain: 0.42, freq: 34.0, pulse: 1.4, warmth: 0.40 },
-      ganzfeld: { enabled: false, gain: 0.20, color: 0.65, sweep: 0.60 },
-      asmr: { enabled: false }
-    },
-    dmnQuieting: {
-      name: 'DMN SUPPRESSION',
-      mechTitle: 'Neuro-Mechanism: Bayesian Surprise & Default Mode Network Quieting',
-      mechText:
-        'The Default Mode Network (DMN) sustains narrative self-talk when sensory input is either static (boredom) or periodic. Operating at Logistic Map r = 3.76 ("Edge of Chaos"), microtonal formant droplets and 3D cave water drops maximize non-repeating Bayesian surprise.',
-      reverbMix: 0.55,
-      spatial: {
-        enabled: true,
-        palette: 'drops',
-        trajectory: 'sphere',
-        count: 3,
-        gain: 0.6,
-        speed: 0.08,
-        distance: 2.4,
-        room: 0.55,
-        spiral: 0
-      },
-      chaos: { enabled: true, gain: 0.75, r: 3.76, rate: 4.8, morph: 0.85 },
-      pac: { enabled: true, gain: 0.40, harmonics: 0.35, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
-      fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
-      sub: { enabled: false, gain: 0.30, freq: 36.0, pulse: 1.5, warmth: 0.35 },
-      ganzfeld: { enabled: true, gain: 0.38, color: 0.52, sweep: 0.72 },
-      asmr: { enabled: false }
-    },
-    lucidHypnagogia: {
-      name: 'LUCID θ–γ PAC',
-      mechTitle: 'Neuro-Mechanism: Thalamocortical Theta-Gamma Phase-Amplitude Coupling',
-      mechText:
-        'In deep meditative and lucid dream states, high-frequency 40 Hz Gamma bursts (conscious lucidity & sensory binding) are nested directly on the peaks of slow 6 Hz Theta oscillations, carried by a 0.1 Hz vagal breath wave and an 8D celestial harmonic aura.',
-      reverbMix: 0.58,
-      spatial: {
-        enabled: true,
-        palette: 'energy',
-        trajectory: 'orbit',
-        count: 2,
-        gain: 0.55,
-        speed: 0.08,
-        distance: 1.6,
-        room: 0.5,
-        spiral: 0
-      },
-      chaos: { enabled: false, gain: 0.25, r: 3.62, rate: 1.8, morph: 0.50 },
-      pac: { enabled: true, gain: 0.82, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.92, breath: 0.80 },
-      fractal: { enabled: false, gain: 0.30, speed: 0.04, depth: 0.50, center: 216 },
-      sub: { enabled: true, gain: 0.52, freq: 32.0, pulse: 1.5, warmth: 0.50 },
-      ganzfeld: { enabled: true, gain: 0.25, color: 0.70, sweep: 0.45 },
-      asmr: { enabled: false }
-    },
-    timelessFractal: {
-      name: 'FRACTAL HORIZON',
-      mechTitle: 'Neuro-Mechanism: Scale-Invariant 1/f Dynamics & Shepard-Risset Paradox',
-      mechText:
-        'Combines an 8-octave Shepard-Risset continuous glissando with a multi-scale Weierstrass fractal modulator and far-horizon 8D excursions. Because the acoustic trajectory ascends forever without ever getting higher, the brain’s linear time-keeping loop is suspended.',
-      reverbMix: 0.72,
-      spatial: {
-        enabled: true,
-        palette: 'chimes',
-        trajectory: 'sphere',
-        count: 3,
-        gain: 0.5,
-        speed: 0.05,
-        distance: 3.0,
-        room: 0.6,
-        spiral: 0
-      },
-      chaos: { enabled: true, gain: 0.35, r: 3.69, rate: 2.4, morph: 0.60 },
-      pac: { enabled: false, gain: 0.40, harmonics: 0.40, theta: 6.5, gamma: 40, depth: 0.60, breath: 0.65 },
-      fractal: { enabled: true, gain: 0.72, speed: 0.07, depth: 0.85, center: 216 },
-      sub: { enabled: true, gain: 0.42, freq: 36.0, pulse: 0.8, warmth: 0.45 },
-      ganzfeld: { enabled: true, gain: 0.22, color: 0.58, sweep: 0.50 },
-      asmr: { enabled: false }
-    },
-    somaticVagal: {
-      name: 'SOMATIC INFRASOUND',
-      mechTitle: 'Neuro-Mechanism: Vestibular Otolith & Vagal Sub-Bass Entrainment',
-      mechText:
-        'Pairs a 30 Hz sub-bass carrier with 2nd/3rd harmonic "missing-fundamental" psychoacoustic warmth, a 1.65 Hz (~100 BPM) trance meter pulse, and spiraling 8D singing bowls.',
-      reverbMix: 0.45,
-      spatial: {
-        enabled: true,
-        palette: 'bowl',
-        trajectory: 'orbit',
-        count: 2,
-        gain: 0.65,
-        speed: 0.05,
-        distance: 1.5,
-        room: 0.45,
-        spiral: 0
-      },
-      chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.5, morph: 0.40 },
-      pac: { enabled: true, gain: 0.55, harmonics: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
-      fractal: { enabled: false, gain: 0.20, speed: -0.04, depth: 0.40, center: 144 },
-      sub: { enabled: true, gain: 0.82, freq: 30.0, pulse: 1.65, warmth: 0.68 },
-      ganzfeld: { enabled: true, gain: 0.32, color: 0.82, sweep: 0.65 },
-      asmr: { enabled: false }
-    },
-    auditoryGanzfeld: {
-      name: 'GANZFELD SONIC VOID',
-      mechTitle: 'Neuro-Mechanism: Stochastic Resonance & Sensory Deprivation Horizon',
-      mechText:
-        'Binaurally decorrelated 1/f Pink and 1/f² Brown noise sculpted by dual resonant cavern filters and orbiting 8D whispered breath deprives the auditory cortex of static anchors, lowering the threshold for subtle internal imagery.',
-      reverbMix: 0.78,
-      spatial: {
-        enabled: true,
-        palette: 'energy',
-        trajectory: 'vertical',
-        count: 2,
-        gain: 0.5,
-        speed: 0.05,
-        distance: 2.2,
-        room: 0.6,
-        spiral: 0
-      },
-      chaos: { enabled: true, gain: 0.28, r: 3.71, rate: 1.6, morph: 0.80 },
-      pac: { enabled: true, gain: 0.48, harmonics: 0.30, theta: 5.0, gamma: 40, depth: 0.65, breath: 0.75 },
-      fractal: { enabled: true, gain: 0.38, speed: -0.03, depth: 0.70, center: 180 },
-      sub: { enabled: true, gain: 0.45, freq: 28.0, pulse: 0.9, warmth: 0.35 },
-      ganzfeld: { enabled: true, gain: 0.78, color: 0.68, sweep: 0.85 },
-      asmr: { enabled: false }
-    },
-    shamanicTrance: {
-      name: '8D SHAMANIC FLIGHT',
-      mechTitle: 'Neuro-Mechanism: 4.5 Hz 8D Frame Drum Entrainment & 110 Hz Tibetan Overtones',
-      mechText:
-        'Orbiting 110 Hz Tibetan/Tuvan overtone singing paired with a 3D-spatialized 4.5 Hz skin-frame drum and seed rattle sweeping around the ear auricles induces thalamocortical theta synchronization and hypnagogic trance.',
-      reverbMix: 0.42,
-      spatial: {
-        enabled: true,
-        palette: 'bowl',
-        trajectory: 'orbit',
-        count: 2,
-        gain: 0.85,
-        speed: 0.12,
-        distance: 1.4,
-        room: 0.4,
-        spiral: 0
-      },
-      chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.40 },
-      pac: { enabled: true, gain: 0.55, harmonics: 0.40, theta: 4.5, gamma: 40, depth: 0.55, breath: 0.70 },
-      fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 220 },
-      sub: { enabled: true, gain: 0.62, freq: 32.0, pulse: 1.125, warmth: 0.55 },
-      ganzfeld: { enabled: false, gain: 0.25, color: 0.70, sweep: 0.50 },
-      asmr: { enabled: false }
-    },
-    somaticTingles: {
-      name: '8D PERIPERSONAL ASMR',
-      mechTitle: 'Neuro-Mechanism: Near-Field Auricle Notch, Cranial Shadow & ASMR Paresthesia',
-      mechText:
-        'Continuous binaural silk brushing, micro-crackles, whispers, and water droplets orbiting 10–25 cm from the ear auricle maximize interaural time/level asymmetry and pinna spectral notches, triggering scalp-to-spine ASMR tingles.',
-      reverbMix: 0.22,
-      spatial: {
-        enabled: true,
-        palette: 'drops',
-        trajectory: 'orbit',
-        count: 2,
-        gain: 0.9,
-        speed: 0.15,
-        distance: 0.6,
-        room: 0.2,
-        spiral: 0
-      },
-      chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.2, morph: 0.45 },
-      pac: { enabled: true, gain: 0.35, harmonics: 0.45, theta: 6.0, gamma: 40, depth: 0.40, breath: 0.85 },
-      fractal: { enabled: false, gain: 0.20, speed: 0.03, depth: 0.40, center: 216 },
-      sub: { enabled: true, gain: 0.32, freq: 36.0, pulse: 0.8, warmth: 0.40 },
-      ganzfeld: { enabled: false, gain: 0.18, color: 0.60, sweep: 0.40 },
-      asmr: { enabled: false }
-    },
-    rebalGateway: {
-      name: 'REBAL // MONROE GATEWAY',
-      mechTitle: 'Neuro-Mechanism: Monroe Gateway REBAL (Resonant Energy Balloon) & 3D Toroidal Breath Entrainment',
-      mechText:
-        'Inspired by Robert Monroe’s Gateway Experience. Breathe with the sound (10 s cycle). EXHALE ▼: the energy bursts out of the crown, fountains UP and over the top, splits into 4 streams that flow DOWN wide around your body and curve under your feet. INHALE ▲: the streams merge, enter the soles of the feet, rise up through the body core and fill the head (heard inside the head). Voice-like breath tones brighten as they rise and darken as they fall.',
-      reverbMix: 0.44,
-      spatial: {
-        enabled: true,
-        palette: 'energy',
-        trajectory: 'rebal',
-        count: 4,
-        gain: 0.9,
-        speed: 0.1,
-        distance: 1.8,
-        room: 0.45,
-        spiral: 0
-      },
-      chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.50 },
-      pac: { enabled: true, baseFreq: 144, gain: 0.46, harmonics: 0.42, theta: 4.5, gamma: 40, depth: 0.58, breath: 0.90 },
-      fractal: { enabled: false, gain: 0.25, speed: 0.03, depth: 0.50, center: 144 },
-      sub: { enabled: true, gain: 0.48, freq: 36.0, pulse: 0.9, warmth: 0.52 },
-      ganzfeld: { enabled: false, gain: 0.18, color: 0.65, sweep: 0.45 },
-      asmr: { enabled: false }
-    }
-  };
-
-  const presetKeys = Object.keys(PRESETS);
-
-  // Mobile Screen Wake Lock & Background Audio Keep-Alive
-  let wakeLock = null;
-  async function acquireWakeLock() {
-    if ('wakeLock' in navigator) {
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => {
-          wakeLock = null;
-        });
-      } catch (err) {
-        // Silently continue if wake lock is denied or unsupported
-      }
-    }
+  function setParam(mod, key, v) {
+    if (mod === 'breath') { engine.setBreath(key, v); return; }
+    if (mod === 'global') { if (key === 'reverbMix') engine.setReverbMix(v); return; }
+    if (mod === 'spatial' && key === 'fountainBreaths') engine.updateModule('spatial', 'spiralBreaths', v);
+    engine.updateModule(mod, key, v);
+  }
+  function getParam(mod, key) {
+    if (mod === 'breath') return engine.params.breath[key];
+    if (mod === 'global') return engine.params[key];
+    return engine.params[mod][key];
   }
 
-  function releaseWakeLock() {
-    if (wakeLock) {
-      wakeLock.release().catch(() => {});
-      wakeLock = null;
-    }
-  }
-
-  // Background Lock-Screen Audio Session & Android Media Notification
-  const telemetryBgAudio = document.getElementById('telemetryBgAudio');
-
-  // In-memory 10-second 16-bit PCM silent WAV generator (zero network dependency!)
-  let bgAudioBlobUrl = null;
-  function getSilentWavUrl() {
-    if (!bgAudioBlobUrl) {
-      const durationSec = 20;
-      const sampleRate = 44100;
-      const numSamples = durationSec * sampleRate;
-      const dataSize = numSamples * 2;
-      const buffer = new ArrayBuffer(44 + dataSize);
-      const view = new DataView(buffer);
-      view.setUint32(0, 0x52494646, false); // "RIFF"
-      view.setUint32(4, 36 + dataSize, true);
-      view.setUint32(8, 0x57415645, false); // "WAVE"
-      view.setUint32(12, 0x666d7420, false); // "fmt "
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM format
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true); // Byte rate
-      view.setUint16(32, 2, true); // Block align
-      view.setUint16(34, 16, true); // 16-bit
-      view.setUint32(36, 0x64617461, false); // "data"
-      view.setUint32(40, dataSize, true);
-      const blob = new Blob([buffer], { type: 'audio/wav' });
-      bgAudioBlobUrl = URL.createObjectURL(blob);
-    }
-    return bgAudioBlobUrl;
-  }
-
-  let bgAudio = null;
-  function getOrCreateBackgroundAudio() {
-    if (!bgAudio) {
-      bgAudio = document.getElementById('bgAudioKeepAlive');
-    }
-    if (!bgAudio) {
-      bgAudio = document.createElement('audio');
-      bgAudio.id = 'bgAudioKeepAlive';
-      bgAudio.loop = true;
-      bgAudio.setAttribute('playsinline', '');
-      bgAudio.setAttribute('webkit-playsinline', '');
-      document.body.appendChild(bgAudio);
-    }
-    if (!bgAudio.src || bgAudio.src === '' || bgAudio.src.indexOf('blob:') === -1) {
-      bgAudio.src = getSilentWavUrl();
-    }
-    bgAudio.volume = 1.0;
-    bgAudio.muted = false; // Android Chrome requires unmuted audio to grant full MediaSession Audio Focus
-    return bgAudio;
-  }
-
-  // Web Worker Ticker: guarantees continuous simulation ticks even with screen locked!
-  let bgWorker = null;
-  try {
-    const workerBlob = new Blob([`
-      let timer = null;
-      self.onmessage = function(e) {
-        if (e.data === 'start') {
-          if (!timer) {
-            timer = setInterval(function() {
-              self.postMessage('tick');
-            }, 50); // 20 Hz background tick (smooth & energy-efficient)
-          }
-        } else if (e.data === 'stop') {
-          if (timer) {
-            clearInterval(timer);
-            timer = null;
-          }
-        }
-      };
-    `], { type: 'application/javascript' });
-    bgWorker = new Worker(URL.createObjectURL(workerBlob));
-    bgWorker.onmessage = function() {
-      if (document.hidden && engine.isRunning) {
-        engine.tick();
-      }
-    };
-  } catch (err) {
-    console.warn('Web Worker ticker unsupported:', err);
-  }
-
-  function startBackgroundAudioSession() {
-    const audio = getOrCreateBackgroundAudio();
-    if (audio) {
-      audio.currentTime = 0;
-      const playPromise = audio.play();
-      if (playPromise && typeof playPromise.then === 'function') {
-        playPromise.then(() => {
-          if (telemetryBgAudio) {
-            telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
-            telemetryBgAudio.style.color = '#38bdf8';
-          }
-        }).catch((err) => {
-          console.warn('HTML5 background audio play:', err);
-          if (telemetryBgAudio) {
-            telemetryBgAudio.textContent = 'PENDING (TAP TO UNLOCK)';
-            telemetryBgAudio.style.color = '#f87171';
-          }
-        });
-      }
-    }
-
-    if (bgWorker) {
-      bgWorker.postMessage('start');
-    }
-
-    if ('mediaSession' in navigator) {
-      try {
-        const artworkUrl = new URL('icon-512.png', window.location.href).href;
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: 'AETHER Consciousness Lab',
-          artist: 'Remi Lab',
-          album: 'WebAudio Neurophenomenology Soundscapes',
-          artwork: [
-            { src: artworkUrl, sizes: '512x512', type: 'image/png' },
-            { src: artworkUrl, sizes: '256x256', type: 'image/png' },
-            { src: artworkUrl, sizes: '192x192', type: 'image/png' }
-          ]
-        });
-        navigator.mediaSession.playbackState = 'playing';
-
-        const updatePosition = () => {
-          if ('setPositionState' in navigator.mediaSession && audio) {
-            try {
-              if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
-                navigator.mediaSession.setPositionState({
-                  duration: audio.duration,
-                  playbackRate: 1.0,
-                  position: Math.min(audio.currentTime, audio.duration)
-                });
-              }
-            } catch (_) {}
-          }
-        };
-        if (audio) {
-          audio.ontimeupdate = updatePosition;
-          updatePosition();
-        }
-
-        navigator.mediaSession.setActionHandler('play', async () => {
-          const a = getOrCreateBackgroundAudio();
-          if (a) a.play().catch(() => {});
-          if (!engine.isRunning) {
-            await toggleAudio();
-          } else if (engine.ctx && engine.ctx.state === 'suspended') {
-            await engine.ctx.resume().catch(() => {});
-          }
-          if (bgWorker) bgWorker.postMessage('start');
-          navigator.mediaSession.playbackState = 'playing';
-
-          if (telemetryBgAudio) {
-            telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
-            telemetryBgAudio.style.color = '#38bdf8';
-          }
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-          const a = getOrCreateBackgroundAudio();
-          if (a) a.pause();
-          if (engine.isRunning) {
-            toggleAudio();
-          }
-          if (bgWorker) bgWorker.postMessage('stop');
-          navigator.mediaSession.playbackState = 'paused';
-          if (telemetryBgAudio) {
-            telemetryBgAudio.textContent = 'PAUSED';
-            telemetryBgAudio.style.color = '';
-          }
-        });
-
-        try {
-          navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (details.seekTime !== undefined && audio) {
-              audio.currentTime = details.seekTime % 10;
-              updatePosition();
-            }
-          });
-        } catch (_) {}
-        try {
-          navigator.mediaSession.setActionHandler('previoustrack', () => {});
-          navigator.mediaSession.setActionHandler('nexttrack', () => {});
-          navigator.mediaSession.setActionHandler('stop', () => {
-            stopBackgroundAudioSession();
-          });
-        } catch (_) {}
-      } catch (err) {
-        console.warn('MediaSession initialization:', err);
-      }
-    }
-  }
-
-  function stopBackgroundAudioSession() {
-    try {
-      const a = getOrCreateBackgroundAudio();
-      if (a) {
-        a.pause();
-      }
-      if (bgWorker) {
-        bgWorker.postMessage('stop');
-      }
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
-      if (telemetryBgAudio) {
-        telemetryBgAudio.textContent = 'STANDBY';
-        telemetryBgAudio.style.color = '';
-      }
-    } catch (_) {}
-  }
-
-  // Synchronous unlock helper called on any direct tap/click gesture
-  function unlockBackgroundAudioSynchronously() {
-    const a = getOrCreateBackgroundAudio();
-    if (a && a.paused) {
-      a.play().then(() => {
-        if (telemetryBgAudio && engine.isRunning) {
-          telemetryBgAudio.textContent = 'ACTIVE (LOCK OK)';
-          telemetryBgAudio.style.color = '#38bdf8';
-        }
-      }).catch(() => {});
-    }
-  }
-
-  // Toggle Audio Engine Power
-  async function toggleAudio() {
-    if (!engine.isRunning) {
-      // Must be called synchronously inside user gesture before any await
-      startBackgroundAudioSession();
-      await engine.start();
-      await acquireWakeLock();
-      powerBtn.classList.add('active');
-      powerBtn.setAttribute('aria-pressed', 'true');
-      powerBtnText.textContent = 'ENGINE ACTIVE (MUTE)';
-      statusOrb.classList.add('live');
-      updateTargetStateBadge();
-    } else {
-      engine.stop();
-      releaseWakeLock();
-      stopBackgroundAudioSession();
-      powerBtn.classList.remove('active');
-      powerBtn.setAttribute('aria-pressed', 'false');
-      powerBtnText.textContent = 'RESUME AUDIO ENGINE';
-      statusOrb.classList.remove('live');
-      telemetryState.textContent = 'PAUSED';
-    }
-  }
-
-  powerBtn.addEventListener('click', (e) => {
-    unlockBackgroundAudioSynchronously();
-    toggleAudio();
+  CONTROLS.forEach(([id, mod, key, fmt]) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      const out = $(id + 'Val');
+      if (out) out.textContent = fmt(v);
+      if (MODULES.includes(mod) && !engine.params[mod].enabled && key !== 'gain') setEnabled(mod, true);
+      setParam(mod, key, v);
+      cancelJourneyOnManual();
+    });
   });
-
-  // Background fallback interval when Android locks screen or switches tabs
-  document.addEventListener('visibilitychange', async () => {
-    if (document.hidden) {
-      if (engine.isRunning) {
-        const a = getOrCreateBackgroundAudio();
-        if (a && a.paused) {
-          a.play().catch(() => {});
-        }
-        if (bgWorker) {
-          bgWorker.postMessage('start');
-        }
-      }
-    } else {
-      if (engine.isRunning) {
-        if (engine.ctx && engine.ctx.state === 'suspended') {
-          await engine.ctx.resume().catch(() => {});
-        }
-        await acquireWakeLock();
-      }
-    }
+  SELECTS.forEach(([id, mod, key]) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      if (!engine.params[mod].enabled) setEnabled(mod, true);
+      setParam(mod, key, el.value);
+      if (mod === 'spatial') updateSpatialVisibility();
+      cancelJourneyOnManual();
+    });
   });
-
-  // Mobile AudioContext auto-unlock on user touch
-  document.addEventListener('touchstart', () => {
-    if (engine.isRunning && engine.ctx && engine.ctx.state === 'suspended') {
-      engine.ctx.resume().catch(() => {});
-    }
-  }, { passive: true });
-
-  // Master & Reverb Controls
-  const masterGainInput = document.getElementById('masterGain');
-  const masterGainVal = document.getElementById('masterGainVal');
-  masterGainInput.addEventListener('input', (e) => {
+  MODULES.forEach((mod) => {
+    const el = $(mod + 'Enabled');
+    if (el) el.addEventListener('change', () => { setEnabled(mod, el.checked); cancelJourneyOnManual(); });
+  });
+  $('chaosSpace3d').addEventListener('change', (e) => engine.updateModule('chaos', 'space3d', e.target.checked));
+  $('rootSelect').addEventListener('change', (e) => engine.setRoot(parseFloat(e.target.value)));
+  $('masterGain').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
-    masterGainVal.textContent = `${Math.round(v * 100)}%`;
+    $('masterGainVal').textContent = pct(v);
     engine.setMasterGain(v);
   });
 
-  const reverbMixInput = document.getElementById('reverbMix');
-  const reverbMixVal = document.getElementById('reverbMixVal');
-  reverbMixInput.addEventListener('input', (e) => {
-    const v = parseFloat(e.target.value);
-    reverbMixVal.textContent = `${Math.round(v * 100)}%`;
-    engine.setReverbMix(v);
-  });
-
-  // Helper to bind slider, toggle & select controls
-  function bindSlider(id, mod, key, formatter) {
-    const el = document.getElementById(id);
-    const valEl = document.getElementById(`${id}Val`);
-    if (!el) return;
-    el.addEventListener('input', (e) => {
-      const v = parseFloat(e.target.value);
-      if (valEl) valEl.textContent = formatter(v);
-      if (engine.params[mod] && !engine.params[mod].enabled) {
-        setModuleActiveUIAndEngine(mod, true);
-      }
-      engine.updateModule(mod, key, v);
-      updateTargetStateBadge();
-    });
-  }
-
-  function bindToggle(id, mod) {
-    const el = document.getElementById(id);
+  function setEnabled(mod, on) {
+    const el = $(mod + 'Enabled');
+    if (el) el.checked = on;
     const card = document.querySelector(`.module-card[data-module="${mod}"]`);
-    if (!el) return;
-    el.addEventListener('change', (e) => {
-      const checked = e.target.checked;
-      engine.updateModule(mod, 'enabled', checked);
-      if (card) {
-        card.classList.toggle('active-module', checked);
-      }
-      updateTargetStateBadge();
+    if (card) card.classList.toggle('active-module', on);
+    engine.updateModule(mod, 'enabled', on);
+  }
+
+  function syncUI() {
+    CONTROLS.forEach(([id, mod, key, fmt]) => {
+      const el = $(id);
+      const v = getParam(mod, key);
+      if (!el || v === undefined || document.activeElement === el) return;
+      el.value = v;
+      const out = $(id + 'Val');
+      if (out) out.textContent = fmt(Number(v));
     });
-  }
-
-  function bindSelect(id, mod, key) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('change', (e) => {
-      const val = e.target.value;
-      if (engine.params[mod] && !engine.params[mod].enabled) {
-        setModuleActiveUIAndEngine(mod, true);
-      }
-      engine.updateModule(mod, key, val);
-      updateTargetStateBadge();
+    SELECTS.forEach(([id, mod, key]) => {
+      const el = $(id);
+      if (el && engine.params[mod][key] !== undefined) el.value = engine.params[mod][key];
     });
-  }
-
-  // Bind Module 1: Binaural 3D Sound Space & REBAL Energy Torus
-  bindToggle('spatialEnabled', 'spatial');
-  bindSelect('spatialPalette', 'spatial', 'palette');
-  bindSelect('spatialTrajectory', 'spatial', 'trajectory');
-
-  // When selecting REBAL in the Palette dropdown, auto-select REBAL trajectory & 4 sources if fewer
-  const spatialPaletteSelect = document.getElementById('spatialPalette');
-  if (spatialPaletteSelect) {
-    spatialPaletteSelect.addEventListener('change', (e) => {
-      if (e.target.value === 'energy') {
-        const trajEl = document.getElementById('spatialTrajectory');
-        if (trajEl && trajEl.value !== 'rebal') {
-          trajEl.value = 'rebal';
-          engine.updateModule('spatial', 'trajectory', 'rebal');
-        }
-        const countEl = document.getElementById('spatialCount');
-        const countValEl = document.getElementById('spatialCountVal');
-        if (countEl && Number(countEl.value) < 4) {
-          countEl.value = 4;
-          if (countValEl) countValEl.textContent = '4';
-          engine.updateModule('spatial', 'count', 4);
-        }
-      }
+    MODULES.forEach((mod) => {
+      const el = $(mod + 'Enabled');
+      if (el) el.checked = !!engine.params[mod].enabled;
+      const card = document.querySelector(`.module-card[data-module="${mod}"]`);
+      if (card) card.classList.toggle('active-module', !!engine.params[mod].enabled);
     });
+    $('chaosSpace3d').checked = engine.params.chaos.space3d !== false;
+    $('rootSelect').value = String(engine.params.root);
+    $('masterGain').value = engine.params.masterGain;
+    $('masterGainVal').textContent = pct(engine.params.masterGain);
+    updateSpatialVisibility();
   }
 
-  bindSlider('spatialCount', 'spatial', 'count', (v) => `${Math.round(v)}`);
-  bindSlider('spatialGain', 'spatial', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('spatialSpeed', 'spatial', 'speed', (v) => {
-    const period = (1 / Math.max(0.001, v)).toFixed(1);
-    return `${v.toFixed(2)} Hz · ${period} s`;
-  });
-  bindSlider('spatialDistance', 'spatial', 'distance', (v) => `${v.toFixed(1)} m`);
-  bindSlider('spatialRoom', 'spatial', 'room', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('spatialSpiral', 'spatial', 'spiral', (v) =>
-    v <= 0.02 ? '0.00 (pure loop)' : `${v.toFixed(2)}x twist`
-  );
-
-  // ==========================================
-  // UNIFIED SOLO ENGINE (All 6 Modules)
-  // ==========================================
-  const ALL_MODULE_KEYS = ['spatial', 'chaos', 'pac', 'fractal', 'sub', 'ganzfeld'];
-  let currentSoloMod = null;
-  let savedSoloState = null;
-
-  const soloButtons = {
-    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '3D', tab: 'spatial' },
-    chaos: { btn: document.getElementById('soloChaosBtn'), label: 'CHAOS', tab: 'chaos' },
-    pac: { btn: document.getElementById('soloPacBtn'), label: 'PAC', tab: 'pac' },
-    fractal: { btn: document.getElementById('soloFractalBtn'), label: 'FRACTAL', tab: 'chaos' },
-    sub: { btn: document.getElementById('soloSubBtn'), label: 'SUB', tab: 'chaos' },
-    ganzfeld: { btn: document.getElementById('soloGanzfeldBtn'), label: 'GANZFELD', tab: 'chaos' }
-  };
-
-  function setModuleActiveUIAndEngine(mod, enabled) {
-    const toggle = document.getElementById(`${mod}Enabled`);
-    const card = document.querySelector(`.module-card[data-module="${mod}"]`);
-    if (toggle) toggle.checked = enabled;
-    if (card) card.classList.toggle('active-module', enabled);
-    engine.updateModule(mod, 'enabled', enabled);
+  function updateSpatialVisibility() {
+    const traj = engine.params.spatial.trajectory;
+    const hud = $('hudLeft');
+    if (traj === 'manual' && !hud.textContent) hud.textContent = 'Drag on either view to move the source';
+    if (traj !== 'manual') hud.textContent = '';
+    document.querySelectorAll('.rebal-only').forEach((el) => { el.style.display = traj === 'rebal' ? '' : 'none'; });
+    document.querySelectorAll('.free-only').forEach((el) => { el.style.display = ['orbit', 'vertical', 'sphere'].includes(traj) ? '' : 'none'; });
   }
 
-  function resetAllSoloButtonsUI() {
-    Object.entries(soloButtons).forEach(([m, s]) => {
-      if (s.btn) {
-        s.btn.classList.remove('active');
-        s.btn.textContent = `SOLO ${s.label}`;
-      }
+  // ------------------------------------------------------------------ presets & morphing
+  function resolveConfig(presetKey, over) {
+    const p = PRESETS[presetKey] || {};
+    const cfg = { reverbMix: p.reverbMix !== undefined ? p.reverbMix : DEFAULTS.reverbMix, breath: Object.assign({}, DEFAULTS.breath, p.breath || {}) };
+    MODULES.forEach((m) => {
+      const listed = p[m];
+      cfg[m] = Object.assign({}, DEFAULTS[m], listed || {}, { enabled: !!(listed && listed.enabled !== false) });
     });
-    currentSoloMod = null;
-    savedSoloState = null;
-  }
-
-  function toggleSolo(mod) {
-    const s = soloButtons[mod];
-    if (!s || !s.btn) return;
-
-    if (currentSoloMod === mod) {
-      // Unsolo: Restore previous state
-      ALL_MODULE_KEYS.forEach((m) => {
-        const restoreVal = savedSoloState ? (savedSoloState[m] ?? true) : true;
-        setModuleActiveUIAndEngine(m, restoreVal);
-      });
-      resetAllSoloButtonsUI();
-    } else {
-      // Soloing a module: if another module was already soloed, keep the original pre-solo snapshot
-      if (!savedSoloState) {
-        savedSoloState = {};
-        ALL_MODULE_KEYS.forEach((m) => {
-          savedSoloState[m] = !!engine.params[m]?.enabled;
-        });
-      }
-
-      // Mute all other modules, enable target module
-      ALL_MODULE_KEYS.forEach((m) => {
-        setModuleActiveUIAndEngine(m, m === mod);
-      });
-
-      // Update button labels & active classes
-      Object.entries(soloButtons).forEach(([m, info]) => {
-        if (!info.btn) return;
-        if (m === mod) {
-          info.btn.classList.add('active');
-          info.btn.textContent = `UNSOLO ${info.label}`;
-        } else {
-          info.btn.classList.remove('active');
-          info.btn.textContent = `SOLO ${info.label}`;
-        }
-      });
-
-      // Switch visualizer tab if defined
-      if (s.tab) {
-        const tabEl = document.querySelector(`.viz-tab[data-viz="${s.tab}"]`);
-        if (tabEl) tabEl.click();
-      }
-
-      currentSoloMod = mod;
-    }
-    updateTargetStateBadge();
-  }
-
-  // Bind click handlers for all 6 SOLO buttons
-  Object.keys(soloButtons).forEach((mod) => {
-    const btn = soloButtons[mod].btn;
-    if (btn) {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleSolo(mod);
+    if (over) {
+      Object.keys(over).forEach((k) => {
+        if (typeof over[k] === 'object') cfg[k] = Object.assign({}, cfg[k], over[k]);
+        else cfg[k] = over[k];
       });
     }
-  });
+    cfg.spatial.spiralBreaths = cfg.spatial.fountainBreaths;
+    return cfg;
+  }
 
-  // Interactive 3D Canvas Drag-to-Localize (Grab & move 3D sound source around head + Vertical Elevation Gauge)
-  let isDraggingSpatial = false;
-  function updateManual3DFromEvent(e) {
-    const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    // Check if dragging inside the right-side Vertical Elevation Gauge (last 72px of canvas)
-    if (px >= rect.width - 72) {
-      const gaugeTop = 44;
-      const gaugeBottom = rect.height - 48;
-      const normY = Math.max(-1, Math.min(1, 1 - ((py - gaugeTop) / Math.max(1, gaugeBottom - gaugeTop)) * 2));
-      // Spherical elevation angle phi (-75 deg floor to +85 deg zenith)
-      const phi = normY * 1.38;
-      const r = 1.05;
-      const horiz = r * Math.cos(phi);
-      const y = r * Math.sin(phi);
-      // Slight frontal-lateral offset so pinna elevation notch & Blauert zenith peak are maximally clear
-      const x = horiz * 0.65;
-      const z = -horiz * 0.76;
-      engine.updateModule('spatial', 'manualPos', { x, y, z });
-      const deg = Math.round((phi * 180) / Math.PI);
-      hudLeft.textContent = `3D Elevation: ${deg >= 0 ? '+' : ''}${deg}° (${deg > 18 ? '▲ Overhead Zenith' : deg < -18 ? '▼ Below Chin/Floor' : 'Ear Level'})`;
+  let morph = null;
+  function morphTo(cfg, seconds) {
+    if (!engine.ctx) {
+      // engine not started yet: just set the parameters
+      engine.params.reverbMix = cfg.reverbMix;
+      Object.assign(engine.params.breath, cfg.breath);
+      MODULES.forEach((m) => Object.assign(engine.params[m], cfg[m]));
+      morph = null;
       return;
     }
-
-    const nx = (px / (rect.width - 64)) * 2 - 1; // -1 (Left) .. +1 (Right)
-    const ny = (py / rect.height) * 2 - 1;       // -1 (Front/Top) .. +1 (Back/Bottom)
-    const x = nx * 1.45;
-    const z = ny * 1.45; // -Z is Front (top of radar), +Z is Behind Head (bottom of radar)
-    const dist = Math.sqrt(x * x + z * z);
-    const elevScale = engine.params.spatial.elevation !== undefined ? engine.params.spatial.elevation : 0.85;
-    const y = Math.cos(dist * Math.PI * 0.7) * 0.75 * elevScale;
-    engine.updateModule('spatial', 'manualPos', { x, y, z });
-    const deg = Math.round((Math.atan2(y, Math.max(0.05, dist)) * 180) / Math.PI);
-    hudLeft.textContent = `3D Drag: X:${x.toFixed(2)}m Z:${z < 0 ? 'Front' : 'Back'}(${z.toFixed(2)}m) Elev:${deg >= 0 ? '+' : ''}${deg}°`;
-  }
-
-  canvas.addEventListener('pointerdown', (e) => {
-    if (activeVizMode !== 'spatial') return;
-    isDraggingSpatial = true;
-    canvas.setPointerCapture(e.pointerId);
-    updateManual3DFromEvent(e);
-  });
-
-  canvas.addEventListener('pointermove', (e) => {
-    if (!isDraggingSpatial) return;
-    updateManual3DFromEvent(e);
-  });
-
-  const endSpatialDrag = () => {
-    if (!isDraggingSpatial) return;
-    isDraggingSpatial = false;
-    engine.updateModule('spatial', 'manualPos', null);
-    hudLeft.textContent = 'HRTF 3D: Drag canvas to grab source';
-  };
-  canvas.addEventListener('pointerup', endSpatialDrag);
-  canvas.addEventListener('pointercancel', endSpatialDrag);
-
-  // Bind Module 2: Chaos
-  bindToggle('chaosEnabled', 'chaos');
-
-  const chaosPaletteEl = document.getElementById('chaosPalette');
-  if (chaosPaletteEl) {
-    chaosPaletteEl.addEventListener('change', (e) => {
-      engine.updateModule('chaos', 'palette', e.target.value);
+    const start = JSON.parse(JSON.stringify(engine.params));
+    // switch discrete parameters now; enable modules that fade in, at zero gain
+    MODULES.forEach((m) => {
+      const tgt = cfg[m];
+      Object.keys(tgt).forEach((k) => {
+        if (k === 'enabled' || k === 'manualPos') return;
+        if (typeof tgt[k] !== 'number' && tgt[k] !== engine.params[m][k]) engine.updateModule(m, k, tgt[k]);
+      });
+      if (tgt.enabled && !engine.params[m].enabled) {
+        start[m].gain = 0;
+        engine.updateModule(m, 'gain', 0);
+        setEnabled(m, true);
+      }
     });
+    morph = { t0: engine.ctx ? engine.ctx.currentTime : 0, T: Math.max(0.05, seconds), start, cfg, last: -1 };
+    if (seconds <= 0.05) stepMorph(true);
   }
 
-  const chaosRhythmEl = document.getElementById('chaosRhythm');
-  if (chaosRhythmEl) {
-    chaosRhythmEl.addEventListener('change', (e) => {
-      engine.updateModule('chaos', 'rhythm', e.target.value);
+  function stepMorph(force) {
+    if (!morph || !engine.ctx) return;
+    const now = engine.ctx.currentTime;
+    if (!force && now - morph.last < 0.1) return;
+    morph.last = now;
+    const u = Math.min(1, (now - morph.t0) / morph.T);
+    const e = 0.5 - 0.5 * Math.cos(Math.PI * u);
+    const L = (a, b) => (typeof a === 'number' && typeof b === 'number' ? a + (b - a) * e : b);
+    const { start, cfg } = morph;
+    engine.setReverbMix(L(start.reverbMix, cfg.reverbMix));
+    Object.keys(cfg.breath).forEach((k) => engine.setBreath(k, L(start.breath[k], cfg.breath[k])));
+    MODULES.forEach((m) => {
+      const tgt = cfg[m];
+      Object.keys(tgt).forEach((k) => {
+        if (k === 'enabled' || k === 'manualPos' || typeof tgt[k] !== 'number') return;
+        let v;
+        if (k === 'gain' && !tgt.enabled) v = start[m].enabled ? L(start[m].gain, 0) : tgt.gain; // fade out only what is playing
+        else v = L(start[m][k], tgt[k]);
+        if (k === 'count' || k === 'fountainBreaths' || k === 'spiralBreaths') v = Math.round(v);
+        if (engine.params[m][k] !== v) engine.updateModule(m, k, v);
+      });
     });
-  }
-
-  const chaosScaleEl = document.getElementById('chaosScale');
-  if (chaosScaleEl) {
-    chaosScaleEl.addEventListener('change', (e) => {
-      engine.updateModule('chaos', 'scale', e.target.value);
-    });
-  }
-
-  bindSlider('chaosGain', 'chaos', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('chaosR', 'chaos', 'r', (v) => {
-    const label = v < 3.45 ? 'Periodic' : v < 3.83 ? 'Edge' : 'Chaotic';
-    return `${v.toFixed(2)} (${label})`;
-  });
-  bindSlider('chaosRate', 'chaos', 'rate', (v) => `${v.toFixed(1)} /s`);
-  bindSlider('chaosRegister', 'chaos', 'register', (v) => {
-    const label = v < 0.28 ? 'Sub/Low' : v < 0.68 ? 'Wide' : 'High';
-    return `${Math.round(v * 100)}% (${label})`;
-  });
-  bindSlider('chaosMorph', 'chaos', 'morph', (v) => `${Math.round(v * 100)}%`);
-
-  // Bind Module 3: PAC
-  bindToggle('pacEnabled', 'pac');
-  bindSlider('pacGain', 'pac', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('pacBaseFreq', 'pac', 'baseFreq', (v) => {
-    const tag = v < 65 ? 'Sub-Bass' : v < 115 ? 'Deep Bass' : v < 185 ? 'Low-Mid' : 'Mid';
-    return `${Math.round(v)} Hz (${tag})`;
-  });
-  bindSlider('pacHarmonics', 'pac', 'harmonics', (v) => {
-    const hTag = v < 0.15 ? 'Pure Sine' : v < 0.55 ? 'Warm Tone' : 'Rich Choral';
-    return `${Math.round(v * 100)}% (${hTag})`;
-  });
-  bindSlider('pacTheta', 'pac', 'theta', (v) => {
-    const band = v < 4 ? 'Delta' : v < 8 ? 'Theta' : 'Alpha';
-    return `${v.toFixed(1)} Hz (${band})`;
-  });
-  bindSlider('pacGamma', 'pac', 'gamma', (v) => `${Math.round(v)} Hz`);
-  bindSlider('pacDepth', 'pac', 'depth', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('pacBreath', 'pac', 'breath', (v) => `${Math.round(v * 100)}%`);
-
-  // Bind Module 4: Fractal
-  bindToggle('fractalEnabled', 'fractal');
-  bindSlider('fractalGain', 'fractal', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('fractalSpeed', 'fractal', 'speed', (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} oct/s`);
-  bindSlider('fractalDepth', 'fractal', 'depth', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('fractalCenter', 'fractal', 'center', (v) => `${Math.round(v)} Hz`);
-
-  // Bind Module 5: Sub-Bass
-  bindToggle('subEnabled', 'sub');
-  bindSlider('subGain', 'sub', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('subFreq', 'sub', 'freq', (v) => `${v.toFixed(1)} Hz`);
-  bindSlider('subPulse', 'sub', 'pulse', (v) => `${v.toFixed(1)} Hz`);
-  bindSlider('subWarmth', 'sub', 'warmth', (v) => `${Math.round(v * 100)}%`);
-
-  // Bind Module 6: Ganzfeld
-  bindToggle('ganzfeldEnabled', 'ganzfeld');
-  bindSlider('ganzfeldGain', 'ganzfeld', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('ganzfeldColor', 'ganzfeld', 'color', (v) => `${Math.round(v * 100)}% Brown`);
-  bindSlider('ganzfeldSweep', 'ganzfeld', 'sweep', (v) => `${Math.round(v * 100)}%`);
-
-  // Bind Module 7: ASMR & Ritual Trance
-  bindToggle('asmrEnabled', 'asmr');
-  bindSelect('asmrPalette', 'asmr', 'palette');
-  bindSlider('asmrGain', 'asmr', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('asmrProximity', 'asmr', 'proximity', (v) => `${v < 0.2 ? 'Intimate (5cm)' : v < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
-  bindSlider('asmrRate', 'asmr', 'rate', (v) => `${v.toFixed(1)} /s`);
-  bindSlider('asmrResonance', 'asmr', 'resonance', (v) => `${Math.round(v * 100)}%`);
-
-  // Apply Preset or Saved Custom Configuration Object
-  function applyConfigObject(p, startIfStopped = true) {
-    if (!p) return;
-
-    if (p.mechTitle) mechTitle.textContent = p.mechTitle;
-    if (p.mechText) mechText.textContent = p.mechText;
-    if (p.name) telemetryState.textContent = p.name;
-
-    if (p.masterGain !== undefined) {
-      masterGainInput.value = p.masterGain;
-      masterGainVal.textContent = `${Math.round(p.masterGain * 100)}%`;
-      engine.setMasterGain(p.masterGain);
-    }
-
-    if (p.reverbMix !== undefined) {
-      reverbMixInput.value = p.reverbMix;
-      reverbMixVal.textContent = `${Math.round(p.reverbMix * 100)}%`;
-      engine.setReverbMix(p.reverbMix);
-    }
-
-    // Sync UI & Engine for each module
-    const syncControl = (id, val, text) => {
-      const el = document.getElementById(id);
-      const valEl = document.getElementById(`${id}Val`);
-      if (el) el.value = val;
-      if (valEl && text !== undefined) valEl.textContent = text;
-    };
-
-    const syncToggle = (id, mod, enabled) => {
-      const el = document.getElementById(id);
-      const card = document.querySelector(`.module-card[data-module="${mod}"]`);
-      if (el) el.checked = enabled;
-      if (card) card.classList.toggle('active-module', enabled);
-      engine.updateModule(mod, 'enabled', enabled);
-    };
-
-    // Reset Solo buttons state when loading a full config
-    resetAllSoloButtonsUI();
-
-    // 1. Spatial (Binaural 3D Sound Space & REBAL Energy Torus)
-    if (p.spatial) {
-      syncToggle('spatialEnabled', 'spatial', p.spatial.enabled);
-      if (document.getElementById('spatialPalette') && p.spatial.palette) {
-        document.getElementById('spatialPalette').value = p.spatial.palette;
-      }
-      if (document.getElementById('spatialTrajectory') && p.spatial.trajectory) {
-        document.getElementById('spatialTrajectory').value = p.spatial.trajectory;
-      }
-      if (p.spatial.count !== undefined) {
-        syncControl('spatialCount', p.spatial.count, `${Math.round(p.spatial.count)}`);
-      }
-      if (p.spatial.gain !== undefined) syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
-      if (p.spatial.speed !== undefined) {
-        const period = (1 / Math.max(0.001, p.spatial.speed)).toFixed(1);
-        syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz · ${period} s`);
-      }
-      if (p.spatial.distance !== undefined) syncControl('spatialDistance', p.spatial.distance, `${p.spatial.distance.toFixed(1)} m`);
-      if (p.spatial.room !== undefined) syncControl('spatialRoom', p.spatial.room, `${Math.round(p.spatial.room * 100)}%`);
-      const spVal = p.spatial.spiral !== undefined ? p.spatial.spiral : 0.0;
-      syncControl(
-        'spatialSpiral',
-        spVal,
-        spVal <= 0.02 ? '0.00 (pure loop)' : `${spVal.toFixed(2)}x twist`
-      );
-      Object.entries(p.spatial).forEach(([k, v]) => {
-        if (k !== 'manualPos' && v !== undefined) engine.updateModule('spatial', k, v);
-      });
-    }
-
-    // 2. Chaos
-    if (p.chaos) {
-      syncToggle('chaosEnabled', 'chaos', p.chaos.enabled);
-      if (document.getElementById('chaosPalette') && p.chaos.palette) {
-        document.getElementById('chaosPalette').value = p.chaos.palette;
-      }
-      if (document.getElementById('chaosRhythm') && p.chaos.rhythm) {
-        document.getElementById('chaosRhythm').value = p.chaos.rhythm;
-      }
-      if (document.getElementById('chaosScale') && p.chaos.scale) {
-        document.getElementById('chaosScale').value = p.chaos.scale;
-      }
-      if (p.chaos.gain !== undefined) syncControl('chaosGain', p.chaos.gain, `${Math.round(p.chaos.gain * 100)}%`);
-      if (p.chaos.r !== undefined) {
-        const rLabel = p.chaos.r < 3.45 ? 'Periodic' : p.chaos.r < 3.83 ? 'Edge' : 'Chaotic';
-        syncControl('chaosR', p.chaos.r, `${p.chaos.r.toFixed(2)} (${rLabel})`);
-      }
-      if (p.chaos.rate !== undefined) syncControl('chaosRate', p.chaos.rate, `${p.chaos.rate.toFixed(1)} /s`);
-      if (p.chaos.register !== undefined) {
-        const regLabel = p.chaos.register < 0.28 ? 'Sub/Low' : p.chaos.register < 0.68 ? 'Wide' : 'High';
-        syncControl('chaosRegister', p.chaos.register, `${Math.round(p.chaos.register * 100)}% (${regLabel})`);
-      }
-      if (p.chaos.morph !== undefined) syncControl('chaosMorph', p.chaos.morph, `${Math.round(p.chaos.morph * 100)}%`);
-      Object.entries(p.chaos).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('chaos', k, v);
-      });
-    }
-
-    // 3. PAC
-    if (p.pac) {
-      syncToggle('pacEnabled', 'pac', p.pac.enabled);
-      if (p.pac.gain !== undefined) syncControl('pacGain', p.pac.gain, `${Math.round(p.pac.gain * 100)}%`);
-      if (p.pac.baseFreq !== undefined) {
-        const bTag = p.pac.baseFreq < 90 ? 'Sub' : p.pac.baseFreq < 180 ? 'Low' : 'Mid';
-        syncControl('pacBaseFreq', p.pac.baseFreq, `${Math.round(p.pac.baseFreq)} Hz (${bTag})`);
-      }
-      if (p.pac.harmonics !== undefined) {
-        const hTag = p.pac.harmonics < 0.15 ? 'Pure Sine' : p.pac.harmonics < 0.55 ? 'Warm Tone' : 'Rich Choral';
-        syncControl('pacHarmonics', p.pac.harmonics, `${Math.round(p.pac.harmonics * 100)}% (${hTag})`);
-      }
-      if (p.pac.theta !== undefined) {
-        const band = p.pac.theta < 4 ? 'Delta' : p.pac.theta < 8 ? 'Theta' : 'Alpha';
-        syncControl('pacTheta', p.pac.theta, `${p.pac.theta.toFixed(1)} Hz (${band})`);
-      }
-      if (p.pac.gamma !== undefined) syncControl('pacGamma', p.pac.gamma, `${Math.round(p.pac.gamma)} Hz`);
-      if (p.pac.depth !== undefined) syncControl('pacDepth', p.pac.depth, `${Math.round(p.pac.depth * 100)}%`);
-      if (p.pac.breath !== undefined) syncControl('pacBreath', p.pac.breath, `${Math.round(p.pac.breath * 100)}%`);
-      Object.entries(p.pac).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('pac', k, v);
-      });
-    }
-
-    // 4. Fractal
-    if (p.fractal) {
-      syncToggle('fractalEnabled', 'fractal', p.fractal.enabled);
-      if (p.fractal.gain !== undefined) syncControl('fractalGain', p.fractal.gain, `${Math.round(p.fractal.gain * 100)}%`);
-      if (p.fractal.speed !== undefined) syncControl('fractalSpeed', p.fractal.speed, `${p.fractal.speed >= 0 ? '+' : ''}${p.fractal.speed.toFixed(2)} oct/s`);
-      if (p.fractal.depth !== undefined) syncControl('fractalDepth', p.fractal.depth, `${Math.round(p.fractal.depth * 100)}%`);
-      if (p.fractal.center !== undefined) syncControl('fractalCenter', p.fractal.center, `${Math.round(p.fractal.center)} Hz`);
-      Object.entries(p.fractal).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('fractal', k, v);
-      });
-    }
-
-    // 5. Sub
-    if (p.sub) {
-      syncToggle('subEnabled', 'sub', p.sub.enabled);
-      if (p.sub.gain !== undefined) syncControl('subGain', p.sub.gain, `${Math.round(p.sub.gain * 100)}%`);
-      if (p.sub.freq !== undefined) syncControl('subFreq', p.sub.freq, `${p.sub.freq.toFixed(1)} Hz`);
-      if (p.sub.pulse !== undefined) syncControl('subPulse', p.sub.pulse, `${p.sub.pulse.toFixed(1)} Hz`);
-      if (p.sub.warmth !== undefined) syncControl('subWarmth', p.sub.warmth, `${Math.round(p.sub.warmth * 100)}%`);
-      Object.entries(p.sub).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('sub', k, v);
-      });
-    }
-
-    // 6. Ganzfeld
-    if (p.ganzfeld) {
-      syncToggle('ganzfeldEnabled', 'ganzfeld', p.ganzfeld.enabled);
-      if (p.ganzfeld.gain !== undefined) syncControl('ganzfeldGain', p.ganzfeld.gain, `${Math.round(p.ganzfeld.gain * 100)}%`);
-      if (p.ganzfeld.color !== undefined) syncControl('ganzfeldColor', p.ganzfeld.color, `${Math.round(p.ganzfeld.color * 100)}% Brown`);
-      if (p.ganzfeld.sweep !== undefined) syncControl('ganzfeldSweep', p.ganzfeld.sweep, `${Math.round(p.ganzfeld.sweep * 100)}%`);
-      Object.entries(p.ganzfeld).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('ganzfeld', k, v);
-      });
-    }
-
-    // 7. ASMR & Ritual Trance
-    if (p.asmr) {
-      syncToggle('asmrEnabled', 'asmr', p.asmr.enabled);
-      if (p.asmr.palette) {
-        const palInput = document.getElementById('asmrPalette');
-        if (palInput) palInput.value = p.asmr.palette;
-      }
-      if (p.asmr.gain !== undefined) syncControl('asmrGain', p.asmr.gain, `${Math.round(p.asmr.gain * 100)}%`);
-      if (p.asmr.proximity !== undefined) {
-        syncControl('asmrProximity', p.asmr.proximity, `${p.asmr.proximity < 0.2 ? 'Intimate (5cm)' : p.asmr.proximity < 0.6 ? 'Peripersonal' : 'Ambient Space'}`);
-      }
-      if (p.asmr.rate !== undefined) syncControl('asmrRate', p.asmr.rate, `${p.asmr.rate.toFixed(1)} /s`);
-      if (p.asmr.resonance !== undefined) syncControl('asmrResonance', p.asmr.resonance, `${Math.round(p.asmr.resonance * 100)}%`);
-      Object.entries(p.asmr).forEach(([k, v]) => {
-        if (v !== undefined) engine.updateModule('asmr', k, v);
-      });
-    }
-
-    if (startIfStopped && !engine.isRunning) {
-      toggleAudio();
-    }
-  }
-
-  function applyPreset(presetKey, startIfStopped = true) {
-    const p = PRESETS[presetKey];
-    if (!p) return;
-    document.querySelectorAll('.preset-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.preset === presetKey);
-    });
-    if (restoreConfigBtn) restoreConfigBtn.classList.remove('active');
-    applyConfigObject(p, startIfStopped);
-  }
-
-  document.querySelectorAll('.preset-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      unlockBackgroundAudioSynchronously();
-      applyPreset(btn.dataset.preset, true);
-    });
-  });
-
-  // Save & Restore Custom Hand-Defined Configuration (persisted in localStorage)
-  function checkSavedConfigAvailable() {
-    try {
-      const raw = localStorage.getItem(CUSTOM_CONFIG_STORAGE_KEY);
-      if (raw && restoreConfigBtn) {
-        restoreConfigBtn.disabled = false;
-      }
-    } catch (_) {
-      // Ignore storage access errors
-    }
-  }
-  checkSavedConfigAvailable();
-  applyPreset('egoDissolution', false);
-
-  if (saveConfigBtn) {
-    saveConfigBtn.addEventListener('click', () => {
-      const snapshot = {
-        name: 'CUSTOM USER CONFIG',
-        mechTitle: 'Custom Hand-Tuned Configuration',
-        mechText: 'Your personal saved configuration across all 7 psychoacoustic synthesis modules.',
-        masterGain: engine.params.masterGain,
-        reverbMix: engine.params.reverbMix,
-        spatial: { ...engine.params.spatial, manualPos: null },
-        chaos: { ...engine.params.chaos },
-        pac: { ...engine.params.pac },
-        fractal: { ...engine.params.fractal },
-        sub: { ...engine.params.sub },
-        ganzfeld: { ...engine.params.ganzfeld },
-        asmr: { ...engine.params.asmr }
-      };
-      try {
-        localStorage.setItem(CUSTOM_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
-      } catch (_) {
-        // Fallback in-memory if localStorage is blocked
-      }
-      window.__savedCustomConfig = snapshot;
-      if (restoreConfigBtn) {
-        restoreConfigBtn.disabled = false;
-      }
-      saveConfigBtn.textContent = '✓ Config Saved!';
-      setTimeout(() => {
-        saveConfigBtn.textContent = '💾 Save Config';
-      }, 1600);
-    });
-  }
-
-  if (restoreConfigBtn) {
-    restoreConfigBtn.addEventListener('click', () => {
-      let saved = window.__savedCustomConfig || null;
-      if (!saved) {
-        try {
-          const raw = localStorage.getItem(CUSTOM_CONFIG_STORAGE_KEY);
-          if (raw) saved = JSON.parse(raw);
-        } catch (_) {
-          saved = null;
+    if (u >= 1) {
+      MODULES.forEach((m) => {
+        if (!cfg[m].enabled) {
+          if (engine.params[m].enabled) setEnabled(m, false);
+          engine.updateModule(m, 'gain', cfg[m].gain); // keep the preset level for when the module is switched on
         }
-      }
-      if (!saved) return;
+      });
+      morph = null;
+    }
+    uiDirty = true;
+  }
 
-      document.querySelectorAll('.preset-btn').forEach((btn) => btn.classList.remove('active'));
-      restoreConfigBtn.classList.add('active');
-      applyConfigObject(saved, true);
+  function applyPreset(key, fade = 2.5) {
+    const p = PRESETS[key];
+    if (!p) return;
+    document.querySelectorAll('.preset-btn').forEach((b) => b.classList.toggle('active', b.dataset.preset === key));
+    $('mechTitle').textContent = p.mechTitle || '';
+    $('mechText').textContent = p.mechText || '';
+    $('telemetryState').textContent = p.title.replace(/^\d+\.\s*/, '').toUpperCase();
+    morphTo(resolveConfig(key), engine.isRunning ? fade : 0);
+    if (!engine.isRunning) { stepMorph(true); syncUI(); }
+  }
+
+  const grid = $('presetGrid');
+  Object.entries(PRESETS).forEach(([key, p]) => {
+    const b = document.createElement('button');
+    b.className = 'preset-btn';
+    b.dataset.preset = key;
+    b.innerHTML = `<span class="preset-title"></span><span class="preset-desc"></span>`;
+    b.querySelector('.preset-title').textContent = p.title;
+    b.querySelector('.preset-desc').textContent = p.desc;
+    b.addEventListener('click', async () => {
+      unlockBackgroundAudio();
+      cancelJourneyOnManual();
+      if (!engine.isRunning) await toggleAudio();
+      applyPreset(key);
     });
+    grid.appendChild(b);
+  });
+
+  // save / restore
+  try { if (localStorage.getItem(STORAGE_KEY)) $('restoreConfigBtn').disabled = false; } catch (_) { /* storage blocked */ }
+  $('saveConfigBtn').addEventListener('click', () => {
+    const snap = JSON.parse(JSON.stringify(engine.params));
+    snap.spatial.manualPos = null;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snap)); } catch (_) { window.__aetherSaved = snap; }
+    $('restoreConfigBtn').disabled = false;
+    $('saveConfigBtn').textContent = '✓ Saved';
+    setTimeout(() => { $('saveConfigBtn').textContent = '💾 Save'; }, 1500);
+  });
+  $('restoreConfigBtn').addEventListener('click', async () => {
+    let snap = window.__aetherSaved || null;
+    try { snap = JSON.parse(localStorage.getItem(STORAGE_KEY)) || snap; } catch (_) { /* ignore */ }
+    if (!snap) return;
+    if (!engine.isRunning) await toggleAudio();
+    document.querySelectorAll('.preset-btn').forEach((b) => b.classList.remove('active'));
+    if (snap.root) engine.setRoot(snap.root);
+    morphTo({ reverbMix: snap.reverbMix, breath: snap.breath, ...Object.fromEntries(MODULES.map((m) => [m, Object.assign({}, DEFAULTS[m], snap[m])])) }, 1.5);
+    $('telemetryState').textContent = 'MY SETTINGS';
+  });
+
+  // solo
+  let soloState = null;
+  let soloMod = null;
+  document.querySelectorAll('.btn-solo').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const mod = btn.dataset.solo;
+      if (soloMod === mod) {
+        MODULES.forEach((m) => setEnabled(m, soloState[m]));
+        soloMod = null;
+        soloState = null;
+      } else {
+        if (!soloState) soloState = Object.fromEntries(MODULES.map((m) => [m, !!engine.params[m].enabled]));
+        MODULES.forEach((m) => setEnabled(m, m === mod));
+        soloMod = mod;
+      }
+      document.querySelectorAll('.btn-solo').forEach((b) => {
+        b.classList.toggle('active', b.dataset.solo === soloMod);
+        b.textContent = b.dataset.solo === soloMod ? 'UNSOLO' : 'SOLO';
+      });
+    });
+  });
+
+  // ------------------------------------------------------------------ guided sessions
+  let journey = null;
+  function startJourney(id) {
+    const j = JOURNEYS[id];
+    if (!j) return;
+    journey = { id, j, t0: engine.ctx.currentTime, idx: -1 };
+    $('journeyBtn').textContent = '■ Stop session';
+    journeyTick();
+  }
+  function stopJourney(msg) {
+    journey = null;
+    $('journeyBtn').textContent = '▶ Start session';
+    $('journeyFill').style.width = '0%';
+    $('journeyClock').textContent = '';
+    if (msg) $('journeyStep').textContent = msg;
+  }
+  function cancelJourneyOnManual() {
+    if (journey) stopJourney('Session stopped: you took over the controls.');
+  }
+  function journeyTick() {
+    if (!journey || !engine.ctx) return;
+    const t = engine.ctx.currentTime - journey.t0;
+    const steps = journey.j.steps;
+    const total = steps[steps.length - 1].at;
+    let idx = 0;
+    while (idx + 1 < steps.length && steps[idx + 1].at <= t) idx++;
+    if (idx !== journey.idx) {
+      journey.idx = idx;
+      const s = steps[idx];
+      $('journeyStep').textContent = s.label;
+      if (s.end) {
+        engine.setMasterGain(engine.params.masterGain); // keep slider value
+        engine.masterGain.gain.setTargetAtTime(0.0001, engine.ctx.currentTime, 6);
+        setTimeout(() => { if (engine.isRunning) toggleAudio(); }, 20000);
+        stopJourney('Session complete. Take a moment before you get up.');
+        return;
+      }
+      const cfg = resolveConfig(s.preset, s.over);
+      $('telemetryState').textContent = journey.j.title.toUpperCase();
+      morphTo(cfg, s.fade || 10);
+    }
+    $('journeyFill').style.width = `${Math.min(100, (t / total) * 100).toFixed(1)}%`;
+    const m = Math.floor(t / 60), sec = Math.floor(t % 60);
+    $('journeyClock').textContent = `${m}:${String(sec).padStart(2, '0')} / ${Math.round(total / 60)} min`;
+  }
+  $('journeyBtn').addEventListener('click', async () => {
+    unlockBackgroundAudio();
+    if (journey) { stopJourney('Session stopped.'); return; }
+    if (!engine.isRunning) await toggleAudio();
+    startJourney($('journeySelect').value);
+  });
+
+  // ------------------------------------------------------------------ audio power, background playback
+  let wakeLock = null;
+  async function acquireWakeLock() {
+    if ('wakeLock' in navigator) {
+      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) { wakeLock = null; }
+    }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  let silentUrl = null;
+  function silentWav() {
+    if (silentUrl) return silentUrl;
+    const sr = 8000, n = sr * 10, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    silentUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    return silentUrl;
+  }
+  const bgAudio = $('bgAudioKeepAlive');
+  function unlockBackgroundAudio() {
+    if (!bgAudio) return;
+    if (!bgAudio.src || bgAudio.src.indexOf('blob:') === -1) bgAudio.src = silentWav();
+    if (bgAudio.paused) bgAudio.play().then(() => setBg('ACTIVE')).catch(() => setBg('TAP TO ENABLE'));
+  }
+  function setBg(t) { $('telemetryBgAudio').textContent = t; }
+  let worker = null;
+  try {
+    const src = 'let t=null;onmessage=(e)=>{if(e.data==="start"&&!t)t=setInterval(()=>postMessage(0),50);else if(e.data==="stop"&&t){clearInterval(t);t=null;}};';
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })));
+    worker.onmessage = () => { if (document.hidden && engine.isRunning) { engine.tick(); appTick(); } };
+  } catch (_) { worker = null; }
+  function mediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      const art = new URL('icon-512.png', window.location.href).href;
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'AETHER', artist: 'Breath-paced 3D sound', album: 'Meditation', artwork: [{ src: art, sizes: '512x512', type: 'image/png' }] });
+      navigator.mediaSession.setActionHandler('play', () => { if (!engine.isRunning) toggleAudio(); });
+      navigator.mediaSession.setActionHandler('pause', () => { if (engine.isRunning) toggleAudio(); });
+    } catch (_) { /* unsupported */ }
   }
 
-  function updateTargetStateBadge() {
-    if (!engine.isRunning) return;
-    const f = engine.params.pac.theta;
-    const band = f < 4 ? 'DELTA TRANCE' : f < 8 ? 'THETA-GAMMA PAC' : 'ALPHA FLOW';
-    telemetryState.textContent = band;
+  async function toggleAudio() {
+    if (!engine.isRunning) {
+      unlockBackgroundAudio();
+      $('powerBtnText').textContent = 'STARTING…';
+      await engine.start();
+      if (worker) worker.postMessage('start');
+      mediaSession();
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+      await acquireWakeLock();
+      $('powerBtn').classList.add('active');
+      $('powerBtn').setAttribute('aria-pressed', 'true');
+      $('powerBtnText').textContent = 'PLAYING (PAUSE)';
+      $('statusOrb').classList.add('live');
+      $('telemetryRenderer').textContent = engine.renderer.mode === 'structural' ? 'STRUCTURAL' : 'BROWSER HRTF';
+      if (!engine.renderer.workletAvailable) $('spatialRenderer').querySelector('option[value="structural"]').disabled = true;
+    } else {
+      engine.stop();
+      releaseWakeLock();
+      if (worker) worker.postMessage('stop');
+      if (bgAudio) bgAudio.pause();
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+      setBg('STANDBY');
+      $('powerBtn').classList.remove('active');
+      $('powerBtn').setAttribute('aria-pressed', 'false');
+      $('powerBtnText').textContent = 'RESUME AUDIO';
+      $('statusOrb').classList.remove('live');
+    }
   }
+  $('powerBtn').addEventListener('click', () => { unlockBackgroundAudio(); toggleAudio(); });
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && engine.isRunning) {
+      if (engine.ctx.state === 'suspended') await engine.ctx.resume().catch(() => {});
+      acquireWakeLock();
+    }
+  });
+  document.addEventListener('touchstart', () => {
+    if (engine.isRunning && engine.ctx && engine.ctx.state === 'suspended') engine.ctx.resume().catch(() => {});
+  }, { passive: true });
 
-  // Visualizer Tabs
+  // ------------------------------------------------------------------ canvas
+  const canvas = $('neuroCanvas');
+  const viz = window.AetherVisualizer.create(canvas, engine);
+  function resize() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = r.width * dpr;
+    canvas.height = r.height * dpr;
+    canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
   document.querySelectorAll('.viz-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.viz-tab').forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
-      activeVizMode = tab.dataset.viz;
-
-      if (activeVizMode === 'spatial') {
-        hudLeft.textContent = 'HRTF Voices: 8 + In-Cranial Core';
-        hudRight.textContent = '0.1 Hz Vagal Coherence Guide';
-      } else if (activeVizMode === 'pac') {
-        hudLeft.textContent = 'Cross-Frequency θ–γ PAC Envelope';
-        hudRight.textContent = 'Interaural Binaural Phase Lissajous';
-      } else {
-        hudLeft.textContent = 'Logistic Chaos & Bayesian Surprise';
-        hudRight.textContent = 'Shepard-Risset & FFT Spectrum';
-      }
+      viz.setMode(tab.dataset.viz);
+      $('hudLeft').style.display = tab.dataset.viz === 'spatial' ? '' : 'none';
     });
   });
+  $('fullscreenBtn').addEventListener('click', () => {
+    const el = $('canvasContainer');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen().then(() => setTimeout(resize, 100)).catch(() => {});
+  });
+  document.addEventListener('fullscreenchange', () => setTimeout(resize, 100));
 
-  // Resize Canvas for Retina/HiDPI
-  function resizeCanvas() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+  let dragging = false;
+  function dragTo(e) {
+    const r = canvas.getBoundingClientRect();
+    const pk = viz.pick(e.clientX - r.left, e.clientY - r.top);
+    const cur = engine.params.spatial.manualPos || engine.nodes.spatial.lastManual || { x: 0, y: 0, z: -1.6 };
+    const pos = pk.view === 'back' ? { x: pk.a, y: pk.b, z: cur.z } : { x: cur.x, y: pk.b, z: -pk.a };
+    pos.x = Math.max(-2.5, Math.min(2.5, pos.x));
+    pos.y = Math.max(-2.2, Math.min(1.7, pos.y));
+    pos.z = Math.max(-2.5, Math.min(2.5, pos.z));
+    engine.params.spatial.manualPos = pos;
+    const d = Math.hypot(pos.x, pos.y, pos.z);
+    const az = Math.round((Math.atan2(pos.x, -pos.z) * 180) / Math.PI);
+    const el = Math.round((Math.atan2(pos.y, Math.hypot(pos.x, pos.z)) * 180) / Math.PI);
+    $('hudLeft').textContent = `azimuth ${az}° · elevation ${el}° · ${d.toFixed(2)} m`;
   }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
+  canvas.addEventListener('pointerdown', (e) => {
+    if (viz.mode !== 'spatial') return;
+    if (engine.params.spatial.trajectory !== 'manual') {
+      $('spatialTrajectory').value = 'manual';
+      engine.updateModule('spatial', 'trajectory', 'manual');
+      updateSpatialVisibility();
+    }
+    if (!engine.params.spatial.enabled) setEnabled('spatial', true);
+    dragging = true;
+    canvas.setPointerCapture(e.pointerId);
+    dragTo(e);
+  });
+  canvas.addEventListener('pointermove', (e) => { if (dragging) dragTo(e); });
+  const endDrag = () => { dragging = false; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 
-  // buffers for real-time audio waveform & spectrum
-  const waveBufL = new Float32Array(512);
-  const waveBufR = new Float32Array(512);
-  const freqBuf = new Uint8Array(512);
-
-  // Main 60 FPS Render & Audio Modulation Loop
+  // ------------------------------------------------------------------ main loop
+  let uiDirty = false;
+  let lastUi = 0;
+  function appTick() {
+    journeyTick();
+    stepMorph(false);
+  }
   function animate(nowMs) {
     requestAnimationFrame(animate);
-
-    // Step audio engine modulations when foreground is active (bgWorker steps it when screen is locked)
     if (!document.hidden) {
       engine.tick();
+      appTick();
     }
-
-    // Update Telemetry Readouts
-    telemetrySurprise.textContent = `${engine.telemetry.bayesianSurprise.toFixed(2)} bits`;
-    telemetryPAC.textContent = engine.params.pac.enabled ? engine.params.pac.depth.toFixed(2) : '0.00';
-
-    const breathVal = engine.telemetry.breathValue;
-    const breathSlope = Math.cos(engine.telemetry.breathPhase);
-    telemetryBreath.textContent = breathSlope >= 0 ? 'INHALE ▲' : 'EXHALE ▼';
-    telemetryBreath.style.color = breathSlope >= 0 ? '#38bdf8' : '#a78bfa';
-
-    // Render Canvas
-    const width = canvas.width / (window.devicePixelRatio || 1);
-    const height = canvas.height / (window.devicePixelRatio || 1);
-
-    ctx2d.fillStyle = 'rgba(6, 9, 17, 0.28)';
-    ctx2d.fillRect(0, 0, width, height);
-
-    if (activeVizMode === 'spatial') {
-      drawSpatialVisualizer(width, height, breathVal, nowMs);
-    } else if (activeVizMode === 'pac') {
-      drawPACVisualizer(width, height, nowMs);
-    } else {
-      drawChaosAndFractalVisualizer(width, height, nowMs);
+    const tel = engine.telemetry;
+    if (engine.isRunning && engine.breath) {
+      const d = engine.breath.durations();
+      const names = { inhale: 'INHALE ▲', holdIn: 'HOLD', exhale: 'EXHALE ▼', holdOut: 'HOLD' };
+      $('telemetryBreath').textContent = names[tel.breathStage] || '—';
+      $('telemetryBreath').style.color = tel.breathStage === 'inhale' ? '#fbbf24' : tel.breathStage === 'exhale' ? '#a78bfa' : '#94a3b8';
+      $('breathFill').style.width = `${Math.round(tel.breathLung * 100)}%`;
+      $('telemetryBreathTimes').textContent = `${d.inhale.toFixed(1)} s in · ${d.exhale.toFixed(1)} s out`;
     }
+    if (uiDirty && nowMs - lastUi > 250) { syncUI(); uiDirty = false; lastUi = nowMs; }
+    viz.draw(nowMs);
   }
 
-  /**
-   * Helper to project 3D (x, y, z) to 2D radar/field coordinates with smooth compression.
-   * In 'rebal' mode, projects into a Frontal-Perspective 3D Apple-Torus view ("The Flow of Your Energy Field")
-   * so vertical elevation y (going UP through the body, exploding in the head, fountaining UP to the top arch,
-   * descending down the outside of the body to below the feet, and curving UP into the feet) is clearly visible!
-   */
-  function project3DToRadar(x, y, z, cx, cy, scale) {
-    const horizDist = Math.sqrt(x * x + z * z);
-    const compressedDist = horizDist <= 1.8
-      ? horizDist
-      : 1.8 + Math.log1p(horizDist - 1.8) * 0.62;
-    const ratio = horizDist > 0.0001 ? compressedDist / horizDist : 1;
-
-    if (engine.params.spatial.trajectory === 'rebal') {
-      // Frontal 3D Apple-Torus Projection: X = Left/Right, Y = Up/Down (Vertical Axis), Z = 3D Depth Tilt
-      const px = cx + (x * ratio * 0.78 + z * ratio * 0.25) * scale;
-      const py = (cy - 6) - y * scale * 0.30 + z * ratio * scale * 0.16;
-      return { px, py, horizDist };
-    }
-
-    const px = cx + x * ratio * scale;
-    const py = cy + z * ratio * scale * 0.88 - y * 14;
-    return { px, py, horizDist };
-  }
-
-  /**
-   * VISUALIZER 1: 3D HRTF Trajectories (Horizontal Radar + Right-Side Vertical Elevation Gauge)
-   */
-  function drawSpatialVisualizer(w, h, breathVal, nowMs) {
-    const cx = (w - 58) * 0.5;
-    const cy = h * 0.5;
-    const scale = Math.min(w - 64, h) * 0.21;
-
-    ctx2d.save();
-
-    // Compass Labels for 3D Orientation (Top = Front -Z, Bottom = Behind Head +Z)
-    ctx2d.fillStyle = 'rgba(148, 163, 184, 0.45)';
-    ctx2d.font = '10px "JetBrains Mono", monospace';
-    ctx2d.textAlign = 'center';
-    ctx2d.fillText('▲ FRONT OF FACE (-Z // BRIGHT PINNA)', cx, 20);
-    ctx2d.fillText('▼ BEHIND NECK (+Z // PINNA SHADOW)', cx, h - 34);
-    ctx2d.textAlign = 'left';
-    ctx2d.fillText('◀ LEFT EAR', 14, cy + 4);
-    ctx2d.textAlign = 'right';
-    ctx2d.fillText('RIGHT EAR ▶', w - 74, cy + 4);
-    ctx2d.textAlign = 'left';
-
-    // Vertical Elevation Side-Profile Gauge (Right side of canvas: ▲ +85° ZENITH <-> 0° EAR <-> ▼ -75° FLOOR)
-    const gaugeX = w - 34;
-    const gaugeTop = 44;
-    const gaugeBottom = h - 48;
-    const gaugeMidY = (gaugeTop + gaugeBottom) * 0.5;
-    const gaugeHalfH = (gaugeBottom - gaugeTop) * 0.5;
-
-    ctx2d.strokeStyle = 'rgba(148, 163, 184, 0.22)';
-    ctx2d.lineWidth = 1.5;
-    ctx2d.beginPath();
-    ctx2d.moveTo(gaugeX, gaugeTop);
-    ctx2d.lineTo(gaugeX, gaugeBottom);
-    ctx2d.stroke();
-
-    // Tick marks for +85° Zenith, 0° Ear Level, -75° Floor
-    [gaugeTop, gaugeMidY, gaugeBottom].forEach((ty) => {
-      ctx2d.beginPath();
-      ctx2d.moveTo(gaugeX - 7, ty);
-      ctx2d.lineTo(gaugeX + 7, ty);
-      ctx2d.stroke();
-    });
-
-    ctx2d.fillStyle = 'rgba(148, 163, 184, 0.58)';
-    ctx2d.font = '9px "JetBrains Mono", monospace';
-    ctx2d.textAlign = 'center';
-    ctx2d.fillText('▲+85°', gaugeX, gaugeTop - 16);
-    ctx2d.fillText('SKY', gaugeX, gaugeTop - 6);
-    ctx2d.fillText('0° EAR', gaugeX - 20, gaugeMidY + 3);
-    ctx2d.fillText('▼-75°', gaugeX, gaugeBottom + 12);
-    ctx2d.fillText('FLOOR', gaugeX, gaugeBottom + 22);
-    ctx2d.textAlign = 'left';
-
-    // 1. 0.1 Hz Coherent Breathing Guide Ring
-    const breathRadius = scale * (0.85 + 0.25 * breathVal);
-    ctx2d.beginPath();
-    ctx2d.arc(cx, cy, breathRadius, 0, Math.PI * 2);
-    ctx2d.strokeStyle = 'rgba(56, 189, 248, 0.16)';
-    ctx2d.lineWidth = 1.8;
-    ctx2d.stroke();
-
-    // Outer reference ring
-    ctx2d.beginPath();
-    ctx2d.arc(cx, cy, scale * 1.45, 0, Math.PI * 2);
-    ctx2d.strokeStyle = 'rgba(148, 163, 184, 0.09)';
-    ctx2d.setLineDash([4, 6]);
-    ctx2d.stroke();
-    ctx2d.setLineDash([]);
-
-    // 2. Listener Cranial Silhouette & Optional In-Cranial Phase-Inverted Core
-    const collapse = engine.params.spatial.collapse;
-    if (collapse > 0.01) {
-      const corePulse = 10 + collapse * 18 + Math.sin(nowMs * 0.008) * 3;
-      const coreGrad = ctx2d.createRadialGradient(cx, cy, 1, cx, cy, corePulse * 2.2);
-      coreGrad.addColorStop(0, `rgba(167, 139, 250, ${collapse * 0.75})`);
-      coreGrad.addColorStop(0.5, `rgba(56, 189, 248, ${collapse * 0.35})`);
-      coreGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-
-      ctx2d.fillStyle = coreGrad;
-      ctx2d.beginPath();
-      ctx2d.arc(cx, cy, corePulse * 2.2, 0, Math.PI * 2);
-      ctx2d.fill();
-    }
-
-    // Left & Right Ear Cups + Head Outline + Nose Pointer
-    ctx2d.strokeStyle = 'rgba(241, 245, 249, 0.55)';
-    ctx2d.lineWidth = 1.6;
-    ctx2d.beginPath();
-    ctx2d.arc(cx, cy, 17, 0, Math.PI * 2);
-    ctx2d.stroke();
-    // Nose triangle facing UP (-Z)
-    ctx2d.beginPath();
-    ctx2d.moveTo(cx - 5, cy - 16);
-    ctx2d.lineTo(cx, cy - 24);
-    ctx2d.lineTo(cx + 5, cy - 16);
-    ctx2d.stroke();
-    // Ear cups
-    ctx2d.fillStyle = 'rgba(56, 189, 248, 0.55)';
-    ctx2d.fillRect(cx - 21, cy - 6, 4, 12);
-    ctx2d.fillRect(cx + 17, cy - 6, 4, 12);
-
-    // 3. Draw 3D Water Drop & ASMR Trigger Ripples at exact 3D emission coordinates
-    if (engine.telemetry.spatialRipples && engine.telemetry.spatialRipples.length > 0 && engine.ctx) {
-      const audioNow = engine.ctx.currentTime;
-      for (let rIdx = engine.telemetry.spatialRipples.length - 1; rIdx >= 0; rIdx--) {
-        const rp = engine.telemetry.spatialRipples[rIdx];
-        const age = audioNow - rp.time;
-        if (age > 0.85) {
-          engine.telemetry.spatialRipples.splice(rIdx, 1);
-          continue;
-        }
-        if (age >= 0) {
-          const { px, py } = project3DToRadar(rp.x, rp.y, rp.z, cx, cy, scale);
-          const rRad = 6 + age * 46;
-          const alpha = Math.max(0, (1 - age / 0.85) * 0.65);
-          ctx2d.beginPath();
-          ctx2d.arc(px, py, rRad, 0, Math.PI * 2);
-          ctx2d.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
-          ctx2d.lineWidth = 1.6;
-          ctx2d.stroke();
-        }
-      }
-    }
-
-    // 4. Draw Active 3D HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
-    const isRebal = engine.params.spatial.trajectory === 'rebal';
-    const voices = (engine.telemetry.spatialVoices || []).filter((v) => v.active !== false);
-
-    // Draw REBAL Apple-Torus Energy Field Lines, Directional Arrows, Human Silhouette ("YOU") & Crown Energy Burst
-    if (isRebal && voices.length > 0) {
-      const stage = engine.telemetry.spatialStage || {};
-      const isInhale = stage.phase === 'inhale';
-      const R = Math.max(0.9, Math.min(4.2, (engine.params.spatial.distance || 1.8) * 1.1));
-      const crownY = window.Spatial3DModule ? window.Spatial3DModule.REBAL_CROWN_Y : 0.14;
-      const feetY = window.Spatial3DModule ? window.Spatial3DModule.REBAL_FEET_Y : -1.6;
-      const yc = (crownY + feetY) / 2;
-      const half = (crownY - feetY) / 2;
-      const ay = 1.0 + 0.55 * R;
-      const s = half / ay;
-      const k = Math.sqrt(Math.max(0, 1 - s * s));
-      const ar = R / (1 + k);
-      const rc = k * ar;
-      const th0 = Math.PI - Math.asin(s);
-
-      ctx2d.save();
-      // 1. Draw nested Apple-Torus Energy Field Loops (matching the exact REBAL equations)
-      const loopScales = [0.72, 1.0, 1.28];
-      loopScales.forEach((ls, lIdx) => {
-        [-1, 1].forEach((side) => {
-          ctx2d.beginPath();
-          const steps = 48;
-          for (let step = 0; step <= steps; step++) {
-            const u = step / steps;
-            const pol = u * Math.PI;
-            const r = R * Math.sin(pol) * ls;
-            const y = (0.22 + 1.25 * Math.sin(pol) - 2.05 * Math.pow(u, 1.35)) * (lIdx === 1 ? 1.0 : (lIdx === 0 ? 0.85 : 1.15));
-            const pt = project3DToRadar(side * r, y, 0, cx, cy, scale);
-            if (step === 0) ctx2d.moveTo(pt.px, pt.py);
-            else ctx2d.lineTo(pt.px, pt.py);
-          }
-          ctx2d.strokeStyle = isInhale
-            ? `rgba(56, 189, 248, ${0.14 + lIdx * 0.05})`
-            : `rgba(167, 139, 250, ${0.18 + lIdx * 0.06})`;
-          ctx2d.lineWidth = lIdx === 1 ? 1.6 : 1.0;
-          ctx2d.stroke();
-
-          // Directional flow arrowheads along the middle loop
-          if (lIdx === 1) {
-            [0.15, 0.52, 0.88].forEach((uArr) => {
-              const pol1 = uArr * Math.PI;
-              const pol2 = (uArr + 0.02) * Math.PI;
-              const r1 = R * Math.sin(pol1);
-              const y1 = 0.22 + 1.25 * Math.sin(pol1) - 2.05 * Math.pow(uArr, 1.35);
-              const r2 = R * Math.sin(pol2);
-              const y2 = 0.22 + 1.25 * Math.sin(pol2) - 2.05 * Math.pow(uArr + 0.02, 1.35);
-              const p1 = project3DToRadar(side * r1, y1, 0, cx, cy, scale);
-              const p2 = project3DToRadar(side * r2, y2, 0, cx, cy, scale);
-              const ang = Math.atan2(p2.py - p1.py, p2.px - p1.px);
-              ctx2d.fillStyle = 'rgba(167, 139, 250, 0.7)';
-              ctx2d.beginPath();
-              ctx2d.moveTo(p2.px, p2.py);
-              ctx2d.lineTo(p2.px - 7 * Math.cos(ang - 0.5), p2.py - 7 * Math.sin(ang - 0.5));
-              ctx2d.lineTo(p2.px - 7 * Math.cos(ang + 0.5), p2.py - 7 * Math.sin(ang + 0.5));
-              ctx2d.closePath();
-              ctx2d.fill();
-            });
-          }
-        });
-      });
-
-      // 2. Draw Central Vertical Core Channel (Feet -> Torso -> Head) & Human Body Silhouette ("YOU")
-      const headPt = project3DToRadar(0, crownY, 0, cx, cy, scale);
-      const feetPt = project3DToRadar(0, feetY, 0, cx, cy, scale);
-      ctx2d.strokeStyle = isInhale ? 'rgba(251, 191, 36, 0.55)' : 'rgba(56, 189, 248, 0.25)';
-      ctx2d.lineWidth = 2.2;
-      ctx2d.beginPath();
-      ctx2d.moveTo(feetPt.px, feetPt.py);
-      ctx2d.lineTo(headPt.px, headPt.py);
-      ctx2d.stroke();
-
-      // Human Torso & Legs Pillar ("YOU")
-      const bodyTopY = headPt.py + 10;
-      const bodyH = Math.max(22, feetPt.py - bodyTopY);
-      ctx2d.fillStyle = 'rgba(15, 23, 42, 0.72)';
-      ctx2d.strokeStyle = 'rgba(241, 245, 249, 0.38)';
-      ctx2d.lineWidth = 1.3;
-      ctx2d.beginPath();
-      ctx2d.roundRect(cx - 14, bodyTopY, 28, bodyH * 0.55, 6);
-      ctx2d.fill();
-      ctx2d.stroke();
-      ctx2d.fillStyle = 'rgba(241, 245, 249, 0.65)';
-      ctx2d.font = '8px "JetBrains Mono", monospace';
-      ctx2d.textAlign = 'center';
-      ctx2d.fillText('YOU', cx, bodyTopY + bodyH * 0.30);
-
-      // 3. Crown Radiant Burst when Inhale fills head or crown burst fires
-      const burstAge = engine.ctx && voices[0].burstTime ? engine.ctx.currentTime - voices[0].burstTime : 99;
-      if (burstAge < 0.6 || (isInhale && stage.u > 0.78)) {
-        const glowRad = burstAge < 0.6 ? 36 + (1 - burstAge / 0.6) * 22 : 28 + Math.sin(nowMs * 0.016) * 6;
-        const headGrad = ctx2d.createRadialGradient(headPt.px, headPt.py, 2, headPt.px, headPt.py, glowRad);
-        headGrad.addColorStop(0, 'rgba(251, 191, 36, 0.85)');
-        headGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
-        headGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
-        ctx2d.fillStyle = headGrad;
-        ctx2d.beginPath();
-        ctx2d.arc(headPt.px, headPt.py, glowRad, 0, Math.PI * 2);
-        ctx2d.fill();
-      }
-      ctx2d.restore();
-    }
-
-    // Show live Stage Choreography Banner when in REBAL mode
-    const stageBanner = (isRebal && voices[0] && voices[0].stageLabel)
-      ? `REBAL TORUS // ${voices[0].stageLabel}`
-      : (engine.params.spatial.trajectory === 'manual' ? 'HRTF 3D // MANUAL POSITION (HOLD)' : '');
-    if (stageBanner) {
-      const isInhale = stageBanner.includes('INHALE');
-      ctx2d.fillStyle = isInhale ? 'rgba(56, 189, 248, 0.95)' : 'rgba(167, 139, 250, 0.95)';
-      ctx2d.font = '10px "JetBrains Mono", monospace';
-      ctx2d.textAlign = 'center';
-      ctx2d.fillText(stageBanner, cx, 36);
-      ctx2d.textAlign = 'left';
-    }
-
-    voices.forEach((v) => {
-      if (v.active === false) return;
-      const energy = v.activeEnergy !== undefined ? v.activeEnergy : 1.0;
-      if (energy < 0.01) return;
-
-      // During REBAL Inhale core ascent, merge overlapping duplicate labels
-      const isMergedInhale = isRebal && v.index > 0 && Math.sqrt(v.x * v.x + v.z * v.z) < 0.12;
-
-      const palette = [
-        '56, 189, 248',  // Cyan
-        '251, 191, 36',  // Amber
-        '52, 211, 153',  // Emerald
-        '251, 113, 133', // Rose
-        '167, 139, 250', // Violet
-        '96, 165, 250',  // Sky
-        '244, 114, 182', // Pink
-        '163, 230, 53'   // Lime
-      ];
-      const hue = palette[v.index % palette.length];
-
-      // Draw Geometric Trail
-      if (v.trail && v.trail.length > 2) {
-        ctx2d.beginPath();
-        for (let t = 0; t < v.trail.length; t++) {
-          const pt = project3DToRadar(v.trail[t].x, v.trail[t].y, v.trail[t].z, cx, cy, scale);
-          if (t === 0) ctx2d.moveTo(pt.px, pt.py);
-          else ctx2d.lineTo(pt.px, pt.py);
-        }
-        ctx2d.strokeStyle = `rgba(${hue}, 0.32)`;
-        ctx2d.lineWidth = 2.0;
-        ctx2d.stroke();
-      }
-
-      if (isMergedInhale) return;
-
-      const { px, py, horizDist } = project3DToRadar(v.x, v.y, v.z, cx, cy, scale);
-      const dist = v.dist || Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-      // True spherical elevation angle phi in degrees (-90° floor to +90° zenith)
-      const elevRad = Math.atan2(v.y || 0, Math.max(0.02, horizDist));
-      const elevDeg = Math.round((elevRad * 180) / Math.PI);
-
-      const distScale = 1 / (1 + Math.max(0, dist - 1.2) * 0.14);
-      const radius = Math.max(4.5, (8 + energy * 4) * distScale);
-
-      // Connection vector from head center to source
-      ctx2d.beginPath();
-      ctx2d.moveTo(cx, cy);
-      ctx2d.lineTo(px, py);
-      ctx2d.strokeStyle = `rgba(${hue}, 0.22)`;
-      ctx2d.lineWidth = 1.2;
-      ctx2d.stroke();
-
-      // Glowing source orb on radar
-      const grad = ctx2d.createRadialGradient(px, py, 1, px, py, radius * 2.6);
-      grad.addColorStop(0, `rgba(${hue}, 0.98)`);
-      grad.addColorStop(0.45, `rgba(${hue}, 0.42)`);
-      grad.addColorStop(1, `rgba(${hue}, 0)`);
-
-      ctx2d.fillStyle = grad;
-      ctx2d.beginPath();
-      ctx2d.arc(px, py, radius * 2.6, 0, Math.PI * 2);
-      ctx2d.fill();
-
-      // Plot live marker on the Right-Side Vertical Elevation Gauge
-      const elevNormGauge = Math.max(-1, Math.min(1, elevRad / 1.48));
-      const gy = gaugeMidY - elevNormGauge * gaugeHalfH;
-      ctx2d.fillStyle = `rgba(${hue}, 0.95)`;
-      ctx2d.beginPath();
-      ctx2d.arc(gaugeX, gy, 5.2, 0, Math.PI * 2);
-      ctx2d.fill();
-      ctx2d.fillStyle = 'rgba(241, 245, 249, 0.88)';
-      ctx2d.font = '9px "JetBrains Mono", monospace';
-      ctx2d.textAlign = 'right';
-      ctx2d.fillText(`S${v.index + 1} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
-      ctx2d.textAlign = 'left';
-
-      // Label with Source #, Distance, Horizontal Pinna Cue & Vertical Elevation Angle
-      ctx2d.fillStyle = 'rgba(241, 245, 249, 0.92)';
-      ctx2d.font = '10px "JetBrains Mono", monospace';
-      const horizTag = dist < 0.28
-        ? 'IN-HEAD'
-        : v.z > 0.25 && Math.abs(v.x) < 0.35
-        ? 'BACK'
-        : v.z < -0.25 && Math.abs(v.x) < 0.35
-        ? 'FRONT'
-        : v.x < 0
-        ? 'LEFT'
-        : 'RIGHT';
-      const elevTag = elevDeg > 18
-        ? `▲+${elevDeg}° SKY`
-        : elevDeg < -18
-        ? `▼${elevDeg}° FLOOR`
-        : `${dist.toFixed(1)}m`;
-      ctx2d.fillText(
-        `S${v.index + 1}: ${horizTag} · ${elevTag}`,
-        px + radius + 5,
-        py + 3
-      );
-    });
-
-    ctx2d.restore();
-  }
-
-  /**
-   * VISUALIZER 2: Theta-Gamma Phase-Amplitude Coupling (PAC) + Binaural Lissajous
-   */
-  function drawPACVisualizer(w, h, nowMs) {
-    const midX = w * 0.54;
-
-    // Left Half: Real-Time Nested Theta-Gamma PAC Wave + 0.1 Hz Breath Swell Envelope
-    const baseFreq = engine.params.pac.baseFreq || 136;
-    const fTheta = engine.params.pac.theta;
-    const fGamma = engine.params.pac.gamma;
-    const pacDepth = engine.params.pac.depth;
-    const breathDepth = engine.params.pac.breath;
-    const breathNorm = 0.5 + 0.5 * engine.telemetry.breathValue;
-    const breathAmp = (1.0 - breathDepth * 0.90) + breathDepth * 1.25 * Math.pow(breathNorm, 1.4);
-    const tSec = nowMs * 0.001;
-
-    ctx2d.save();
-    const plotLeft = 28;
-    const plotWidth = midX - 48;
-    const cy = h * 0.5;
-    const amp = h * 0.27 * Math.min(1.25, Math.max(0.18, breathAmp));
-
-    // Draw 0.1 Hz Breath Swell Halo background bar
-    ctx2d.fillStyle = `rgba(56, 189, 248, ${0.03 + 0.10 * breathNorm * breathDepth})`;
-    ctx2d.fillRect(plotLeft, cy - amp * 1.05, plotWidth, amp * 2.1);
-
-    ctx2d.beginPath();
-    for (let i = 0; i <= plotWidth; i++) {
-      const normX = i / plotWidth; // 0.35 seconds window
-      const t = tSec + normX * 0.35;
-      const thetaWave = Math.cos(t * fTheta * Math.PI * 2);
-      const gate = Math.pow(Math.max(0, thetaWave), 2.2);
-      const gammaFlutter = Math.sin(t * fGamma * Math.PI * 2) * 0.55;
-      const gammaBurst = gammaFlutter * gate * pacDepth;
-
-      const y = cy - (thetaWave * 0.52 + gammaBurst * 0.48) * amp;
-      if (i === 0) ctx2d.moveTo(plotLeft + i, y);
-      else ctx2d.lineTo(plotLeft + i, y);
-    }
-    ctx2d.strokeStyle = '#fbbf24';
-    ctx2d.lineWidth = 2;
-    ctx2d.stroke();
-
-    // Draw pure Theta carrier reference
-    ctx2d.beginPath();
-    for (let i = 0; i <= plotWidth; i++) {
-      const normX = i / plotWidth;
-      const t = tSec + normX * 0.35;
-      const thetaWave = Math.cos(t * fTheta * Math.PI * 2);
-      const y = cy - thetaWave * 0.52 * amp;
-      if (i === 0) ctx2d.moveTo(plotLeft + i, y);
-      else ctx2d.lineTo(plotLeft + i, y);
-    }
-    ctx2d.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-    ctx2d.lineWidth = 1.5;
-    ctx2d.stroke();
-
-    // Telemetry label on PAC plot
-    ctx2d.font = '11px "JetBrains Mono", monospace';
-    ctx2d.fillStyle = 'rgba(226, 232, 240, 0.85)';
-    const harmPct = Math.round((engine.params.pac.harmonics !== undefined ? engine.params.pac.harmonics : 0.45) * 100);
-    ctx2d.fillText(
-      `Carrier: ${Math.round(baseFreq)}Hz (${harmPct}% Harmonics) | Slow Rhythm: ${(fTheta).toFixed(1)}Hz | Silk PAC: ${Math.round(pacDepth * 100)}% | Breath: ${Math.round(breathNorm * 100)}%`,
-      plotLeft,
-      h - 14
-    );
-
-    // Right Half: Live Stereo Binaural Phase Lissajous (Left vs Right Ear)
-    const lissCx = midX + (w - midX) * 0.5;
-    const lissCy = h * 0.5;
-    const lissRadius = Math.min(w - midX, h) * 0.36;
-
-    ctx2d.beginPath();
-    ctx2d.arc(lissCx, lissCy, lissRadius, 0, Math.PI * 2);
-    ctx2d.strokeStyle = 'rgba(148, 163, 184, 0.14)';
-    ctx2d.stroke();
-
-    if (engine.analyserL && engine.analyserR && engine.isRunning) {
-      engine.analyserL.getFloatTimeDomainData(waveBufL);
-      engine.analyserR.getFloatTimeDomainData(waveBufR);
-
-      ctx2d.beginPath();
-      for (let i = 0; i < waveBufL.length; i++) {
-        const lx = lissCx + waveBufL[i] * lissRadius * 2.2;
-        const ry = lissCy + waveBufR[i] * lissRadius * 2.2;
-        if (i === 0) ctx2d.moveTo(lx, ry);
-        else ctx2d.lineTo(lx, ry);
-      }
-      ctx2d.strokeStyle = '#38bdf8';
-      ctx2d.lineWidth = 1.6;
-      ctx2d.stroke();
-    }
-
-    ctx2d.restore();
-  }
-
-  /**
-   * VISUALIZER 3: Edge-of-Chaos Bayesian Surprise Droplets + Shepard-Risset Spectrum
-   */
-  function drawChaosAndFractalVisualizer(w, h, nowMs) {
-    ctx2d.save();
-
-    // 1. Live FFT Spectrum Backdrop
-    if (engine.analyserMaster && engine.isRunning) {
-      engine.analyserMaster.getByteFrequencyData(freqBuf);
-      const barCount = 96;
-      const barW = w / barCount;
-
-      ctx2d.beginPath();
-      for (let i = 0; i < barCount; i++) {
-        const val = freqBuf[i] / 255;
-        const bh = val * h * 0.68;
-        ctx2d.fillStyle = `rgba(56, 189, 248, ${0.08 + val * 0.25})`;
-        ctx2d.fillRect(i * barW, h - bh, barW - 1, bh);
-      }
-    }
-
-    // 2. Shepard-Risset Rising/Falling Octave Horizon + Multi-Scale Weierstrass Curve
-    if (engine.params.fractal.enabled) {
-      const fDepth = engine.params.fractal.depth;
-      const tSec = nowMs * 0.001;
-
-      // Draw continuous Weierstrass 1/f spectral envelope across the 8-octave horizon
-      ctx2d.beginPath();
-      for (let px = 0; px <= w; px += 4) {
-        const octPos = px / w;
-        const bell = 0.5 - 0.5 * Math.cos(octPos * Math.PI * 2);
-        const octPhase = octPos * Math.PI * 2;
-        const wCurve =
-          0.52 * Math.sin(tSec * 0.38 * Math.PI * 2 + octPhase) +
-          0.28 * Math.sin(tSec * 1.00 * Math.PI * 2 + octPhase * 2.0 + 1.1) +
-          0.15 * Math.sin(tSec * 2.62 * Math.PI * 2 + octPhase * 4.0 + 2.4) +
-          0.08 * Math.sin(tSec * 6.85 * Math.PI * 2 + octPhase * 8.0 + 0.7);
-        const y = h * (0.82 - bell * 0.52 - fDepth * wCurve * bell * 0.22);
-        if (px === 0) ctx2d.moveTo(px, y);
-        else ctx2d.lineTo(px, y);
-      }
-      ctx2d.strokeStyle = 'rgba(52, 211, 153, 0.45)';
-      ctx2d.lineWidth = 1.8;
-      ctx2d.stroke();
-
-      engine.telemetry.shepardVoices.forEach((sv, idx) => {
-        const x = sv.octavePos * w;
-        const y = h * (0.82 - Math.min(1.2, sv.amp) * 0.48 - (sv.ripple || 0) * 0.16);
-        const r = Math.max(3, 5 + Math.min(1.2, sv.amp) * 9);
-
-        // Primary Shepard Octave Voice
-        ctx2d.beginPath();
-        ctx2d.arc(x, y, r, 0, Math.PI * 2);
-        ctx2d.fillStyle = `rgba(52, 211, 153, ${0.25 + Math.min(1, sv.amp) * 0.65})`;
-        ctx2d.fill();
-
-        // Recursive Self-Similar Harmonic Branch Satellite (visible when fDepth > 0)
-        if (fDepth > 0.05) {
-          const satAngle = tSec * (1.2 + idx * 0.4) + idx;
-          const satDist = r + 6 + fDepth * 14;
-          const sx = x + Math.cos(satAngle) * satDist;
-          const sy = y + Math.sin(satAngle) * satDist;
-
-          ctx2d.beginPath();
-          ctx2d.moveTo(x, y);
-          ctx2d.lineTo(sx, sy);
-          ctx2d.strokeStyle = `rgba(167, 243, 208, ${fDepth * 0.5})`;
-          ctx2d.lineWidth = 1;
-          ctx2d.stroke();
-
-          ctx2d.beginPath();
-          ctx2d.arc(sx, sy, Math.max(2, r * 0.45 * fDepth), 0, Math.PI * 2);
-          ctx2d.fillStyle = `rgba(167, 243, 208, ${0.3 + fDepth * 0.6})`;
-          ctx2d.fill();
-        }
-
-        ctx2d.font = '10px "JetBrains Mono", monospace';
-        ctx2d.fillStyle = 'rgba(167, 243, 208, 0.85)';
-        ctx2d.fillText(`${Math.round(sv.freq)}Hz`, x - 14, y - r - 5);
-      });
-    }
-
-    // 3. Chaos Multi-Archetype Events (Position X = State x_n, Y = Surprise/Pitch, Color = Archetype)
-    const archColors = {
-      metallic: '251, 191, 36',  // Amber (FM Bell / Singing Bowl)
-      liquid: '56, 189, 248',    // Cyan (Liquid Formant / Bio-Call)
-      plucked: '52, 211, 153',   // Emerald (Modal Wood / Koto / Glass)
-      subglitch: '251, 113, 133',// Rose (Tectonic Sub-Drop / Microclick)
-      breath: '167, 139, 250'    // Violet (Reverse Swell / Overtone Chant)
-    };
-    const archNames = {
-      metallic: 'FM-BELL',
-      liquid: 'FORMANT',
-      plucked: 'MODAL',
-      subglitch: 'SUB-DROP',
-      breath: 'SWELL'
-    };
-
-    const droplets = engine.telemetry.recentDroplets;
-    for (let i = 0; i < droplets.length; i++) {
-      const d = droplets[i];
-      const age = (nowMs - d.birth) / 3600;
-      if (age > 1) continue;
-
-      const x = 40 + d.x * (w - 80);
-      const y = h * 0.84 - (d.surprise / 6.2) * (h * 0.68);
-      const r = (5 + d.surprise * 3.0) * (1 - age * 0.45);
-      const alpha = (1 - age) * 0.9;
-      const rgb = archColors[d.archetype] || '167, 139, 250';
-
-      ctx2d.beginPath();
-      ctx2d.arc(x, y, r, 0, Math.PI * 2);
-      ctx2d.fillStyle = `rgba(${rgb}, ${alpha})`;
-      ctx2d.fill();
-
-      // Ripple ring
-      ctx2d.beginPath();
-      ctx2d.arc(x, y, r + age * 32, 0, Math.PI * 2);
-      ctx2d.strokeStyle = `rgba(${rgb}, ${alpha * 0.45})`;
-      ctx2d.lineWidth = 1.2;
-      ctx2d.stroke();
-
-      // Show 12-TET Musical Note Name, Archetype & Motif-Mutation indicator on fresh events
-      if (age < 0.48) {
-        ctx2d.fillStyle = `rgba(241, 245, 249, ${(1 - age * 2.0) * 0.95})`;
-        ctx2d.font = '10px "JetBrains Mono", monospace';
-        const tag = archNames[d.archetype] || 'CHAOS';
-        const noteLabel = d.noteName ? `${d.noteName} (${Math.round(d.freq)}Hz)` : `${Math.round(d.freq)}Hz`;
-        const mutFlag = d.mutated ? ' ✦MUT' : '';
-        ctx2d.fillText(`${noteLabel} · ${tag}${mutFlag}`, x + r + 5, y + 3);
-      }
-    }
-
-    ctx2d.restore();
-  }
-
+  applyPreset('rebalGateway', 0);
+  syncUI();
   requestAnimationFrame(animate);
+  window.__aether = { engine, applyPreset, resolveConfig, morphTo, startJourney };
 });
