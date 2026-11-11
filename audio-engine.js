@@ -11,7 +11,7 @@
  *
  * Signal flow: modules -> dryBus / reverb send (hall + shimmer) -> mixBus -> limiter -> master -> output.
  *              binaural renderer -> spatialBus (+ natural room reverb) -> mixBus.
- * Renderer slots: 0-5 Module 01 streams, 6-8 chaos events, 9-11 close-up & ritual.
+ * Renderer slots: 0-5 Module 01 streams, 6-8 chaos events, 9-11 close-up & ritual, 12 ear-model calibration.
  */
 class ConsciousnessAudioEngine {
   constructor() {
@@ -132,7 +132,7 @@ class ConsciousnessAudioEngine {
     this.setReverbMix(this.params.reverbMix);
 
     // ---- binaural renderer + natural room for spatialised sources
-    this.renderer = new window.AetherBinaural.BinauralRenderer(ctx, { sources: 12 });
+    this.renderer = new window.AetherBinaural.BinauralRenderer(ctx, { sources: 13 });
     await this.renderer.init();
     this.spatialBus = ctx.createGain();
     this.spatialBus.connect(this.mixBus);

@@ -30,6 +30,18 @@
     return t * t * (3 - 2 * t);
   };
   const ease = (u) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(u, 0, 1));
+  // Hold an AudioParam at its current value and drop its future automation. Needed before muting: the
+  // module schedules linear ramps up to LOOKAHEAD seconds ahead, and a ramp scheduled after a
+  // setTargetAtTime(0) would bring the level back and hold it there.
+  const holdAt = (prm, t) => {
+    if (typeof prm.cancelAndHoldAtTime === 'function') {
+      prm.cancelAndHoldAtTime(t);
+    } else {
+      const v = prm.value;
+      prm.cancelScheduledValues(t);
+      prm.setValueAtTime(v, t);
+    }
+  };
 
   const MAX_STREAMS = 6;
   const LOOKAHEAD = 0.15; // seconds: audio parameters are scheduled this far ahead
@@ -780,7 +792,7 @@
 
       if (!p.enabled) {
         if (!this._muted) {
-          this.streams.forEach((s) => s.out.gain.setTargetAtTime(0, now, 0.08));
+          this.streams.forEach((s) => this._muteStream(s, now, 0.08));
           this._muted = true;
         }
         this.telemetry.spatialVoices.forEach((v) => { v.active = false; });
@@ -802,9 +814,10 @@
         const active = k < n;
         const gate = active ? 1 : 0;
         if (!active) {
-          s.out.gain.setTargetAtTime(0, now, 0.25);
+          if (s.on !== false) this._muteStream(s, now, 0.25);
           continue;
         }
+        s.on = true;
         const pos = res.streams[k];
         // keep part of the 1/r distance cue but stop sources near the head from jumping 6-8 dB louder
         const dist = Math.hypot(pos.x, pos.y, pos.z);
@@ -889,7 +902,13 @@
         this.renderer.setMode(p.renderer);
       }
       if (key === 'room' || key === 'cue' || key === 'enabled') this.applyRendererConfig();
-      if (key === 'enabled' && !p.enabled) this.streams.forEach((s) => s.out.gain.setTargetAtTime(0, now, 0.08));
+      if (key === 'enabled' && !p.enabled) this.streams.forEach((s) => this._muteStream(s, now, 0.08));
+    }
+
+    _muteStream(s, now, tc) {
+      holdAt(s.out.gain, now);
+      s.out.gain.setTargetAtTime(0, now, tc);
+      s.on = false;
     }
 
     applyRendererConfig() {

@@ -33,13 +33,13 @@
 (function (global) {
   'use strict';
 
-  const MAX_SOURCES = 12;
+  const MAX_SOURCES = 13;
 
   // ===========================================================================================
   // AudioWorklet module (runs in AudioWorkletGlobalScope — must not reference anything outside)
   // ===========================================================================================
   function aetherBinauralWorklet() {
-    const MAX_SOURCES = 12;
+    const MAX_SOURCES = 13;
     const C = 343; // speed of sound, m/s
     const SUB = 32; // control-rate sub-block (samples)
     const MAX_TAPS = 160; // measured-HRTF FIR length limit
@@ -778,6 +778,23 @@
     async setEarCue(k) {
       this.earK = Math.max(0, Math.min(2.5, k));
       if (this.mode === 'measured' && this.earModel) await this.prepareEarModel(this.earModel, this.earK);
+    }
+
+    /** Drop the scheduled future positions of slot i (before scheduling a new sequence of test bursts). */
+    cancelSlot(i) {
+      const s = this.slots[i];
+      if (!s) return;
+      const now = this.ctx.currentTime;
+      let prms = [];
+      if (this.mode !== 'hrtf' && this.params[i]) {
+        const p = this.params[i];
+        prms = [p.x, p.y, p.z, p.w];
+      } else if (this.hrtf) {
+        const h = this.hrtf.slots[i];
+        prms = [h.panner.positionX, h.panner.positionY, h.panner.positionZ, h.extG.gain, h.intG.gain].filter(Boolean);
+      }
+      prms.forEach((prm) => prm.cancelScheduledValues(now));
+      s.lastT = now;
     }
 
     /** Jump slot i to a position at audio time t (no glide), e.g. for test bursts. */

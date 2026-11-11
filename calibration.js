@@ -14,7 +14,8 @@
 (function (global) {
   'use strict';
   const STORAGE_KEY = 'aether_ear_model_v1';
-  const SLOT = 0;
+  const SLOT = 12; // renderer slot used only by the calibration
+  const CAL_REVERB = 0.1; // late room reverb during the test (early reflections are kept)
   const DIST = 1.5;
   const POS = {
     front: { az: 0, el: 0, label: 'FRONT' },
@@ -70,6 +71,7 @@
       stopPlayback();
       const ctx = engine.ctx;
       const r = engine.renderer;
+      r.cancelSlot(SLOT); // pressing B while A plays must not keep A's pending positions
       const input = r.input(SLOT);
       let t = ctx.currentTime + 0.12;
       keys.forEach((k) => {
@@ -103,8 +105,10 @@
         enabled: Object.fromEntries(global.ConsciousnessAudioEngine.MODULES.map((m) => [m, !!engine.params[m].enabled])),
         mode: engine.renderer.mode,
         earModel: engine.renderer.earModel,
-        reverbMix: engine.params.reverbMix
+        reverbMix: engine.params.reverbMix,
+        roomReverb: engine.renderer.cfg.reverb
       };
+      engine.renderer.setConfig({ reverb: CAL_REVERB });
       global.ConsciousnessAudioEngine.MODULES.forEach((m) => hooks.setEnabled(m, false));
       engine.setReverbMix(0.1);
       if (engine.renderer.mode === 'hrtf') engine.renderer.setMode('structural');
@@ -114,6 +118,7 @@
       if (!saved) return;
       stopPlayback();
       engine.setReverbMix(saved.reverbMix);
+      engine.renderer.setConfig({ reverb: saved.roomReverb });
       global.ConsciousnessAudioEngine.MODULES.forEach((m) => hooks.setEnabled(m, saved.enabled[m]));
       saved = null;
     }
