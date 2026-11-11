@@ -74,7 +74,7 @@
         <div class="visualizer-card">
           <div class="visualizer-header">
             <div class="viz-tabs" role="tablist">
-              <button class="viz-tab active" data-viz="spatial" role="tab">8D Auricle HRTF &amp; Spatial ASMR</button>
+              <button class="viz-tab active" data-viz="spatial" role="tab">3D Sound Space</button>
               <button class="viz-tab" data-viz="pac" role="tab">θ–γ PAC &amp; Binaural Lissajous</button>
               <button class="viz-tab" data-viz="chaos" role="tab">Edge-of-Chaos &amp; Fractal Spectrum</button>
             </div>
@@ -83,7 +83,7 @@
           <div class="canvas-container">
             <canvas id="neuroCanvas"></canvas>
             <div class="viz-hud">
-              <div class="hud-pill" id="hudLeft">HRTF Voices: 8 + In-Cranial Core</div>
+              <div class="hud-pill" id="hudLeft">HRTF 3D · drag to place a source</div>
               <div class="hud-pill" id="hudRight">0.1 Hz Vagal Coherence Guide</div>
             </div>
           </div>
@@ -159,104 +159,62 @@
         <article class="module-card active-module" data-module="spatial">
           <div class="module-header">
             <div>
-              <span class="module-tag tag-cyan">01 // 8D BINAURAL AURICLE &amp; SPATIAL ASMR</span>
-              <h3>8D Spatial ASMR &amp; Auricle Geometry</h3>
+              <span class="module-tag tag-cyan">01 // BINAURAL 3D SOUND SPACE</span>
+              <h3>3D Sound Space &amp; REBAL Energy Torus</h3>
             </div>
             <div class="header-actions">
-              <button type="button" id="soloSpatialBtn" class="btn-solo" title="Mute all other modules to hear pure 8D Binaural Auricle &amp; Spatial ASMR">SOLO 8D</button>
+              <button type="button" id="soloSpatialBtn" class="btn-solo" title="Mute all other modules to hear the 3D sound space alone">SOLO 3D</button>
               <label class="toggle-switch">
                 <input type="checkbox" id="spatialEnabled" checked />
                 <span class="slider"></span>
               </label>
             </div>
           </div>
-          <p class="module-subtitle">Ear-auricle (pinna) spectral notch, cranial head-shadow &amp; ITD/ILD phase with moving 8D sources, water drops &amp; ASMR. Drag on canvas to move manually.</p>
+          <p class="module-subtitle">Measured-HRTF binaural rendering with floor reflection &amp; room for out-of-head 3D localization. Use headphones. Drag on the canvas (top or front view) to place a source.</p>
 
           <div class="control-list">
             <div class="control-row">
-              <div class="control-label"><span>8D Sound &amp; ASMR Palette</span></div>
+              <div class="control-label"><span>Sound</span></div>
               <select id="spatialPalette" class="select-input">
-                <option value="rebal">⚡ REBAL // Monroe Resonant Energy Balloon (Inspire/Expire Torus)</option>
-                <option value="water_bowl" selected>🥣 8D Singing Bowls + Crystal Water Drops (Moving + Drops)</option>
-                <option value="water_drops">💧 3D Cave Water Droplets &amp; Flowing Stream (ASMR Water)</option>
-                <option value="crackle">✨ 8D Silk Brush &amp; Micro-Crackle Tingles (Binaural ASMR)</option>
-                <option value="whisper">🌬️ 8D Whispered Air &amp; Breath Halo (Moving Vocal ASMR)</option>
-                <option value="tapping">🎋 8D Hollow Bamboo, Wood &amp; Glass Taps (Percussive ASMR)</option>
-                <option value="rich8d">🌌 8D Celestial Harmonic Pad &amp; Auricle Shimmer (Continuous 8D)</option>
-                <option value="shamanic">🥁 8D Tibetan Overtone Singing &amp; 4.5 Hz Shamanic Drum</option>
+                <option value="energy" selected>⚡ Breath Energy (voice + breath + sparkle)</option>
+                <option value="bowl">🥣 Singing Bowls</option>
+                <option value="drops">💧 Water Drops</option>
+                <option value="chimes">✨ Crystal Chimes</option>
               </select>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>3D / 8D Trajectory Geometry</span></div>
+              <div class="control-label"><span>Movement</span></div>
               <select id="spatialTrajectory" class="select-input">
-                <option value="rebal">REBAL Toroidal Breath Loop (Head → Crown Split 2/4 → Torus → Feet → Body Inhale)</option>
-                <option value="bifurcation_random" selected>5m Split &amp; Merge — Random Variations (Head ↔ 5m Split/Merge Odyssey)</option>
-                <option value="bifurcation5m">5m Split &amp; Merge — Classic (Head → 5m Front → Split L/R → Zenith ▲ → Back → Head)</option>
-                <option value="orbit8d">8D Spherical Orbit (Left/Right + Front/Back + Up/Down Elevation)</option>
-                <option value="zenith_arch">Over-the-Head Zenith Dome Arch (Floor ▼ ↔ Overhead Crown ▲)</option>
-                <option value="helix3d">3D Vertical Helix / DNA Spiral (Climbing Floor ▼ ↔ Sky Zenith ▲)</option>
-                <option value="infinity">Figure-8 / Infinity (∞ Passing Through Head)</option>
-                <option value="peripersonal">Intimate Peripersonal Halo (5–20 cm Ear-to-Ear ASMR)</option>
-                <option value="radial">Far-Horizon Excursion (Close Ear ↔ 10m Distance)</option>
-                <option value="mixed">Mixed Geometries (8D Sphere + Zenith Arch + ∞)</option>
-                <option value="circle">360° Circular Halo (Around Perimeter of Head)</option>
-                <option value="spiral">Breathing Spiral (Far Horizon ↔ Center of Head)</option>
-                <option value="torus">Counter-Rotating 3D Toroidal Knot</option>
+                <option value="rebal">REBAL Energy Torus (exhale: crown → around → feet · inhale: feet → head)</option>
+                <option value="orbit" selected>Horizontal Orbit (ear level)</option>
+                <option value="vertical">Vertical Loops (front → above → behind → below)</option>
+                <option value="sphere">Free 3D Wander (whole sphere)</option>
+                <option value="manual">Hold Still (drag to place)</option>
               </select>
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Number of Moving 3D Sources (1–8)</span><span class="mono-val" id="spatialCountVal">2 Sources</span></div>
-              <input type="range" id="spatialCount" min="1" max="8" step="1" value="2" />
+              <div class="control-label"><span>Sources</span><span class="mono-val" id="spatialCountVal">2</span></div>
+              <input type="range" id="spatialCount" min="1" max="4" step="1" value="2" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Layer Level</span><span class="mono-val" id="spatialGainVal">85%</span></div>
-              <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.85" />
+              <div class="control-label"><span>Level</span><span class="mono-val" id="spatialGainVal">80%</span></div>
+              <input type="range" id="spatialGain" min="0" max="1" step="0.01" value="0.8" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>3D Orbit / Breath Loop Speed</span><span class="mono-val" id="spatialSpeedVal">0.16 Hz</span></div>
-              <input type="range" id="spatialSpeed" min="0.03" max="0.8" step="0.01" value="0.16" />
+              <div class="control-label"><span>Speed (cycles / s)</span><span class="mono-val" id="spatialSpeedVal">0.10 Hz · 10.0 s</span></div>
+              <input type="range" id="spatialSpeed" min="0.02" max="0.5" step="0.01" value="0.1" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Toroidal Spiral Speed (0 = Just Turning)</span><span class="mono-val" id="spatialSpiralVal">0.00 (Just Turning)</span></div>
-              <input type="range" id="spatialSpiral" min="0" max="3" step="0.05" value="0" />
+              <div class="control-label"><span>Distance</span><span class="mono-val" id="spatialDistanceVal">1.8 m</span></div>
+              <input type="range" id="spatialDistance" min="0.5" max="4" step="0.1" value="1.8" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Drops 💧 ↔ Moving Inhale/Exhale &amp; Harmonics 🌬️🎶</span><span class="mono-val" id="spatialPulseVal">50% (Drops + Harmonics)</span></div>
-              <input type="range" id="spatialPulse" min="0" max="1" step="0.01" value="0.50" />
+              <div class="control-label"><span>Room / Externalization</span><span class="mono-val" id="spatialRoomVal">45%</span></div>
+              <input type="range" id="spatialRoom" min="0" max="1" step="0.01" value="0.45" />
             </div>
             <div class="control-row">
-              <div class="control-label"><span>Water Drop / Harmonic Pulse Rate</span><span class="mono-val" id="spatialRateVal">3.2 /s</span></div>
-              <input type="range" id="spatialRate" min="0.2" max="10" step="0.2" value="3.2" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Ear Auricle (Pinna) &amp; Cranial Shadow</span><span class="mono-val" id="spatialAuricleVal">90% (8D Hyper-Real)</span></div>
-              <input type="range" id="spatialAuricle" min="0" max="1" step="0.01" value="0.90" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>3D Vertical Elevation (Floor ▼ ↔ Zenith ▲)</span><span class="mono-val" id="spatialElevationVal">85% (-75° ↔ +85°)</span></div>
-              <input type="range" id="spatialElevation" min="0" max="1" step="0.01" value="0.85" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Horizontal Distance &amp; Horizon Span</span><span class="mono-val" id="spatialAsymmetryVal">80%</span></div>
-              <input type="range" id="spatialAsymmetry" min="0" max="1" step="0.01" value="0.80" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Moving Source Base Pitch</span><span class="mono-val" id="spatialBaseFreqVal">174 Hz (Mid)</span></div>
-              <input type="range" id="spatialBaseFreq" min="36" max="320" step="1" value="174" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>In-Cranial Phase Collapse (0% = Off)</span><span class="mono-val" id="spatialCollapseVal">0%</span></div>
-              <input type="range" id="spatialCollapse" min="0" max="1" step="0.01" value="0" />
-            </div>
-            <div class="control-row">
-              <div class="control-label"><span>Harmonic Tuning Intervals</span></div>
-              <select id="spatialTuning" class="select-input">
-                <option value="octaves" selected>Deep Octaves &amp; 5ths (Wide Low-to-Mid Spread)</option>
-                <option value="just">Just Intonation (Pure Harmonic Ratios)</option>
-                <option value="golden">Golden Ratio (φ = 1.618 Non-Octave)</option>
-                <option value="overtone">Natural Overtone Series</option>
-                <option value="quartal">Mystic Quartal Space (4ths &amp; 5ths)</option>
-              </select>
+              <div class="control-label"><span>REBAL Torus Twist</span><span class="mono-val" id="spatialSpiralVal">0.00 (pure loop)</span></div>
+              <input type="range" id="spatialSpiral" min="0" max="2" step="0.05" value="0" />
             </div>
           </div>
         </article>
@@ -500,7 +458,8 @@
   <!-- Persistent HTML5 audio element for Android background audio focus & lock-screen playback -->
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="audio-engine.js?v=4.9"></script>
-  <script src="app.js?v=4.9"></script>
+  <script src="spatial-engine.js?v=5.0"></script>
+  <script src="audio-engine.js?v=5.0"></script>
+  <script src="app.js?v=5.0"></script>
 </body>
 </html>

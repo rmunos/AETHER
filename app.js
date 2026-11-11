@@ -33,26 +33,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Phenomenological Presets Definition
   const PRESETS = {
     egoDissolution: {
-      name: '8D BOWLS & WATER DROPS',
-      mechTitle: 'Neuro-Mechanism: 8D Auricle (Pinna) Localization & Parietal De-Anchoring',
+      name: '3D SINGING BOWLS',
+      mechTitle: 'Neuro-Mechanism: Binaural HRTF Localization & Parietal De-Anchoring',
       mechText:
-        'True 3D/8D localization combines Interaural Time Difference (ITD 0–680 µs), contralateral cranial head-shadowing, Blauert front/back bands (1.05 kHz rear vs 3.65 kHz front), and the ear auricle (pinna) elevation spectral notch (5–11.5 kHz) on moving singing bowls and water droplets.',
+        'Struck singing bowls wander slowly over the whole sphere around you. Each source is rendered through a measured head-related transfer function (interaural time/level differences + pinna spectral cues), with a physically delayed floor reflection and a short room, so the sounds are heard outside the head at a precise place in space.',
       reverbMix: 0.38,
       spatial: {
         enabled: true,
-        palette: 'water_bowl',
-        trajectory: 'bifurcation_random',
-        count: 2,
-        baseFreq: 174,
+        palette: 'bowl',
+        trajectory: 'sphere',
+        count: 3,
         gain: 0.85,
-        speed: 0.16,
-        pulse: 0.50,
-        rate: 3.2,
-        auricle: 0.92,
-        elevation: 0.85,
-        collapse: 0.0,
-        asymmetry: 0.82,
-        tuning: 'octaves'
+        speed: 0.05,
+        distance: 2.0,
+        room: 0.5,
+        spiral: 0
       },
       chaos: { enabled: false, scale: 'pentatonic', gain: 0.22, r: 3.68, rate: 2.0, morph: 0.75 },
       pac: { enabled: false, baseFreq: 110, gain: 0.38, harmonics: 0.45, theta: 5.5, gamma: 40, depth: 0.65, breath: 0.70 },
@@ -69,19 +64,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.55,
       spatial: {
         enabled: true,
-        palette: 'water_drops',
-        trajectory: 'mixed',
+        palette: 'drops',
+        trajectory: 'sphere',
         count: 3,
-        baseFreq: 96,
-        gain: 0.58,
-        speed: 0.14,
-        pulse: 0.50,
-        rate: 3.5,
-        auricle: 0.88,
-        elevation: 0.85,
-        collapse: 0.0,
-        asymmetry: 0.75,
-        tuning: 'quartal'
+        gain: 0.6,
+        speed: 0.08,
+        distance: 2.4,
+        room: 0.55,
+        spiral: 0
       },
       chaos: { enabled: true, gain: 0.75, r: 3.76, rate: 4.8, morph: 0.85 },
       pac: { enabled: true, gain: 0.40, harmonics: 0.35, theta: 7.8, gamma: 42, depth: 0.55, breath: 0.50 },
@@ -98,19 +88,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.58,
       spatial: {
         enabled: true,
-        palette: 'rich8d',
-        trajectory: 'orbit8d',
+        palette: 'energy',
+        trajectory: 'orbit',
         count: 2,
-        baseFreq: 96,
-        gain: 0.58,
-        speed: 0.12,
-        pulse: 0.85,
-        rate: 1.4,
-        auricle: 0.90,
-        elevation: 0.85,
-        collapse: 0.0,
-        asymmetry: 0.70,
-        tuning: 'just'
+        gain: 0.55,
+        speed: 0.08,
+        distance: 1.6,
+        room: 0.5,
+        spiral: 0
       },
       chaos: { enabled: false, gain: 0.25, r: 3.62, rate: 1.8, morph: 0.50 },
       pac: { enabled: true, gain: 0.82, harmonics: 0.50, theta: 6.0, gamma: 40, depth: 0.92, breath: 0.80 },
@@ -127,19 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.72,
       spatial: {
         enabled: true,
-        palette: 'rich8d',
-        trajectory: 'helix3d',
+        palette: 'chimes',
+        trajectory: 'sphere',
         count: 3,
-        baseFreq: 108,
-        gain: 0.58,
-        speed: 0.15,
-        pulse: 0.80,
-        rate: 1.6,
-        auricle: 0.90,
-        elevation: 0.92,
-        collapse: 0.0,
-        asymmetry: 0.85,
-        tuning: 'overtone'
+        gain: 0.5,
+        speed: 0.05,
+        distance: 3.0,
+        room: 0.6,
+        spiral: 0
       },
       chaos: { enabled: true, gain: 0.35, r: 3.69, rate: 2.4, morph: 0.60 },
       pac: { enabled: false, gain: 0.40, harmonics: 0.40, theta: 6.5, gamma: 40, depth: 0.60, breath: 0.65 },
@@ -156,19 +136,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.45,
       spatial: {
         enabled: true,
-        palette: 'water_bowl',
-        trajectory: 'spiral',
+        palette: 'bowl',
+        trajectory: 'orbit',
         count: 2,
-        baseFreq: 64,
         gain: 0.65,
-        speed: 0.10,
-        pulse: 0.75,
-        rate: 2.0,
-        auricle: 0.88,
-        elevation: 0.85,
-        collapse: 0.0,
-        asymmetry: 0.75,
-        tuning: 'octaves'
+        speed: 0.05,
+        distance: 1.5,
+        room: 0.45,
+        spiral: 0
       },
       chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.5, morph: 0.40 },
       pac: { enabled: true, gain: 0.55, harmonics: 0.55, theta: 4.5, gamma: 36, depth: 0.70, breath: 0.85 },
@@ -185,19 +160,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.78,
       spatial: {
         enabled: true,
-        palette: 'whisper',
-        trajectory: 'zenith_arch',
+        palette: 'energy',
+        trajectory: 'vertical',
         count: 2,
-        baseFreq: 80,
-        gain: 0.55,
-        speed: 0.09,
-        pulse: 0.80,
-        rate: 1.8,
-        auricle: 0.90,
-        elevation: 0.90,
-        collapse: 0.0,
-        asymmetry: 0.80,
-        tuning: 'quartal'
+        gain: 0.5,
+        speed: 0.05,
+        distance: 2.2,
+        room: 0.6,
+        spiral: 0
       },
       chaos: { enabled: true, gain: 0.28, r: 3.71, rate: 1.6, morph: 0.80 },
       pac: { enabled: true, gain: 0.48, harmonics: 0.30, theta: 5.0, gamma: 40, depth: 0.65, breath: 0.75 },
@@ -214,19 +184,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.42,
       spatial: {
         enabled: true,
-        palette: 'shamanic',
-        trajectory: 'orbit8d',
+        palette: 'bowl',
+        trajectory: 'orbit',
         count: 2,
-        baseFreq: 110,
-        gain: 0.92,
-        speed: 0.14,
-        pulse: 0.82,
-        rate: 4.5,
-        auricle: 0.94,
-        elevation: 0.88,
-        collapse: 0.0,
-        asymmetry: 0.78,
-        tuning: 'just'
+        gain: 0.85,
+        speed: 0.12,
+        distance: 1.4,
+        room: 0.4,
+        spiral: 0
       },
       chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.40 },
       pac: { enabled: true, gain: 0.55, harmonics: 0.40, theta: 4.5, gamma: 40, depth: 0.55, breath: 0.70 },
@@ -243,19 +208,14 @@ document.addEventListener('DOMContentLoaded', () => {
       reverbMix: 0.22,
       spatial: {
         enabled: true,
-        palette: 'crackle',
-        trajectory: 'peripersonal',
+        palette: 'drops',
+        trajectory: 'orbit',
         count: 2,
-        baseFreq: 128,
-        gain: 0.94,
-        speed: 0.18,
-        pulse: 0.76,
-        rate: 4.4,
-        auricle: 0.96,
-        elevation: 0.80,
-        collapse: 0.0,
-        asymmetry: 0.65,
-        tuning: 'golden'
+        gain: 0.9,
+        speed: 0.15,
+        distance: 0.6,
+        room: 0.2,
+        spiral: 0
       },
       chaos: { enabled: false, gain: 0.20, r: 3.60, rate: 1.2, morph: 0.45 },
       pac: { enabled: true, gain: 0.35, harmonics: 0.45, theta: 6.0, gamma: 40, depth: 0.40, breath: 0.85 },
@@ -268,24 +228,18 @@ document.addEventListener('DOMContentLoaded', () => {
       name: 'REBAL // MONROE GATEWAY',
       mechTitle: 'Neuro-Mechanism: Monroe Gateway REBAL (Resonant Energy Balloon) & 3D Toroidal Breath Entrainment',
       mechText:
-        'Inspired by Robert Monroe’s Gateway Experience: on Expiration (Exhale ▼), vibrant resonant breath and pure harmonic beacons fountain out the top of the head (+85° Crown ▲), split into 4 directions, and spiral down a 3D Torus around your body to merge at your feet (-75° Floor ▼). On Inspiration (Inhale ▲), the merged energy rises straight up through your whole body core into the cranium, filling your head with golden Hemi-Sync resonance.',
+        'Inspired by Robert Monroe’s Gateway Experience. Breathe with the sound (10 s cycle). EXHALE ▼: the energy bursts out of the crown, fountains UP and over the top, splits into 4 streams that flow DOWN wide around your body and curve under your feet. INHALE ▲: the streams merge, enter the soles of the feet, rise up through the body core and fill the head (heard inside the head). Voice-like breath tones brighten as they rise and darken as they fall.',
       reverbMix: 0.44,
       spatial: {
         enabled: true,
-        palette: 'rebal',
+        palette: 'energy',
         trajectory: 'rebal',
         count: 4,
-        baseFreq: 144,
-        gain: 0.92,
-        speed: 0.12,
-        spiral: 0.0,
-        pulse: 1.00,
-        rate: 4.2,
-        auricle: 0.95,
-        elevation: 0.95,
-        collapse: 0.0,
-        asymmetry: 0.85,
-        tuning: 'just'
+        gain: 0.9,
+        speed: 0.1,
+        distance: 1.8,
+        room: 0.45,
+        spiral: 0
       },
       chaos: { enabled: false, gain: 0.20, r: 3.65, rate: 1.5, morph: 0.50 },
       pac: { enabled: true, baseFreq: 144, gain: 0.46, harmonics: 0.42, theta: 4.5, gamma: 40, depth: 0.58, breath: 0.90 },
@@ -663,17 +617,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Bind Module 1: Unified 8D Binaural Auricle & Spatial ASMR
+  // Bind Module 1: Binaural 3D Sound Space & REBAL Energy Torus
   bindToggle('spatialEnabled', 'spatial');
   bindSelect('spatialPalette', 'spatial', 'palette');
   bindSelect('spatialTrajectory', 'spatial', 'trajectory');
-  bindSelect('spatialTuning', 'spatial', 'tuning');
 
-  // When selecting REBAL in the Palette dropdown, automatically pair it with the REBAL Toroidal Breath Trajectory, 4 Directions & 0% Drops
+  // When selecting REBAL in the Palette dropdown, auto-select REBAL trajectory & 4 sources if fewer
   const spatialPaletteSelect = document.getElementById('spatialPalette');
   if (spatialPaletteSelect) {
     spatialPaletteSelect.addEventListener('change', (e) => {
-      if (e.target.value === 'rebal') {
+      if (e.target.value === 'energy') {
         const trajEl = document.getElementById('spatialTrajectory');
         if (trajEl && trajEl.value !== 'rebal') {
           trajEl.value = 'rebal';
@@ -683,47 +636,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const countValEl = document.getElementById('spatialCountVal');
         if (countEl && Number(countEl.value) < 4) {
           countEl.value = 4;
-          if (countValEl) countValEl.textContent = '4 Sources';
+          if (countValEl) countValEl.textContent = '4';
           engine.updateModule('spatial', 'count', 4);
-        }
-        const pulseEl = document.getElementById('spatialPulse');
-        const pulseValEl = document.getElementById('spatialPulseVal');
-        if (pulseEl) {
-          pulseEl.value = 1.0;
-          if (pulseValEl) pulseValEl.textContent = '100% (No Drops — Moving Sound 🌬️🎶)';
-          engine.updateModule('spatial', 'pulse', 1.0);
         }
       }
     });
   }
 
-  bindSlider('spatialCount', 'spatial', 'count', (v) => `${Math.round(v)} ${Math.round(v) === 1 ? 'Source' : 'Sources'}`);
-  bindSlider('spatialBaseFreq', 'spatial', 'baseFreq', (v) => {
-    const tag = v < 65 ? 'Sub' : v < 130 ? 'Low' : 'Mid';
-    return `${Math.round(v)} Hz (${tag})`;
-  });
+  bindSlider('spatialCount', 'spatial', 'count', (v) => `${Math.round(v)}`);
   bindSlider('spatialGain', 'spatial', 'gain', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`);
-  bindSlider('spatialSpiral', 'spatial', 'spiral', (v) =>
-    v <= 0.02 ? '0.00 (Just Turning)' : `${v.toFixed(2)}x Spiral`
-  );
-  bindSlider('spatialPulse', 'spatial', 'pulse', (v) =>
-    v <= 0.02
-      ? '0% (100% Drops Only 💧)'
-      : v >= 0.98
-      ? '100% (No Drops — Moving Sound 🌬️🎶)'
-      : `${Math.round(v * 100)}% (Drops 💧 + Moving Sound 🌬️🎶)`
-  );
-  bindSlider('spatialRate', 'spatial', 'rate', (v) => (v <= 0.05 ? '0 /s (Continuous)' : `${v.toFixed(1)} /s`));
-  bindSlider('spatialAuricle', 'spatial', 'auricle', (v) => {
-    const label = v > 0.75 ? '8D Hyper-Real' : v > 0.35 ? 'Balanced' : 'Subtle';
-    return `${Math.round(v * 100)}% (${label})`;
+  bindSlider('spatialSpeed', 'spatial', 'speed', (v) => {
+    const period = (1 / Math.max(0.001, v)).toFixed(1);
+    return `${v.toFixed(2)} Hz · ${period} s`;
   });
-  bindSlider('spatialElevation', 'spatial', 'elevation', (v) =>
-    v <= 0.02 ? '0% (Flat 2D)' : `${Math.round(v * 100)}% (-${Math.round(75 * v)}° ↔ +${Math.round(85 * v)}°)`
+  bindSlider('spatialDistance', 'spatial', 'distance', (v) => `${v.toFixed(1)} m`);
+  bindSlider('spatialRoom', 'spatial', 'room', (v) => `${Math.round(v * 100)}%`);
+  bindSlider('spatialSpiral', 'spatial', 'spiral', (v) =>
+    v <= 0.02 ? '0.00 (pure loop)' : `${v.toFixed(2)}x twist`
   );
-  bindSlider('spatialCollapse', 'spatial', 'collapse', (v) => `${Math.round(v * 100)}%`);
-  bindSlider('spatialAsymmetry', 'spatial', 'asymmetry', (v) => `${Math.round(v * 100)}%`);
 
   // ==========================================
   // UNIFIED SOLO ENGINE (All 6 Modules)
@@ -733,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let savedSoloState = null;
 
   const soloButtons = {
-    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '8D', tab: 'spatial' },
+    spatial: { btn: document.getElementById('soloSpatialBtn'), label: '3D', tab: 'spatial' },
     chaos: { btn: document.getElementById('soloChaosBtn'), label: 'CHAOS', tab: 'chaos' },
     pac: { btn: document.getElementById('soloPacBtn'), label: 'PAC', tab: 'pac' },
     fractal: { btn: document.getElementById('soloFractalBtn'), label: 'FRACTAL', tab: 'chaos' },
@@ -1000,7 +930,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset Solo buttons state when loading a full config
     resetAllSoloButtonsUI();
 
-    // 1. Spatial (Unified 8D Binaural Auricle & Spatial ASMR)
+    // 1. Spatial (Binaural 3D Sound Space & REBAL Energy Torus)
     if (p.spatial) {
       syncToggle('spatialEnabled', 'spatial', p.spatial.enabled);
       if (document.getElementById('spatialPalette') && p.spatial.palette) {
@@ -1010,50 +940,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('spatialTrajectory').value = p.spatial.trajectory;
       }
       if (p.spatial.count !== undefined) {
-        syncControl('spatialCount', p.spatial.count, `${p.spatial.count} ${p.spatial.count === 1 ? 'Source' : 'Sources'}`);
-      }
-      if (p.spatial.baseFreq !== undefined) {
-        const tag = p.spatial.baseFreq < 65 ? 'Sub' : p.spatial.baseFreq < 130 ? 'Low' : 'Mid';
-        syncControl('spatialBaseFreq', p.spatial.baseFreq, `${Math.round(p.spatial.baseFreq)} Hz (${tag})`);
+        syncControl('spatialCount', p.spatial.count, `${Math.round(p.spatial.count)}`);
       }
       if (p.spatial.gain !== undefined) syncControl('spatialGain', p.spatial.gain, `${Math.round(p.spatial.gain * 100)}%`);
-      if (p.spatial.speed !== undefined) syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz`);
+      if (p.spatial.speed !== undefined) {
+        const period = (1 / Math.max(0.001, p.spatial.speed)).toFixed(1);
+        syncControl('spatialSpeed', p.spatial.speed, `${p.spatial.speed.toFixed(2)} Hz · ${period} s`);
+      }
+      if (p.spatial.distance !== undefined) syncControl('spatialDistance', p.spatial.distance, `${p.spatial.distance.toFixed(1)} m`);
+      if (p.spatial.room !== undefined) syncControl('spatialRoom', p.spatial.room, `${Math.round(p.spatial.room * 100)}%`);
       const spVal = p.spatial.spiral !== undefined ? p.spatial.spiral : 0.0;
       syncControl(
         'spatialSpiral',
         spVal,
-        spVal <= 0.02 ? '0.00 (Just Turning)' : `${spVal.toFixed(2)}x Spiral`
+        spVal <= 0.02 ? '0.00 (pure loop)' : `${spVal.toFixed(2)}x twist`
       );
-      engine.updateModule('spatial', 'spiral', spVal);
-      if (p.spatial.pulse !== undefined) {
-        const pTxt =
-          p.spatial.pulse <= 0.02
-            ? '0% (100% Drops Only 💧)'
-            : p.spatial.pulse >= 0.98
-            ? '100% (No Drops — Moving Sound 🌬️🎶)'
-            : `${Math.round(p.spatial.pulse * 100)}% (Drops 💧 + Moving Sound 🌬️🎶)`;
-        syncControl('spatialPulse', p.spatial.pulse, pTxt);
-      }
-      if (p.spatial.rate !== undefined) {
-        syncControl('spatialRate', p.spatial.rate, p.spatial.rate <= 0.05 ? '0 /s (Continuous)' : `${p.spatial.rate.toFixed(1)} /s`);
-      }
-      if (p.spatial.auricle !== undefined) {
-        const aLabel = p.spatial.auricle > 0.75 ? '8D Hyper-Real' : p.spatial.auricle > 0.35 ? 'Balanced' : 'Subtle';
-        syncControl('spatialAuricle', p.spatial.auricle, `${Math.round(p.spatial.auricle * 100)}% (${aLabel})`);
-      }
-      if (p.spatial.elevation !== undefined) {
-        const elVal = p.spatial.elevation;
-        const elTxt =
-          elVal <= 0.02
-            ? '0% (Flat 2D)'
-            : `${Math.round(elVal * 100)}% (-${Math.round(75 * elVal)}° ↔ +${Math.round(85 * elVal)}°)`;
-        syncControl('spatialElevation', elVal, elTxt);
-      }
-      if (p.spatial.collapse !== undefined) syncControl('spatialCollapse', p.spatial.collapse, `${Math.round(p.spatial.collapse * 100)}%`);
-      if (p.spatial.asymmetry !== undefined) syncControl('spatialAsymmetry', p.spatial.asymmetry, `${Math.round(p.spatial.asymmetry * 100)}%`);
-      if (p.spatial.tuning && document.getElementById('spatialTuning')) {
-        document.getElementById('spatialTuning').value = p.spatial.tuning;
-      }
       Object.entries(p.spatial).forEach(([k, v]) => {
         if (k !== 'manualPos' && v !== undefined) engine.updateModule('spatial', k, v);
       });
@@ -1478,65 +1379,57 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 4. Draw Active 8D Auricle HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
-    const rawCount = engine.params.spatial.count || 2;
+    // 4. Draw Active 3D HRTF Voices + Geometric Trails + Vertical Elevation Gauge Markers
     const isRebal = engine.params.spatial.trajectory === 'rebal';
-    const isBifurcation =
-      engine.params.spatial.trajectory === 'bifurcation5m' ||
-      engine.params.spatial.trajectory === 'bifurcation_random' ||
-      isRebal;
-    const activeCount = isBifurcation ? Math.max(2, rawCount) : rawCount;
-    const voices = engine.telemetry.spatialVoices.slice(0, activeCount);
+    const voices = (engine.telemetry.spatialVoices || []).filter((v) => v.active !== false);
 
-    // Draw REBAL Apple-Torus Energy Field Lines, Arrows, Human Body ("YOU") & Head Explosion when in REBAL mode
-    if (isRebal && voices[0]) {
-      const stageTxt = voices[0].stageLabel || '';
-      const isInhalePhase = stageTxt.startsWith('INHALE');
-      const isHeadExplosion = stageTxt.includes('HEAD ENERGY EXPLOSION');
-      const asym = engine.params.spatial.asymmetry !== undefined ? engine.params.spatial.asymmetry : 0.85;
-      const elevScale = Math.max(0.35, engine.params.spatial.elevation !== undefined ? engine.params.spatial.elevation : 0.95);
-      const R = 2.4 + 2.0 * asym;
-      const Y = (2.2 + 1.6 * asym) * elevScale;
+    // Draw REBAL Apple-Torus Energy Field Lines, Directional Arrows, Human Silhouette ("YOU") & Crown Energy Burst
+    if (isRebal && voices.length > 0) {
+      const stage = engine.telemetry.spatialStage || {};
+      const isInhale = stage.phase === 'inhale';
+      const R = Math.max(0.9, Math.min(4.2, (engine.params.spatial.distance || 1.8) * 1.1));
+      const crownY = window.Spatial3DModule ? window.Spatial3DModule.REBAL_CROWN_Y : 0.14;
+      const feetY = window.Spatial3DModule ? window.Spatial3DModule.REBAL_FEET_Y : -1.6;
+      const yc = (crownY + feetY) / 2;
+      const half = (crownY - feetY) / 2;
+      const ay = 1.0 + 0.55 * R;
+      const s = half / ay;
+      const k = Math.sqrt(Math.max(0, 1 - s * s));
+      const ar = R / (1 + k);
+      const rc = k * ar;
+      const th0 = Math.PI - Math.asin(s);
 
       ctx2d.save();
-      // 1. Draw nested Apple-Torus Energy Field Loops (Left & Right dipole lobes matching "The Flow of Your Energy Field")
-      const loopScales = [0.68, 1.0, 1.28];
+      // 1. Draw nested Apple-Torus Energy Field Loops (matching the exact REBAL equations)
+      const loopScales = [0.72, 1.0, 1.28];
       loopScales.forEach((ls, lIdx) => {
         [-1, 1].forEach((side) => {
           ctx2d.beginPath();
-          const steps = 44;
-          for (let s = 0; s <= steps; s++) {
-            const u = s / steps;
-            const pol = u * Math.PI;
-            const lx = side * R * ls * Math.sin(pol);
-            const ly = Y * (0.12 * Math.cos(pol) - 0.23 * (1 - Math.cos(pol)) + 0.88 * ls * Math.sin(2.0 * pol));
-            const pt = project3DToRadar(lx, ly, 0, cx, cy, scale);
-            if (s === 0) ctx2d.moveTo(pt.px, pt.py);
+          const steps = 48;
+          for (let step = 0; step <= steps; step++) {
+            const u = step / steps;
+            const th = th0 - u * 2 * th0;
+            const r = Math.max(0, rc + ar * Math.cos(th)) * ls;
+            const y = yc + ay * Math.sin(th) * ls;
+            const pt = project3DToRadar(side * r, y, 0, cx, cy, scale);
+            if (step === 0) ctx2d.moveTo(pt.px, pt.py);
             else ctx2d.lineTo(pt.px, pt.py);
           }
-          ctx2d.strokeStyle = isInhalePhase
+          ctx2d.strokeStyle = isInhale
             ? `rgba(56, 189, 248, ${0.14 + lIdx * 0.05})`
             : `rgba(167, 139, 250, ${0.18 + lIdx * 0.06})`;
           ctx2d.lineWidth = lIdx === 1 ? 1.6 : 1.0;
           ctx2d.stroke();
 
-          // Draw directional flow arrowheads along the middle loop (u = 0.14 going UP-OUT, u = 0.50 going DOWN, u = 0.86 curving UP into feet)
+          // Directional flow arrowheads along the middle loop
           if (lIdx === 1) {
-            [0.14, 0.50, 0.86].forEach((uArr) => {
-              const pol1 = uArr * Math.PI;
-              const pol2 = (uArr + 0.025) * Math.PI;
-              const p1 = project3DToRadar(
-                side * R * ls * Math.sin(pol1),
-                Y * (0.12 * Math.cos(pol1) - 0.23 * (1 - Math.cos(pol1)) + 0.88 * ls * Math.sin(2.0 * pol1)),
-                0, cx, cy, scale
-              );
-              const p2 = project3DToRadar(
-                side * R * ls * Math.sin(pol2),
-                Y * (0.12 * Math.cos(pol2) - 0.23 * (1 - Math.cos(pol2)) + 0.88 * ls * Math.sin(2.0 * pol2)),
-                0, cx, cy, scale
-              );
+            [0.15, 0.52, 0.88].forEach((uArr) => {
+              const th1 = th0 - uArr * 2 * th0;
+              const th2 = th0 - (uArr + 0.02) * 2 * th0;
+              const p1 = project3DToRadar(side * Math.max(0, rc + ar * Math.cos(th1)), yc + ay * Math.sin(th1), 0, cx, cy, scale);
+              const p2 = project3DToRadar(side * Math.max(0, rc + ar * Math.cos(th2)), yc + ay * Math.sin(th2), 0, cx, cy, scale);
               const ang = Math.atan2(p2.py - p1.py, p2.px - p1.px);
-              ctx2d.fillStyle = 'rgba(167, 139, 250, 0.65)';
+              ctx2d.fillStyle = 'rgba(167, 139, 250, 0.7)';
               ctx2d.beginPath();
               ctx2d.moveTo(p2.px, p2.py);
               ctx2d.lineTo(p2.px - 7 * Math.cos(ang - 0.5), p2.py - 7 * Math.sin(ang - 0.5));
@@ -1549,18 +1442,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // 2. Draw Central Vertical Core Channel (Feet -> Torso -> Head) & Human Body Silhouette ("YOU")
-      const headPt = project3DToRadar(0, 0.12 * Y, 0, cx, cy, scale);
-      const feetPt = project3DToRadar(0, -0.58 * Y, 0, cx, cy, scale);
-      ctx2d.strokeStyle = isInhalePhase ? 'rgba(251, 191, 36, 0.55)' : 'rgba(56, 189, 248, 0.25)';
+      const headPt = project3DToRadar(0, crownY, 0, cx, cy, scale);
+      const feetPt = project3DToRadar(0, feetY, 0, cx, cy, scale);
+      ctx2d.strokeStyle = isInhale ? 'rgba(251, 191, 36, 0.55)' : 'rgba(56, 189, 248, 0.25)';
       ctx2d.lineWidth = 2.2;
       ctx2d.beginPath();
       ctx2d.moveTo(feetPt.px, feetPt.py);
       ctx2d.lineTo(headPt.px, headPt.py);
       ctx2d.stroke();
 
-      // Subtle Human Torso & Legs Pillar ("YOU") between headPt and feetPt
-      const bodyTopY = headPt.py + 14;
-      const bodyH = Math.max(24, feetPt.py - bodyTopY);
+      // Human Torso & Legs Pillar ("YOU")
+      const bodyTopY = headPt.py + 10;
+      const bodyH = Math.max(22, feetPt.py - bodyTopY);
       ctx2d.fillStyle = 'rgba(15, 23, 42, 0.72)';
       ctx2d.strokeStyle = 'rgba(241, 245, 249, 0.38)';
       ctx2d.lineWidth = 1.3;
@@ -1573,42 +1466,42 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.textAlign = 'center';
       ctx2d.fillText('YOU', cx, bodyTopY + bodyH * 0.30);
 
-      // 3. Radiant Golden-Cyan Head Energy Explosion when Inhale reaches the Head
-      if (isInhalePhase) {
-        const headGlowRad = isHeadExplosion ? 48 + Math.sin(nowMs * 0.018) * 12 : 26;
-        const headGrad = ctx2d.createRadialGradient(headPt.px, headPt.py, 2, headPt.px, headPt.py, headGlowRad);
-        headGrad.addColorStop(0, isHeadExplosion ? 'rgba(251, 191, 36, 0.85)' : 'rgba(56, 189, 248, 0.48)');
-        headGrad.addColorStop(0.5, isHeadExplosion ? 'rgba(56, 189, 248, 0.45)' : 'rgba(167, 139, 250, 0.20)');
+      // 3. Crown Radiant Burst when Inhale fills head or crown burst fires
+      const burstAge = engine.ctx && voices[0].burstTime ? engine.ctx.currentTime - voices[0].burstTime : 99;
+      if (burstAge < 0.6 || (isInhale && stage.u > 0.78)) {
+        const glowRad = burstAge < 0.6 ? 36 + (1 - burstAge / 0.6) * 22 : 28 + Math.sin(nowMs * 0.016) * 6;
+        const headGrad = ctx2d.createRadialGradient(headPt.px, headPt.py, 2, headPt.px, headPt.py, glowRad);
+        headGrad.addColorStop(0, 'rgba(251, 191, 36, 0.85)');
+        headGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
         headGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
         ctx2d.fillStyle = headGrad;
         ctx2d.beginPath();
-        ctx2d.arc(headPt.px, headPt.py, headGlowRad, 0, Math.PI * 2);
+        ctx2d.arc(headPt.px, headPt.py, glowRad, 0, Math.PI * 2);
         ctx2d.fill();
       }
       ctx2d.restore();
     }
 
-    // Show live Stage Choreography Banner when in REBAL or 5m Split & Merge mode
-    if (isBifurcation && voices[0] && voices[0].stageLabel) {
-      const prefix = isRebal ? 'REBAL TORUS' : '5m SPLIT & MERGE';
-      const isInhale = voices[0].stageLabel.startsWith('INHALE');
-      ctx2d.fillStyle = isRebal
-        ? (isInhale ? 'rgba(251, 191, 36, 0.95)' : 'rgba(167, 139, 250, 0.95)')
-        : 'rgba(56, 189, 248, 0.88)';
+    // Show live Stage Choreography Banner when in REBAL mode
+    const stageBanner = (isRebal && voices[0] && voices[0].stageLabel)
+      ? `REBAL TORUS // ${voices[0].stageLabel}`
+      : (engine.params.spatial.trajectory === 'manual' ? 'HRTF 3D // MANUAL POSITION (HOLD)' : '');
+    if (stageBanner) {
+      const isInhale = stageBanner.includes('INHALE');
+      ctx2d.fillStyle = isInhale ? 'rgba(56, 189, 248, 0.95)' : 'rgba(167, 139, 250, 0.95)';
       ctx2d.font = '10px "JetBrains Mono", monospace';
       ctx2d.textAlign = 'center';
-      ctx2d.fillText(`${prefix} // ${voices[0].stageLabel}`, cx, 36);
+      ctx2d.fillText(stageBanner, cx, 36);
       ctx2d.textAlign = 'left';
     }
 
     voices.forEach((v) => {
+      if (v.active === false) return;
       const energy = v.activeEnergy !== undefined ? v.activeEnergy : 1.0;
       if (energy < 0.01) return;
 
-      // When voices are merged into ONE stream (in 'rebal' core ascent/feet or 'bifurcation5m'), skip drawing duplicate overlapping labels
-      const isMergedOdd = isRebal
-        ? (v.index > 0 && v.splitFactor !== undefined && v.splitFactor < 0.08)
-        : (isBifurcation && (v.index % 2 === 1) && v.splitFactor !== undefined && v.splitFactor < 0.06);
+      // During REBAL Inhale core ascent, merge overlapping duplicate labels
+      const isMergedInhale = isRebal && v.index > 0 && Math.sqrt(v.x * v.x + v.z * v.z) < 0.12;
 
       const palette = [
         '56, 189, 248',  // Cyan
@@ -1622,7 +1515,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
       const hue = palette[v.index % palette.length];
 
-      // Draw Geometric Trail (shows 8D Orbit, 5m Split & Merge, Zenith Arch, 3D Helix, Figure-8 ∞, or Far-Horizon ray)
+      // Draw Geometric Trail
       if (v.trail && v.trail.length > 2) {
         ctx2d.beginPath();
         for (let t = 0; t < v.trail.length; t++) {
@@ -1635,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx2d.stroke();
       }
 
-      if (isMergedOdd) return;
+      if (isMergedInhale) return;
 
       const { px, py, horizDist } = project3DToRadar(v.x, v.y, v.z, cx, cy, scale);
       const dist = v.dist || Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -1643,7 +1536,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const elevRad = Math.atan2(v.y || 0, Math.max(0.02, horizDist));
       const elevDeg = Math.round((elevRad * 180) / Math.PI);
 
-      // Sources shrink slightly when they travel very far out (up to 11m), and swell slightly overhead
       const distScale = 1 / (1 + Math.max(0, dist - 1.2) * 0.14);
       const radius = Math.max(4.5, (8 + energy * 4) * distScale);
 
@@ -1676,8 +1568,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx2d.fillStyle = 'rgba(241, 245, 249, 0.88)';
       ctx2d.font = '9px "JetBrains Mono", monospace';
       ctx2d.textAlign = 'right';
-      const gaugeTag = isBifurcation && v.splitFactor < 0.06 ? 'MERGED' : `S${v.index + 1}`;
-      ctx2d.fillText(`${gaugeTag} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
+      ctx2d.fillText(`S${v.index + 1} ${elevDeg >= 0 ? '+' : ''}${elevDeg}°`, gaugeX - 8, gy + 3);
       ctx2d.textAlign = 'left';
 
       // Label with Source #, Distance, Horizontal Pinna Cue & Vertical Elevation Angle
@@ -1697,9 +1588,8 @@ document.addEventListener('DOMContentLoaded', () => {
         : elevDeg < -18
         ? `▼${elevDeg}° FLOOR`
         : `${dist.toFixed(1)}m`;
-      const srcPrefix = isBifurcation && v.splitFactor < 0.06 ? 'MERGED' : `S${v.index + 1}`;
       ctx2d.fillText(
-        `${srcPrefix}: ${horizTag} · ${elevTag}`,
+        `S${v.index + 1}: ${horizTag} · ${elevTag}`,
         px + radius + 5,
         py + 3
       );
