@@ -1408,9 +1408,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const steps = 48;
           for (let step = 0; step <= steps; step++) {
             const u = step / steps;
-            const th = th0 - u * 2 * th0;
-            const r = Math.max(0, rc + ar * Math.cos(th)) * ls;
-            const y = yc + ay * Math.sin(th) * ls;
+            const pol = u * Math.PI;
+            const r = R * Math.sin(pol) * ls;
+            const y = (0.22 + 1.25 * Math.sin(pol) - 2.05 * Math.pow(u, 1.35)) * (lIdx === 1 ? 1.0 : (lIdx === 0 ? 0.85 : 1.15));
             const pt = project3DToRadar(side * r, y, 0, cx, cy, scale);
             if (step === 0) ctx2d.moveTo(pt.px, pt.py);
             else ctx2d.lineTo(pt.px, pt.py);
@@ -1424,10 +1424,14 @@ document.addEventListener('DOMContentLoaded', () => {
           // Directional flow arrowheads along the middle loop
           if (lIdx === 1) {
             [0.15, 0.52, 0.88].forEach((uArr) => {
-              const th1 = th0 - uArr * 2 * th0;
-              const th2 = th0 - (uArr + 0.02) * 2 * th0;
-              const p1 = project3DToRadar(side * Math.max(0, rc + ar * Math.cos(th1)), yc + ay * Math.sin(th1), 0, cx, cy, scale);
-              const p2 = project3DToRadar(side * Math.max(0, rc + ar * Math.cos(th2)), yc + ay * Math.sin(th2), 0, cx, cy, scale);
+              const pol1 = uArr * Math.PI;
+              const pol2 = (uArr + 0.02) * Math.PI;
+              const r1 = R * Math.sin(pol1);
+              const y1 = 0.22 + 1.25 * Math.sin(pol1) - 2.05 * Math.pow(uArr, 1.35);
+              const r2 = R * Math.sin(pol2);
+              const y2 = 0.22 + 1.25 * Math.sin(pol2) - 2.05 * Math.pow(uArr + 0.02, 1.35);
+              const p1 = project3DToRadar(side * r1, y1, 0, cx, cy, scale);
+              const p2 = project3DToRadar(side * r2, y2, 0, cx, cy, scale);
               const ang = Math.atan2(p2.py - p1.py, p2.px - p1.px);
               ctx2d.fillStyle = 'rgba(167, 139, 250, 0.7)';
               ctx2d.beginPath();

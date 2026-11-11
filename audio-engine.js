@@ -205,7 +205,8 @@ class ConsciousnessAudioEngine {
 
     this.dryBus.gain.value = this._dryLevel(this.params.reverbMix);
     this.dryBus.connect(this.compressor);
-    this.spatialDryBus.connect(this.compressor);
+    // Connect spatialDryBus directly to masterGain to preserve 100% pure binaural stereo isolation (no compressor crosstalk)
+    this.spatialDryBus.connect(this.masterGain);
     this.reverbSendGain.connect(this.reverbNode);
     this.shimmerGain.connect(this.reverbNode);
     this.reverbNode.connect(this.reverbReturn);
