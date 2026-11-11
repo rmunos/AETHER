@@ -256,6 +256,10 @@
       if (mode === 'spiral') {
         r = 0.17 * Math.pow(Math.sin(Math.PI * p), 0.8) * (1 - smooth(0.8, 1.0, p));
         az = az0 + turns * TAU + 2 * TAU * p; // keeps turning the same way, coiling up inside
+      } else if (opts.innerSwirl > 0) {
+        // gentle swirl around the body axis so the rise inside is heard as movement (small interaural changes)
+        r = 0.12 * opts.innerSwirl * Math.pow(Math.sin(Math.PI * p), 0.8) * (1 - smooth(0.85, 1.0, p));
+        az = az0 + 1.5 * TAU * p;
       }
       out.x = r * Math.sin(az);
       out.z = -r * Math.cos(az);
@@ -329,9 +333,11 @@
       p.cue = clamp(p.cue !== undefined ? p.cue : 1, 0, 2);
       p.turns = clamp(p.turns !== undefined ? p.turns : 1.25, 0, 3);
       p.twist = clamp(p.twist || 0, -1, 1);
+      p.innerSwirl = clamp(p.innerSwirl !== undefined ? p.innerSwirl : 0.5, 0, 1);
       p.fountainBreaths = clamp(Math.round(p.fountainBreaths || 6), 1, 40);
       p.spiralBreaths = clamp(Math.round(p.spiralBreaths || 6), 1, 40);
-      if (p.renderer !== 'hrtf') p.renderer = 'structural';
+      if (!['structural', 'measured', 'hrtf'].includes(p.renderer)) p.renderer = 'structural';
+      if (p.earModel === undefined) p.earModel = null;
     }
 
     // ---------------------------------------------------------------- buffers & waves
@@ -521,7 +527,7 @@
             rotate = 0.07 * TAU * phase; // slow drift of the whole field
           }
           const pos = rebalPosition(st, k, rs.mode === 'balloon' ? 'fountain' : rs.mode, {
-            L, n, turns: p.turns, twist: p.twist, rotate
+            L, n, turns: p.turns, twist: p.twist, rotate, innerSwirl: p.innerSwirl
           });
           pos.st = st;
           res.streams.push(pos);
@@ -878,7 +884,10 @@
         this.frames.length = 0;
         if (key !== 'count') this.renderer.unprime();
       }
-      if (key === 'renderer') this.renderer.setMode(p.renderer);
+      if (key === 'renderer' || key === 'earModel') {
+        if (p.earModel) this.renderer.earModel = p.earModel;
+        this.renderer.setMode(p.renderer);
+      }
       if (key === 'room' || key === 'cue' || key === 'enabled') this.applyRendererConfig();
       if (key === 'enabled' && !p.enabled) this.streams.forEach((s) => s.out.gain.setTargetAtTime(0, now, 0.08));
     }
@@ -886,6 +895,11 @@
     applyRendererConfig() {
       const p = this.params;
       this.renderer.setConfig({ cue: p.cue, pinna: Math.min(1.3, 0.5 + 0.5 * p.cue), er: 0.25 + 1.1 * p.room, reverb: 0.08 + 0.55 * p.room, roomSize: 0.8 + 0.6 * p.room });
+      // measured ear models: the same slider scales the fine spectral structure (1 = as measured)
+      if (this.renderer.setEarCue && Math.abs(this.renderer.earK - p.cue) > 0.01) {
+        clearTimeout(this._cueTimer);
+        this._cueTimer = setTimeout(() => this.renderer.setEarCue(p.cue).catch(() => {}), 120);
+      }
     }
   }
 

@@ -42,6 +42,7 @@
         <a href="#listen">How to listen</a>
         <a href="#rebal">REBAL practice</a>
         <a href="#space">How the 3D sound works</a>
+        <a href="#calibration">Ear-model calibration</a>
         <a href="#check">Localisation check</a>
         <a href="#modules">Modules</a>
         <a href="#sessions">Presets &amp; sessions</a>
@@ -98,7 +99,23 @@
             <tr><td><strong>Distance &amp; outside the head</strong></td><td>Level, room reflections, direct-to-reverberant ratio</td><td>Six early reflections per source, each with its own interaural cues, and a natural room reverb.</td></tr>
             <tr><td><strong>Inside the body</strong></td><td>(not a physical direction)</td><td>An interior path: same sound in both ears, dry and close, with a small left/right offset.</td></tr>
           </table>
-          <p>Front/back and up/down depend on ear shape, so they vary between people; left/right is reliable for everyone. The <em>Renderer</em> menu switches to the browser's measured HRTF for comparison.</p>
+          <p>Front/back and up/down depend on ear shape, so they vary between people; left/right is reliable for everyone. Run the ear-model calibration once to pick the model that suits your ears. The <em>Renderer</em> menu also offers the browser's built-in HRTF for comparison.</p>
+        </section>
+
+        <section id="calibration" class="doc-section">
+          <h2>Ear-model calibration (front/back and up/down)</h2>
+          <p>The outer ear filters sound differently for each direction, and these filters differ from person to person. With someone else's ears, sounds in front are often heard behind and elevation is vague. The best practical fix without measuring your own ears is to choose, by ear, the measured ear model closest to yours.</p>
+          <h3>What you compare</h3>
+          <p>Eight candidates: the built-in structural model, the MIT KEMAR dummy head, and six listeners of the HUTUBS database (TU Berlin). The six were chosen automatically from the 93 measured people of HUTUBS so that they cover the spread of ear shapes (clustering of their median-plane spectra; each represents 4 to 26 of the 93).</p>
+          <h3>How it works</h3>
+          <ol>
+            <li><strong>Seven duels.</strong> A and B each play short noise bursts in front of you, above, behind and below. Pick the one where the four places are most distinct and most correct, especially front vs behind. The winner of each duel goes on (a knock-out tournament).</li>
+            <li><strong>Blind test.</strong> 16 bursts, 4 from each place in random order; you answer where you hear them. Optionally the same test with the built-in model, to see whether the measured ears really help.</li>
+            <li>The chosen ear model is saved in your browser and used by every module, including the REBAL flow.</li>
+          </ol>
+          <p>Chance level is 4 of 16 overall and 4 of 8 for front/behind or above/below. Even with a well-matched ear model, front/back swaps remain common over headphones without head tracking; scores around 6/8 for front/behind are good. If front and back stay swapped, try <em>Spectral cue strength</em> 1.3-1.6: with a measured ear model it exaggerates the fine spectral detail of the ears while keeping the level difference between the ears as measured.</p>
+          <h3>How the measured models are rendered</h3>
+          <p>Each model stores the direction-dependent part of the measured responses (directional transfer functions), smoothed to 1/8 octave, on a 10° grid over the whole sphere. The browser rebuilds short minimum-phase filters at your sound card's sample rate and interpolates between grid points as sources move. The time difference between the ears comes from a spherical-head model with that listener's head radius (fitted to the measurements, 8.0 to 9.1 cm).</p>
         </section>
 
         <section id="check" class="doc-section">
@@ -148,6 +165,10 @@
             <li>V. C. Raykar, R. Duraiswami, B. Yegnanarayana, "Extracting the frequencies of the pinna spectral notches in measured HRTFs", JASA, 2005.</li>
             <li>K. Iida et al., "Median plane localization using a parametric model of the HRTF based on spectral cues", Applied Acoustics, 2007.</li>
             <li>R. N. Shepard, "Circularity in judgments of relative pitch", JASA, 1964; J.-C. Risset, 1969.</li>
+            <li>Ear models: HUTUBS database, TU Berlin (CC BY 4.0): F. Brinkmann et al., "A cross-evaluated database of measured and simulated HRTFs including 3D head meshes, anthropometric features, and headphone impulse responses", J. Audio Eng. Soc. 67(9), 2019, doi:10.14279/depositonce-8487.</li>
+            <li>Ear model: MIT KEMAR: W. G. Gardner, K. D. Martin, "HRTF measurements of a KEMAR", JASA 97, 1995.</li>
+            <li>Y. Iwaya, "Individualization of head-related transfer functions with tournament-style listening test: listening with other's ears", Acoust. Sci. & Tech. 27(6), 2006.</li>
+            <li>J. C. Middlebrooks, "Individual differences in external-ear transfer functions reduced by scaling in frequency", JASA 106, 1999 (directional transfer functions).</li>
           </ul>
         </section>
       </div>

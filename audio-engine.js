@@ -26,8 +26,8 @@ class ConsciousnessAudioEngine {
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
       spatial: {
         enabled: true, palette: 'breath', trajectory: 'rebal', rebalMode: 'program', count: 4, gain: 0.85,
-        speed: 0.08, distance: 1.9, room: 0.45, cue: 1.0, turns: 1.25, twist: 0,
-        fountainBreaths: 6, spiralBreaths: 6, renderer: 'structural', manualPos: null
+        speed: 0.08, distance: 1.9, room: 0.45, cue: 1.0, turns: 1.25, twist: 0, innerSwirl: 0.5,
+        fountainBreaths: 6, spiralBreaths: 6, renderer: 'structural', earModel: null, manualPos: null
       },
       chaos: { enabled: false, palette: 'hybrid', rhythm: 'avalanche', scale: 'pentatonic', gain: 0.55, r: 3.74, rate: 2.6, register: 0.45, morph: 0.6, space3d: true },
       pac: { enabled: false, gain: 0.45, baseFreq: 108, harmonics: 0.35, theta: 6.0, gamma: 40, depth: 0.5, breath: 0.6 },

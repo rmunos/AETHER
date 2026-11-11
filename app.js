@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['spatialTurns', 'spatial', 'turns', (v) => v.toFixed(2)],
     ['spatialStageBreaths', 'spatial', 'fountainBreaths', (v) => `${Math.round(v)}`],
     ['spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`],
+    ['spatialInnerSwirl', 'spatial', 'innerSwirl', pct],
     ['spatialRoom', 'spatial', 'room', pct],
     ['spatialCue', 'spatial', 'cue', (v) => v.toFixed(2)],
     ['chaosGain', 'chaos', 'gain', pct],
@@ -91,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('change', () => {
       if (!engine.params[mod].enabled) setEnabled(mod, true);
       setParam(mod, key, el.value);
-      if (mod === 'spatial') updateSpatialVisibility();
+      if (mod === 'spatial') { updateSpatialVisibility(); updateRendererUI(); }
       cancelJourneyOnManual();
     });
   });
@@ -135,10 +136,47 @@ document.addEventListener('DOMContentLoaded', () => {
       if (card) card.classList.toggle('active-module', !!engine.params[mod].enabled);
     });
     $('chaosSpace3d').checked = engine.params.chaos.space3d !== false;
+    updateRendererUI();
     $('rootSelect').value = String(engine.params.root);
     $('masterGain').value = engine.params.masterGain;
     $('masterGainVal').textContent = pct(engine.params.masterGain);
     updateSpatialVisibility();
+  }
+
+  function earModelName(id) {
+    const m = (window.AETHER_HRTF_INDEX || []).find((x) => x.id === id);
+    return m ? m.name : id;
+  }
+
+  function updateRendererUI() {
+    const sel = $('spatialRenderer');
+    const opt = sel.querySelector('option[value="measured"]');
+    const id = engine.params.spatial.earModel;
+    opt.disabled = !id;
+    opt.textContent = id ? `Measured ear model: ${earModelName(id)}` : 'Measured ear model (calibrate first)';
+    sel.value = engine.params.spatial.renderer;
+    if (engine.renderer) {
+      const m = engine.renderer.mode;
+      $('telemetryRenderer').textContent = m === 'measured' ? `EAR: ${earModelName(engine.renderer.earModel).toUpperCase()}` : m === 'structural' ? 'STRUCTURAL' : 'BROWSER HRTF';
+    }
+  }
+
+  function applyEarModel(id) {
+    engine.params.spatial.earModel = id || engine.params.spatial.earModel;
+    if (id) {
+      engine.renderer.earModel = id;
+      engine.updateModule('spatial', 'earModel', id);
+      engine.updateModule('spatial', 'renderer', 'measured');
+    } else {
+      engine.updateModule('spatial', 'renderer', 'structural');
+    }
+    syncUI();
+  }
+
+  function restoreRenderer(mode) {
+    engine.updateModule('spatial', 'renderer', mode === 'measured' && engine.renderer.earModel ? 'measured' : mode);
+    if (mode !== 'hrtf') engine.renderer.setMode(engine.params.spatial.renderer);
+    syncUI();
   }
 
   function updateSpatialVisibility() {
@@ -165,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     cfg.spatial.spiralBreaths = cfg.spatial.fountainBreaths;
+    // listening setup chosen by the listener (renderer, ear model, cue strength) is not part of a preset
+    ['renderer', 'earModel', 'cue'].forEach((k) => { cfg.spatial[k] = engine.params.spatial[k]; });
     return cfg;
   }
 
@@ -398,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (_) { /* unsupported */ }
   }
 
+  let earApplied = false;
   async function toggleAudio() {
     if (!engine.isRunning) {
       unlockBackgroundAudio();
@@ -411,8 +452,15 @@ document.addEventListener('DOMContentLoaded', () => {
       $('powerBtn').setAttribute('aria-pressed', 'true');
       $('powerBtnText').textContent = 'PLAYING (PAUSE)';
       $('statusOrb').classList.add('live');
-      $('telemetryRenderer').textContent = engine.renderer.mode === 'structural' ? 'STRUCTURAL' : 'BROWSER HRTF';
-      if (!engine.renderer.workletAvailable) $('spatialRenderer').querySelector('option[value="structural"]').disabled = true;
+      if (!engine.renderer.workletAvailable) {
+        $('spatialRenderer').querySelector('option[value="structural"]').disabled = true;
+        $('calOpen').disabled = true;
+      } else if (!earApplied) {
+        earApplied = true;
+        const saved = window.AetherCalibration.loadSaved();
+        if (saved && saved.id) applyEarModel(saved.id);
+      }
+      updateRendererUI();
     } else {
       engine.stop();
       releaseWakeLock();
@@ -436,6 +484,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchstart', () => {
     if (engine.isRunning && engine.ctx && engine.ctx.state === 'suspended') engine.ctx.resume().catch(() => {});
   }, { passive: true });
+
+  // ------------------------------------------------------------------ ear-model calibration
+  const calibration = window.AetherCalibration.create(engine, {
+    setEnabled,
+    start: async () => { unlockBackgroundAudio(); if (!engine.isRunning) await toggleAudio(); },
+    applyEarModel,
+    restoreRenderer
+  });
+  $('calOpen').addEventListener('click', () => { cancelJourneyOnManual(); calibration.open(); });
 
   // ------------------------------------------------------------------ canvas
   const canvas = $('neuroCanvas');
@@ -525,5 +582,5 @@ document.addEventListener('DOMContentLoaded', () => {
   applyPreset('rebalGateway', 0);
   syncUI();
   requestAnimationFrame(animate);
-  window.__aether = { engine, applyPreset, resolveConfig, morphTo, startJourney };
+  window.__aether = { engine, applyPreset, resolveConfig, morphTo, startJourney, calibration, applyEarModel };
 });

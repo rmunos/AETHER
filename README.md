@@ -28,13 +28,21 @@ Default sound: breath noise + harmonic overtones whose pitch follows height (a r
 sparkles that make each stream easy to localise. Alternatives: resonant voices, water fountain, singing bowls,
 crystal chimes.
 
-## 3D rendering (`binaural-renderer.js`)
+## 3D rendering (`binaural-renderer.js`, `calibration.js`, `hrtf/`)
 
 A structural binaural model in an AudioWorklet (12 sources): spherical-head ITD, Brown & Duda head-shadow
 filters (frequency-dependent ILD), near-field level differences, elevation-dependent pinna notches, Blauert
 directional bands, shoulder reflection, six image-source early reflections and a natural late reverb, plus an
-"interior" rendering for sounds inside the head/body. The browser's measured-HRTF panner is available for A/B
-comparison.
+"interior" rendering for sounds inside the head/body.
+
+Front/back and up/down depend on the listener's own ears, so the app also ships seven **measured ear models**
+(MIT KEMAR and six HUTUBS listeners chosen to cover the spread of 93 measured people) and a 4-minute
+**calibration**: a knock-out tournament of A/B duels (bursts in front, above, behind, below), then a 16-sound blind
+test. The chosen model replaces the modelled head shadow and pinna cues in the same AudioWorklet (minimum-phase FIRs
+rebuilt in the browser, interpolated on a 10° grid). The browser's own HRTF panner remains available for comparison.
+
+Ear-model data: HUTUBS, TU Berlin, CC BY 4.0 (Brinkmann et al., JAES 2019, doi:10.14279/depositonce-8487);
+MIT KEMAR (Gardner & Martin, JASA 1995), free use with citation.
 
 ## Modules
 
@@ -66,6 +74,8 @@ spatial-engine.js     Module 01: breath clock, REBAL geometry, stream generators
 modules-a.js          Modules 02-04
 modules-b.js          Modules 05-07
 docs.html             user guide
+calibration.js        ear-model calibration (tournament + blind test)
+hrtf/                 measured ear models (HUTUBS listeners, MIT KEMAR)
 assets/               figures
 ```
 

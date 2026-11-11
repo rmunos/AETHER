@@ -10,7 +10,7 @@
   <title>AETHER // 3D sound for meditation and expanded states</title>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="apple-touch-icon" href="icon-512.png" />
-  <link rel="stylesheet" href="styles.css?v=6.0" />
+  <link rel="stylesheet" href="styles.css?v=6.1" />
 </head>
 <body>
   <div class="app-shell">
@@ -174,7 +174,7 @@
               <label class="toggle-switch"><input type="checkbox" id="spatialEnabled" checked /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Tip: click or drag on the 3D views to place a source by hand. Each stream is rendered binaurally (head shadow, interaural delay, pinna notches, shoulder and room reflections). Inhale: energy rises inside you from the soles to the crown. Exhale: it fountains out of the crown, over and down around you, back into the soles.</p>
+          <p class="module-subtitle">Tip: run the ear calibration below once; click or drag on the 3D views to place a source by hand. Each stream is rendered binaurally (head shadow, interaural delay, pinna notches, shoulder and room reflections). Inhale: energy rises inside you from the soles to the crown. Exhale: it fountains out of the crown, over and down around you, back into the soles.</p>
           <div class="control-list">
             <div class="control-row">
               <div class="control-label"><span>Movement</span></div>
@@ -226,9 +226,15 @@
                 <input type="range" id="spatialTurns" min="0" max="3" step="0.25" value="1.25" />
               </div>
             </div>
-            <div class="control-row rebal-only">
-              <div class="control-label"><span>Guided pattern: breaths per stage</span><span class="mono-val" id="spatialStageBreathsVal">6</span></div>
-              <input type="range" id="spatialStageBreaths" min="2" max="20" step="1" value="6" />
+            <div class="control-row two-col rebal-only">
+              <div>
+                <div class="control-label"><span>Breaths per stage</span><span class="mono-val" id="spatialStageBreathsVal">6</span></div>
+                <input type="range" id="spatialStageBreaths" min="2" max="20" step="1" value="6" />
+              </div>
+              <div>
+                <div class="control-label"><span>Inner swirl (inhale)</span><span class="mono-val" id="spatialInnerSwirlVal">50%</span></div>
+                <input type="range" id="spatialInnerSwirl" min="0" max="1" step="0.05" value="0.5" />
+              </div>
             </div>
             <div class="control-row free-only">
               <div class="control-label"><span>Movement speed</span><span class="mono-val" id="spatialSpeedVal">0.08 Hz</span></div>
@@ -247,10 +253,12 @@
             <div class="control-row">
               <div class="control-label"><span>Renderer</span></div>
               <select id="spatialRenderer" class="select-input">
-                <option value="structural" selected>Structural binaural model (recommended)</option>
-                <option value="hrtf">Browser measured HRTF (for comparison)</option>
+                <option value="structural" selected>Built-in structural model</option>
+                <option value="measured" disabled>Measured ear model (calibrate first)</option>
+                <option value="hrtf">Browser HRTF (for comparison)</option>
               </select>
             </div>
+            <button type="button" class="btn-calibrate" id="calOpen">🎧 Calibrate front/back &amp; up/down for your ears (4 min)</button>
           </div>
         </article>
 
@@ -558,15 +566,27 @@
     <footer class="footer-note">Use headphones at a moderate volume. Do not listen while driving or operating machinery. These sounds are designed to support relaxation, imagery and meditation; they are not a medical treatment.</footer>
   </div>
 
+  <div class="cal-modal" id="calModal" role="dialog" aria-modal="true" aria-labelledby="calTitle">
+    <div class="cal-box">
+      <div class="cal-head">
+        <span class="module-tag tag-cyan" id="calTitle">EAR-MODEL CALIBRATION</span>
+        <button type="button" class="btn-mini" id="calClose" title="Close (Esc)">✕</button>
+      </div>
+      <div id="calBody"></div>
+    </div>
+  </div>
+
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="binaural-renderer.js?v=6.0"></script>
-  <script src="spatial-engine.js?v=6.0"></script>
-  <script src="modules-a.js?v=6.0"></script>
-  <script src="modules-b.js?v=6.0"></script>
-  <script src="audio-engine.js?v=6.0"></script>
-  <script src="presets.js?v=6.0"></script>
-  <script src="visualizer.js?v=6.0"></script>
-  <script src="app.js?v=6.0"></script>
+  <script src="binaural-renderer.js?v=6.1"></script>
+  <script src="spatial-engine.js?v=6.1"></script>
+  <script src="modules-a.js?v=6.1"></script>
+  <script src="modules-b.js?v=6.1"></script>
+  <script src="audio-engine.js?v=6.1"></script>
+  <script src="presets.js?v=6.1"></script>
+  <script src="hrtf/index.js?v=6.1"></script>
+  <script src="calibration.js?v=6.1"></script>
+  <script src="visualizer.js?v=6.1"></script>
+  <script src="app.js?v=6.1"></script>
 </body>
 </html>

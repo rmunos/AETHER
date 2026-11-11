@@ -13,7 +13,7 @@
       mechText: 'Breathe with the sound. INHALE: the energy rises inside you from the soles to the crown (heard inside the head, getting brighter and higher). EXHALE: it leaves the crown upwards like a fountain, arcs over and flows down around the outside of your body, curls under the feet and re-enters through the soles. After six breaths the flow becomes a spiral that winds down around you and coils back up inside; then the balloon is sustained. Height is carried by the overtone pitch and brightness, left/right and front/back by the binaural renderer.',
       reverbMix: 0.32,
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'breath', count: 4, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, cue: 1.0, fountainBreaths: 6, spiralBreaths: 6 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'breath', count: 4, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, fountainBreaths: 6, spiralBreaths: 6 },
       pac: { enabled: true, gain: 0.3, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0.25, breath: 0.7, baseFreq: 108 },
       ganzfeld: { enabled: true, texture: 'surf', gain: 0.28, color: 0.6, sweep: 0.55 },
       sub: { enabled: true, pattern: 'breath', gain: 0.3, freq: 27, warmth: 0.5 }
@@ -25,7 +25,7 @@
       mechText: 'The resonant voices recall the Gateway "resonant tuning" hum. Their vowel moves from "oo" (low, under the feet) through "ah" (ear level) to "ee" (above the head), a height cue that works for most listeners even when pinna cues do not.',
       reverbMix: 0.42,
       breath: { rate: 5, inhale: 0.42, holdIn: 1, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'spiral', palette: 'choir', count: 6, gain: 0.85, distance: 2.1, turns: 1.5, room: 0.55, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'spiral', palette: 'choir', count: 6, gain: 0.85, distance: 2.1, turns: 1.5, room: 0.55 },
       pac: { enabled: true, gain: 0.25, harmonics: 0.4, theta: 5.0, gamma: 40, depth: 0.2, breath: 0.8, baseFreq: 108 },
       sub: { enabled: true, pattern: 'breath', gain: 0.32, freq: 27, warmth: 0.5 }
     },
@@ -36,7 +36,7 @@
       mechText: 'Breathing at about six breaths per minute with a longer exhale is the classic "resonance" breathing rate. The surf draws back on the inhale and breaks on the exhale, so you can follow it without counting.',
       reverbMix: 0.4,
       breath: { rate: 5.5, inhale: 0.4, holdIn: 0, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'sphere', palette: 'bowl', count: 3, gain: 0.8, speed: 0.04, distance: 2.2, room: 0.55, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'sphere', palette: 'bowl', count: 3, gain: 0.8, speed: 0.04, distance: 2.2, room: 0.55 },
       ganzfeld: { enabled: true, texture: 'surf', gain: 0.45, color: 0.55, sweep: 0.7 },
       sub: { enabled: true, pattern: 'heartbeat', gain: 0.35, freq: 32, pulse: 0.9, warmth: 0.45 }
     },
@@ -46,7 +46,7 @@
       mechTitle: 'Unpredictable but structured sound',
       mechText: 'Near r ≈ 3.7 the logistic map produces short motifs that mutate before they can loop. Attention keeps tracking the sound without settling into prediction or inner dialogue. Each note is placed at its own point in space.',
       reverbMix: 0.5,
-      spatial: { enabled: true, trajectory: 'sphere', palette: 'water', count: 3, gain: 0.55, speed: 0.06, distance: 2.4, room: 0.55, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'sphere', palette: 'water', count: 3, gain: 0.55, speed: 0.06, distance: 2.4, room: 0.55 },
       chaos: { enabled: true, palette: 'hybrid', rhythm: 'avalanche', scale: 'pentatonic', gain: 0.6, r: 3.74, rate: 2.6, register: 0.45, morph: 0.6, space3d: true },
       ganzfeld: { enabled: true, texture: 'cavern', gain: 0.25, color: 0.55, sweep: 0.6 }
     },
@@ -56,7 +56,7 @@
       mechTitle: 'Theta-range binaural beat with a gamma-rate shimmer',
       mechText: 'A 6 Hz interaural beat sits in the theta range associated with drowsy, image-rich states; overtones flutter at 40 Hz on its crests. Evidence that binaural beats entrain brain rhythms is mixed; treat it as a texture that many people find helpful for letting go.',
       reverbMix: 0.5,
-      spatial: { enabled: true, trajectory: 'orbit', palette: 'breath', count: 2, gain: 0.55, speed: 0.05, distance: 1.6, room: 0.5, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'orbit', palette: 'breath', count: 2, gain: 0.55, speed: 0.05, distance: 1.6, room: 0.5 },
       pac: { enabled: true, gain: 0.6, harmonics: 0.45, theta: 6.0, gamma: 40, depth: 0.8, breath: 0.75, baseFreq: 108 },
       ganzfeld: { enabled: true, texture: 'cavern', gain: 0.22, color: 0.7, sweep: 0.45 },
       sub: { enabled: true, pattern: 'breath', gain: 0.35, freq: 27, warmth: 0.5 }
@@ -67,7 +67,7 @@
       mechTitle: 'Shepard–Risset paradox',
       mechText: 'Octave-spaced voices glide upwards forever under a fixed spectral envelope, so the sound rises without arriving. Combined with distant, wandering chimes it opens a sense of space and suspends the feeling of linear time.',
       reverbMix: 0.65,
-      spatial: { enabled: true, trajectory: 'sphere', palette: 'chimes', count: 3, gain: 0.5, speed: 0.04, distance: 3.0, room: 0.7, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'sphere', palette: 'chimes', count: 3, gain: 0.5, speed: 0.04, distance: 3.0, room: 0.7 },
       fractal: { enabled: true, gain: 0.6, speed: 0.05, depth: 0.7, center: 216 },
       sub: { enabled: true, pattern: 'pulse', gain: 0.3, freq: 27, pulse: 0.5, warmth: 0.45 }
     },
@@ -78,7 +78,7 @@
       mechText: 'A 30 Hz tone with harmonics, shaped as a slow heartbeat, gives the attention something to rest on in the body while the bowls circle around you.',
       reverbMix: 0.4,
       breath: { rate: 5, inhale: 0.4 },
-      spatial: { enabled: true, trajectory: 'orbit', palette: 'bowl', count: 2, gain: 0.7, speed: 0.04, distance: 1.5, room: 0.45, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'orbit', palette: 'bowl', count: 2, gain: 0.7, speed: 0.04, distance: 1.5, room: 0.45 },
       pac: { enabled: true, gain: 0.35, harmonics: 0.5, theta: 3.0, gamma: 36, depth: 0.3, breath: 0.85, baseFreq: 108 },
       ganzfeld: { enabled: true, texture: 'surf', gain: 0.32, color: 0.75, sweep: 0.5 },
       sub: { enabled: true, pattern: 'heartbeat', gain: 0.6, freq: 30, pulse: 0.85, warmth: 0.65 }
@@ -89,7 +89,7 @@
       mechTitle: 'Auditory Ganzfeld',
       mechText: 'A uniform, featureless sound field (usually paired with diffuse light over closed eyes) removes external anchors; after a few minutes many people notice spontaneous imagery.',
       reverbMix: 0.7,
-      spatial: { enabled: true, trajectory: 'vertical', palette: 'choir', count: 2, gain: 0.35, speed: 0.03, distance: 2.4, room: 0.65, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'vertical', palette: 'choir', count: 2, gain: 0.35, speed: 0.03, distance: 2.4, room: 0.65 },
       pac: { enabled: true, gain: 0.35, harmonics: 0.3, theta: 4.5, gamma: 40, depth: 0.4, breath: 0.6, baseFreq: 108 },
       ganzfeld: { enabled: true, texture: 'cavern', gain: 0.7, color: 0.65, sweep: 0.8 }
     },
@@ -99,7 +99,7 @@
       mechTitle: 'Rhythmic drumming at ≈ 4-4.5 beats per second',
       mechText: 'Steady drumming in this range is used in many traditions for "journeying". The drum alternates slightly left and right in front of you; the rattle answers from the other side.',
       reverbMix: 0.38,
-      spatial: { enabled: true, trajectory: 'sphere', palette: 'choir', count: 2, gain: 0.45, speed: 0.04, distance: 2.4, room: 0.5, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'sphere', palette: 'choir', count: 2, gain: 0.45, speed: 0.04, distance: 2.4, room: 0.5 },
       asmr: { enabled: true, palette: 'shamanic', gain: 0.6, proximity: 0.5, rate: 4.5, resonance: 0.55 },
       sub: { enabled: true, pattern: 'breath', gain: 0.3, freq: 27, warmth: 0.5 }
     },
@@ -109,7 +109,7 @@
       mechTitle: 'Near-field binaural cues',
       mechText: 'Sources close to one ear produce a large level difference between the ears even at low frequencies, which is heard as intimate and very close; many people feel tingles along the scalp.',
       reverbMix: 0.2,
-      spatial: { enabled: true, trajectory: 'orbit', palette: 'water', count: 2, gain: 0.6, speed: 0.07, distance: 0.8, room: 0.2, cue: 1.0 },
+      spatial: { enabled: true, trajectory: 'orbit', palette: 'water', count: 2, gain: 0.6, speed: 0.07, distance: 0.8, room: 0.2 },
       asmr: { enabled: true, palette: 'whisper', gain: 0.55, proximity: 0.1, rate: 3, resonance: 0.6 }
     },
     locTest: {
@@ -118,7 +118,7 @@
       mechTitle: 'Check what you hear',
       mechText: 'The canvas shows where each burst is rendered. Left/right is easy for everyone; front/back and up/down depend on how well generic ear cues fit your own ears. If front and back are swapped, try raising the spectral cue strength or switching renderer.',
       reverbMix: 0.15,
-      spatial: { enabled: true, trajectory: 'test', palette: 'breath', count: 1, gain: 0.7, distance: 1.6, room: 0.4, cue: 1.2 }
+      spatial: { enabled: true, trajectory: 'test', palette: 'breath', count: 1, gain: 0.7, distance: 1.6, room: 0.4 }
     }
   };
 

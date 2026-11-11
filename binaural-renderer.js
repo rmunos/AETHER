@@ -21,7 +21,11 @@
  *     - an "interior" path (inside the head / body: diotic, dry) cross-faded per source;
  *     - a mono reverb send (late reverb = native ConvolverNode owned by the engine).
  *
- *  2. "hrtf" — the browser's measured-HRTF PannerNode, kept as a fallback and for A/B listening.
+ *  2. "measured" — the same worklet, but the head shadow, pinna and torso cues come from a measured ear model
+ *     (HUTUBS listeners or MIT KEMAR, see hrtf/): minimum-phase FIRs rebuilt in the browser from smoothed
+ *     directional transfer functions, bilinear interpolation on a 10° grid, cross-faded per 32-sample block;
+ *     interaural delay from the spherical-head model with the listener's fitted head radius.
+ *  3. "hrtf" — the browser's measured-HRTF PannerNode, kept as a fallback and for A/B listening.
  *
  * The worklet source is serialised with Function.prototype.toString() and loaded from a Blob URL, so the
  * renderer also works when index.html is opened from file://.
@@ -38,6 +42,7 @@
     const MAX_SOURCES = 12;
     const C = 343; // speed of sound, m/s
     const SUB = 32; // control-rate sub-block (samples)
+    const MAX_TAPS = 160; // measured-HRTF FIR length limit
     const BUF = 8192; // delay line per source (power of two)
     const MASK = BUF - 1;
     const PI = Math.PI;
@@ -142,6 +147,19 @@
         this.erLp = new Float64Array(2);
         this.silent = 1e9;
         this.snap = true;
+        // measured-HRTF state: input histories (double length, so the last taps are contiguous) and FIRs
+        this.xL = new Float32Array(2 * MAX_TAPS);
+        this.xR = new Float32Array(2 * MAX_TAPS);
+        this.xp = 0;
+        this.hCL = new Float32Array(MAX_TAPS);
+        this.hCR = new Float32Array(MAX_TAPS);
+        this.hPL = new Float32Array(MAX_TAPS);
+        this.hPR = new Float32Array(MAX_TAPS);
+        this.az = 0;
+        this.el = 0;
+        this.hAz = 1e9;
+        this.hEl = 1e9;
+        this.hSet = null;
       }
     }
 
@@ -173,14 +191,53 @@
           this.names.push(['x' + i, 'y' + i, 'z' + i, 'w' + i]);
           this.src.push(new Source());
         }
+        this.sets = {};
+        this.set = null; // active measured ear model (null = structural cues)
+        this.structRadius = this.cfg.headRadius;
         this._derive();
         this.port.onmessage = (e) => {
           const m = e.data || {};
           if (m.type === 'config' && m.cfg) {
             Object.assign(this.cfg, m.cfg);
+            if (!this.set) this.structRadius = this.cfg.headRadius;
             this._derive();
+          } else if (m.type === 'hrtf' && m.id && m.set) {
+            this.sets[m.id] = m.set;
+            if (this.set && this.setId === m.id) this._useSet(m.id); // rebuilt (e.g. new cue strength)
+          } else if (m.type === 'useHrtf') {
+            this._useSet(m.id);
           }
         };
+      }
+
+      _useSet(id) {
+        const set = id ? this.sets[id] : null;
+        this.set = set || null;
+        this.setId = set ? id : null;
+        this.cfg.headRadius = set && set.headRadius ? set.headRadius : this.structRadius;
+        this._derive();
+        for (const st of this.src) { st.hAz = 1e9; st.hSet = null; }
+      }
+
+      _interp(set, az, el, oL, oR) {
+        const T = set.taps;
+        let ef = (el - set.elMin) / set.elStep;
+        ef = ef < 0 ? 0 : ef > set.nEl - 1 ? set.nEl - 1 : ef;
+        const e0 = Math.min(set.nEl - 2, Math.floor(ef));
+        const te = ef - e0;
+        const af = ((((az % 360) + 360) % 360) / set.azStep);
+        const a0 = Math.floor(af) % set.nAz;
+        const ta = af - Math.floor(af);
+        const a1 = (a0 + 1) % set.nAz;
+        const w00 = (1 - te) * (1 - ta), w01 = (1 - te) * ta, w10 = te * (1 - ta), w11 = te * ta;
+        const n2 = 2 * T;
+        const i00 = (e0 * set.nAz + a0) * n2, i01 = (e0 * set.nAz + a1) * n2;
+        const i10 = ((e0 + 1) * set.nAz + a0) * n2, i11 = ((e0 + 1) * set.nAz + a1) * n2;
+        const d = set.data;
+        for (let k = 0; k < T; k++) {
+          oL[k] = w00 * d[i00 + k] + w01 * d[i01 + k] + w10 * d[i10 + k] + w11 * d[i11 + k];
+          oR[k] = w00 * d[i00 + T + k] + w01 * d[i01 + T + k] + w10 * d[i10 + T + k] + w11 * d[i11 + T + k];
+        }
       }
 
       _derive() {
@@ -208,6 +265,10 @@
         const d = Math.sqrt(x * x + y * y + z * z);
         const dc = d > 0.05 ? d : 0.05;
         const ux = x / dc, uy = y / dc, uz = z / dc;
+        if (d > 0.02) {
+          st.az = (Math.atan2(-ux, -uz) * 180) / PI; // SOFA convention: counter-clockwise, 90 = left
+          st.el = (Math.asin(clamp(uy, -1, 1)) * 180) / PI;
+        }
 
         // ---- interaural cues (direct path)
         const thR = Math.acos(clamp(ux, -1, 1));
@@ -370,8 +431,12 @@
         const HK = this.HK, HB = this.HB, HN = this.HN, HA1 = this.HA1;
         const c = this.cfg;
         const erOn = c.er > 0.0005;
-        const eqOn = c.cue > 0.0005 || c.pinna > 0.0005;
+        const set = this.set;
+        const eqOn = !set && (c.cue > 0.0005 || c.pinna > 0.0005);
         const erK = this.erLpK;
+        const T = set ? set.taps : 0;
+        const xL = st.xL, xR = st.xR, hCL = st.hCL, hCR = st.hCR, hPL = st.hPL, hPR = st.hPR;
+        let xp = st.xp;
         let w = st.w;
         for (let s0 = 0; s0 < N; s0 += SUB) {
           const s1 = s0 + SUB < N ? s0 + SUB : N;
@@ -383,7 +448,25 @@
           const wv = pw.length > 1 ? pw[idx] : pw[0];
           this._controls(x, y, z, wv, tgt, st);
           if (eqOn) this._eqCoeffs(st);
-          if (st.snap) { cur.set(tgt); st.snap = false; }
+          let xf = false;
+          if (set) {
+            if (st.hSet !== set) {
+              this._interp(set, st.az, st.el, hCL, hCR);
+              hPL.set(hCL); hPR.set(hCR);
+              st.hSet = set; st.hAz = st.az; st.hEl = st.el;
+              if (st.xp >= T) { st.xp = 0; xp = 0; }
+            } else if (Math.abs(st.az - st.hAz) > 0.05 || Math.abs(st.el - st.hEl) > 0.05) {
+              hPL.set(hCL); hPR.set(hCR);
+              this._interp(set, st.az, st.el, hCL, hCR);
+              st.hAz = st.az; st.hEl = st.el;
+              xf = true;
+            }
+          }
+          if (st.snap) {
+            cur.set(tgt);
+            st.snap = false;
+            if (set) { hPL.set(hCL); hPR.set(hCR); xf = false; }
+          }
           const inv = 1 / len;
           for (let k = 0; k < NCTRL; k++) stp[k] = (tgt[k] - cur[k]) * inv;
           for (let j = s0; j < s1; j++) {
@@ -404,18 +487,46 @@
             const dL = cur[K_DL], dR = cur[K_DR];
             let sL = rdCubic(buf, w, dL);
             let sR = rdCubic(buf, w, dR);
-            const tg = cur[K_TG];
-            if (tg > 1e-4) {
-              const td = cur[K_TD];
-              sL += tg * rdLin(buf, w, dL + td);
-              sR += tg * rdLin(buf, w, dR + td);
+            let yL, yR;
+            if (set) {
+              // measured ear model: per-ear minimum-phase FIR on the delayed signal (cross-faded on changes)
+              xL[xp] = sL; xL[xp + T] = sL;
+              xR[xp] = sR; xR[xp + T] = sR;
+              const b = xp + T;
+              let cL = 0, cR = 0;
+              if (xf) {
+                let pL = 0, pR = 0;
+                for (let k = 0; k < T; k++) {
+                  const vl = xL[b - k], vr = xR[b - k];
+                  cL += hCL[k] * vl; pL += hPL[k] * vl;
+                  cR += hCR[k] * vr; pR += hPR[k] * vr;
+                }
+                const al = (j - s0 + 1) / len;
+                cL = pL + (cL - pL) * al;
+                cR = pR + (cR - pR) * al;
+              } else {
+                for (let k = 0; k < T; k++) {
+                  cL += hCL[k] * xL[b - k];
+                  cR += hCR[k] * xR[b - k];
+                }
+              }
+              xp = xp + 1 === T ? 0 : xp + 1;
+              yL = cL;
+              yR = cR;
+            } else {
+              const tg = cur[K_TG];
+              if (tg > 1e-4) {
+                const td = cur[K_TD];
+                sL += tg * rdLin(buf, w, dL + td);
+                sR += tg * rdLin(buf, w, dR + td);
+              }
+              // head shadow: H(s) = (alpha s + beta) / (s + beta), beta = 2c/a (bilinear transform)
+              const aL = cur[K_HL], aR = cur[K_HR];
+              yL = (aL * HK + HB) * HN * sL + (HB - aL * HK) * HN * hs[0] - HA1 * hs[1];
+              hs[0] = sL; hs[1] = yL;
+              yR = (aR * HK + HB) * HN * sR + (HB - aR * HK) * HN * hs[2] - HA1 * hs[3];
+              hs[2] = sR; hs[3] = yR;
             }
-            // head shadow: H(s) = (alpha s + beta) / (s + beta), beta = 2c/a (bilinear transform)
-            const aL = cur[K_HL], aR = cur[K_HR];
-            const yL = (aL * HK + HB) * HN * sL + (HB - aL * HK) * HN * hs[0] - HA1 * hs[1];
-            hs[0] = sL; hs[1] = yL;
-            const yR = (aR * HK + HB) * HN * sR + (HB - aR * HK) * HN * hs[2] - HA1 * hs[3];
-            hs[2] = sR; hs[3] = yR;
             const ext = cur[K_EXT];
             let outLv = yL * cur[K_AL] * ext;
             let outRv = yR * cur[K_AR] * ext;
@@ -448,10 +559,159 @@
           }
         }
         st.w = w;
+        st.xp = xp;
       }
     }
 
     registerProcessor('aether-binaural', AetherBinauralProcessor);
+  }
+
+  // ===========================================================================================
+  // Measured ear models: decode the compact magnitude sets of hrtf/*.js into minimum-phase FIRs
+  // ===========================================================================================
+  const MEASURED_GAIN = 0.78; // level match with the structural model (measured by tests/test-measured.js)
+
+  function fftInPlace(re, im, inverse) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        let t = re[i]; re[i] = re[j]; re[j] = t;
+        t = im[i]; im[i] = im[j]; im[j] = t;
+      }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = ((inverse ? 2 : -2) * Math.PI) / len;
+      const wr = Math.cos(ang), wi = Math.sin(ang);
+      const h = len >> 1;
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let j = 0; j < h; j++) {
+          const a = i + j, b = a + h;
+          const vr = re[b] * cr - im[b] * ci;
+          const vi = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - vr; im[b] = im[a] - vi;
+          re[a] += vr; im[a] += vi;
+          const t = cr * wr - ci * wi;
+          ci = cr * wi + ci * wr;
+          cr = t;
+        }
+      }
+    }
+    if (inverse) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+
+  function decodeBase64(b64) {
+    if (typeof atob === 'function') {
+      const bin = atob(b64);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+    return new Uint8Array(Buffer.from(b64, 'base64'));
+  }
+
+  /**
+   * Build minimum-phase FIRs at sample rate fs from a compact ear model.
+   * k scales the fine spectral structure (deviation from a ~1-octave smoothed curve): 1 = as measured,
+   * > 1 = exaggerated pinna cues (spectral contrast enhancement), < 1 = flattened. Broad level differences
+   * (head shadow, interaural level difference) stay as measured.
+   */
+  function buildHrirSet(raw, fs, k = 1) {
+    const g = raw.grid;
+    const nb = raw.bands.n;
+    const nDir = g.nEl * g.nAz;
+    if (!raw._q) raw._q = decodeBase64(raw.data);
+    const q = raw._q;
+    const N = 512;
+    const half = N / 2;
+    const taps = Math.min(160, Math.max(48, Math.round(0.00145 * fs)));
+    const fade = Math.max(4, Math.round(taps * 0.25));
+    const lfMin = Math.log2(raw.bands.fmin), lfMax = Math.log2(raw.bands.fmax);
+    const binPos = new Float64Array(half + 1); // fractional band index of each FFT bin
+    for (let b = 0; b <= half; b++) {
+      const f = Math.max(1, (b * fs) / N);
+      binPos[b] = Math.max(0, Math.min(nb - 1, ((Math.log2(f) - lfMin) / (lfMax - lfMin)) * (nb - 1)));
+    }
+    const out = new Float32Array(nDir * 2 * taps);
+    const db = new Float64Array(nb);
+    const sm = new Float64Array(nb);
+    const re = new Float64Array(N), im = new Float64Array(N);
+    let power = 0;
+    const R = 5; // +-5 bands ~ +-0.5 octave
+    for (let d = 0; d < nDir; d++) {
+      for (let ear = 0; ear < 2; ear++) {
+        const off = (d * 2 + ear) * nb;
+        for (let i = 0; i < nb; i++) db[i] = raw.q.offset + q[off + i] * raw.q.step;
+        if (k !== 1) {
+          for (let i = 0; i < nb; i++) {
+            let acc = 0, wsum = 0;
+            for (let j = Math.max(0, i - R); j <= Math.min(nb - 1, i + R); j++) {
+              const wt = 1 - Math.abs(j - i) / (R + 1);
+              acc += wt * db[j];
+              wsum += wt;
+            }
+            sm[i] = acc / wsum;
+          }
+          for (let i = 0; i < nb; i++) db[i] = sm[i] + k * (db[i] - sm[i]);
+        }
+        for (let b = 0; b <= half; b++) {
+          const x = binPos[b];
+          const i0 = Math.min(nb - 2, Math.floor(x));
+          const t = x - i0;
+          const v = ((db[i0] * (1 - t) + db[i0 + 1] * t) * Math.LN10) / 20; // natural log of the magnitude
+          re[b] = v; im[b] = 0;
+          if (b > 0 && b < half) { re[N - b] = v; im[N - b] = 0; }
+        }
+        // real cepstrum, folded to the causal side -> minimum-phase log spectrum -> impulse response
+        fftInPlace(re, im, true);
+        for (let n = 1; n < half; n++) { re[n] *= 2; im[n] = 0; }
+        for (let n = half + 1; n < N; n++) { re[n] = 0; im[n] = 0; }
+        im[0] = 0; im[half] = 0;
+        fftInPlace(re, im, false);
+        for (let b = 0; b < N; b++) {
+          const m = Math.exp(re[b]);
+          const ph = im[b];
+          re[b] = m * Math.cos(ph);
+          im[b] = m * Math.sin(ph);
+        }
+        fftInPlace(re, im, true);
+        const o = (d * 2 + ear) * taps;
+        for (let n = 0; n < taps; n++) {
+          let v = re[n];
+          if (n >= taps - fade) v *= 0.5 + 0.5 * Math.cos((Math.PI * (n - (taps - fade) + 1)) / (fade + 1));
+          out[o + n] = v;
+          power += v * v;
+        }
+      }
+    }
+    // equal average power over all directions and both ears, times the level-match gain
+    const scale = MEASURED_GAIN / Math.sqrt(power / (nDir * 2));
+    for (let i = 0; i < out.length; i++) out[i] *= scale;
+    return { taps, nAz: g.nAz, nEl: g.nEl, azStep: g.azStep, elMin: g.elMin, elStep: g.elStep, headRadius: raw.headRadius, data: out };
+  }
+
+  const scriptCache = {};
+  function loadScript(src) {
+    if (!scriptCache[src]) {
+      scriptCache[src] = new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        el.src = src;
+        el.onload = () => resolve();
+        el.onerror = () => { delete scriptCache[src]; reject(new Error('cannot load ' + src)); };
+        document.head.appendChild(el);
+      });
+    }
+    return scriptCache[src];
+  }
+
+  async function loadEarModelData(id, base = 'hrtf/') {
+    global.AETHER_HRTF = global.AETHER_HRTF || {};
+    if (!global.AETHER_HRTF[id]) await loadScript(`${base}${id}.js`);
+    if (!global.AETHER_HRTF[id]) throw new Error('ear model not found: ' + id);
+    return global.AETHER_HRTF[id];
   }
 
   // ===========================================================================================
@@ -482,6 +742,62 @@
       this.hrtf = null;
       this.mode = 'none';
       this.workletAvailable = false;
+      this.earModel = null; // id of the measured ear model used in 'measured' mode
+      this.earK = 1; // fine-structure scaling of the measured cues
+      this.builtKey = {}; // id -> 'fs:k' of the version sent to the worklet
+      this.loading = {};
+      this.base = opts.base || 'hrtf/';
+    }
+
+    /** Load (if needed), build at the context rate and send an ear model to the worklet. */
+    async prepareEarModel(id, k = this.earK) {
+      if (!this.workletAvailable) throw new Error('measured ear models need AudioWorklet');
+      const key = `${this.ctx.sampleRate}:${k.toFixed(3)}`;
+      if (this.builtKey[id] === key) return;
+      const pendingKey = id + '|' + key;
+      if (!this.loading[pendingKey]) {
+        this.loading[pendingKey] = (async () => {
+          const raw = await loadEarModelData(id, this.base);
+          const set = buildHrirSet(raw, this.ctx.sampleRate, k);
+          this.node.port.postMessage({ type: 'hrtf', id, set });
+          this.builtKey[id] = key;
+        })().finally(() => { delete this.loading[pendingKey]; });
+      }
+      await this.loading[pendingKey];
+    }
+
+    /** Use a measured ear model (id) or the structural model (null) inside the worklet. */
+    async useEarModel(id) {
+      if (id) await this.prepareEarModel(id);
+      if (this.node) this.node.port.postMessage({ type: 'useHrtf', id: id || null });
+      if (id) this.earModel = id;
+      this.activeEar = id || null;
+    }
+
+    /** Change the cue strength of the measured model (rebuilds the active set). */
+    async setEarCue(k) {
+      this.earK = Math.max(0, Math.min(2.5, k));
+      if (this.mode === 'measured' && this.earModel) await this.prepareEarModel(this.earModel, this.earK);
+    }
+
+    /** Jump slot i to a position at audio time t (no glide), e.g. for test bursts. */
+    jumpTo(i, x, y, z, w = 0, t) {
+      const s = this.slots[i];
+      if (!s) return;
+      const at = Math.max(this.ctx.currentTime, t || 0);
+      if (this.mode !== 'hrtf' && this.params[i]) {
+        const p = this.params[i];
+        p.x.setValueAtTime(x, at); p.y.setValueAtTime(y, at); p.z.setValueAtTime(z, at); p.w.setValueAtTime(w, at);
+      } else if (this.hrtf) {
+        const pn = this.hrtf.slots[i].panner;
+        if (pn.positionX) { pn.positionX.setValueAtTime(x, at); pn.positionY.setValueAtTime(y, at); pn.positionZ.setValueAtTime(z, at); }
+        else if (pn.setPosition) pn.setPosition(x, y, z);
+        this.hrtf.slots[i].extG.gain.setValueAtTime(1, at);
+        this.hrtf.slots[i].intG.gain.setValueAtTime(0, at);
+      }
+      s.primed = true;
+      s.lastT = at;
+      s.last = { x, y, z, w };
     }
 
     async init() {
@@ -553,13 +869,17 @@
     }
 
     setMode(mode) {
-      if (mode === 'structural' && !this.workletAvailable) mode = 'hrtf';
-      if (mode !== 'structural' && mode !== 'hrtf') mode = this.workletAvailable ? 'structural' : 'hrtf';
+      if ((mode === 'structural' || mode === 'measured') && !this.workletAvailable) mode = 'hrtf';
+      if (mode === 'measured' && !this.earModel) mode = 'structural';
+      if (mode !== 'structural' && mode !== 'hrtf' && mode !== 'measured') mode = this.workletAvailable ? 'structural' : 'hrtf';
+      const isWorklet = (m) => m === 'structural' || m === 'measured';
+      if (isWorklet(mode)) this.useEarModel(mode === 'measured' ? this.earModel : null).catch((e) => console.warn('[AETHER] ear model', e));
       if (mode === this.mode) return this.mode;
+      if (isWorklet(mode) && isWorklet(this.mode)) { this.mode = mode; return mode; }
       if (mode === 'hrtf') this._buildHrtf();
       this.slots.forEach((s, i) => {
         try { s.input.disconnect(); } catch (_) { /* not connected */ }
-        if (mode === 'structural') {
+        if (isWorklet(mode)) {
           s.input.connect(this.node, 0, i);
         } else {
           const h = this.hrtf.slots[i];
@@ -607,7 +927,7 @@
           prm.linearRampToValueAtTime(v, t);
         }
       };
-      if (this.mode === 'structural' && this.params[i]) {
+      if ((this.mode === 'structural' || this.mode === 'measured') && this.params[i]) {
         const p = this.params[i];
         ramp(p.x, x); ramp(p.y, y); ramp(p.z, z); ramp(p.w, Math.max(0, Math.min(1, w)));
       } else if (this.mode === 'hrtf' && this.hrtf) {
@@ -638,6 +958,9 @@
     BinauralRenderer,
     MAX_SOURCES,
     DEFAULT_CFG,
+    MEASURED_GAIN,
+    buildHrirSet,
+    loadEarModelData,
     workletModule: aetherBinauralWorklet
   };
 })(typeof window !== 'undefined' ? window : globalThis);
