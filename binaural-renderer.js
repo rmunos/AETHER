@@ -17,7 +17,9 @@
  *     - shoulder reflection for raised sources (comb below 2 kHz that depends on elevation);
  *     - direction-dependent "directional band" EQ (Blauert): front ≈ 4 kHz, overhead ≈ 8 kHz, rear ≈ 1 kHz
  *       plus a rear pinna shadow and a torso shadow for low sources, scaled by an adjustable cue strength;
- *     - six first-order image-source early reflections (shoebox room), each with its own ITD / ILD;
+ *     - six first-order image-source early reflections (shoebox room), each with its own ITD / ILD, then
+ *       diffused per ear by four all-pass filters (smears each reflection over ~20 ms, so moving sources
+ *       do not get the sweeping comb-filter colour of discrete echoes, i.e. a metallic flanging);
  *     - an "interior" path (inside the head / body: diotic, dry) cross-faded per source;
  *     - a mono reverb send (late reverb = native ConvolverNode owned by the engine).
  *
@@ -43,6 +45,10 @@
     const C = 343; // speed of sound, m/s
     const SUB = 32; // control-rate sub-block (samples)
     const MAX_TAPS = 160; // measured-HRTF FIR length limit
+    // early-reflection diffusers: four all-pass filters per ear, mutually prime delays (samples at 44.1 kHz)
+    const AP_DELAYS = [[113, 199, 307, 421], [127, 181, 331, 409]];
+    const AP_G = 0.55;
+    const SHOULDER_LP_HZ = 3000; // the shoulder reflection only carries low-frequency elevation cues
     const BUF = 8192; // delay line per source (power of two)
     const MASK = BUF - 1;
     const PI = Math.PI;
@@ -145,6 +151,7 @@
         this.eqState = new Float64Array(2 * N_EQ);
         this.hs = new Float64Array(4);
         this.erLp = new Float64Array(2);
+        this.shLp = new Float64Array(2);
         this.silent = 1e9;
         this.snap = true;
         // measured-HRTF state: input histories (double length, so the last taps are contiguous) and FIRs
@@ -251,6 +258,14 @@
         this.room = { xl: -3.2 * s, xr: 3.2 * s, yf: -2.6 * s, yc: 2.0 * s, zf: -3.6 * s, zb: 3.0 * s };
         this.refl = [0.55, 0.7, 0.65, 0.65, 0.65, 0.65]; // floor, ceiling, left, right, front, back
         this.erLpK = 1 - Math.exp((-2 * PI * 5200) / fs);
+        this.shK = 1 - Math.exp((-2 * PI * SHOULDER_LP_HZ) / fs);
+        if (!this.ap) {
+          this.ap = AP_DELAYS.map((ear) => ear.map((d) => {
+            const D = Math.max(8, Math.round((d * fs) / 44100));
+            return { D, buf: new Float32Array(D), p: 0 };
+          }));
+          this.erBus = [new Float32Array(128), new Float32Array(128)];
+        }
         this.eqTrig = EQ_DEFS.map((e) => {
           const w0 = (2 * PI * Math.min(e.f, fs * 0.45)) / fs;
           return { type: e.type, cw: Math.cos(w0), sw: Math.sin(w0), q: e.q, dyn: !!e.dyn };
@@ -359,7 +374,7 @@
         g[3] = cue * (-4.0 * backW - 9.0 * downW);
         g[4] = n1db;
         fq[4] = n1;
-        g[5] = n1db * 0.7 * (1 - smooth(20, 55, polDeg));
+        g[5] = n1db * 0.45 * (1 - smooth(20, 55, polDeg));
         fq[5] = Math.min(n1 * N2_RATIO, 0.45 * fs);
       }
 
@@ -405,6 +420,11 @@
         oL.fill(0);
         if (oR !== oL) oR.fill(0);
         if (send) send.fill(0);
+        if (this.erBus[0].length !== N) this.erBus = [new Float32Array(N), new Float32Array(N)];
+        const busL = this.erBus[0], busR = this.erBus[1];
+        busL.fill(0);
+        busR.fill(0);
+        this.erUsed = false;
         for (let i = 0; i < this.n; i++) {
           const st = this.src[i];
           const chans = inputs[i];
@@ -420,14 +440,39 @@
           if (st.silent > BUF) { st.snap = true; continue; } // delay line fully flushed: skip
           this._render(st, i, active ? inp : null, parameters, oL, oR, send, N);
         }
+        if (this.erUsed || this.erTail > 0) {
+          this.erTail = this.erUsed ? 4096 : this.erTail - N; // let the diffusers ring out
+          this._diffuse(busL, 0, N);
+          this._diffuse(busR, 1, N);
+          for (let j = 0; j < N; j++) { oL[j] += busL[j]; oR[j] += busR[j]; }
+        }
         return true;
+      }
+
+      _diffuse(x, ear, N) {
+        const g = AP_G;
+        for (const ap of this.ap[ear]) {
+          const buf = ap.buf, D = ap.D;
+          let p = ap.p;
+          for (let j = 0; j < N; j++) {
+            const vd = buf[p];
+            const v = x[j] + g * vd; // v[n] = x[n] + g v[n-D]
+            x[j] = vd - g * v; // y[n] = -g v[n] + v[n-D]  (all-pass)
+            buf[p] = v;
+            p = p + 1 === D ? 0 : p + 1;
+          }
+          ap.p = p;
+        }
       }
 
       _render(st, i, inp, P, oL, oR, send, N) {
         const nm = this.names[i];
         const px = P[nm[0]], py = P[nm[1]], pz = P[nm[2]], pw = P[nm[3]];
         const cur = st.cur, tgt = st.tgt, stp = st.step, buf = st.buf;
-        const cf = st.eqCoef, es = st.eqState, hs = st.hs, el = st.erLp;
+        const cf = st.eqCoef, es = st.eqState, hs = st.hs, el = st.erLp, sh = st.shLp;
+        const shK = this.shK;
+        const busL = this.erBus[0], busR = this.erBus[1];
+        if (this.cfg.er > 0.0005) this.erUsed = true;
         const HK = this.HK, HB = this.HB, HN = this.HN, HA1 = this.HA1;
         const c = this.cfg;
         const erOn = c.er > 0.0005;
@@ -517,8 +562,10 @@
               const tg = cur[K_TG];
               if (tg > 1e-4) {
                 const td = cur[K_TD];
-                sL += tg * rdLin(buf, w, dL + td);
-                sR += tg * rdLin(buf, w, dR + td);
+                sh[0] += shK * (rdLin(buf, w, dL + td) - sh[0]);
+                sh[1] += shK * (rdLin(buf, w, dR + td) - sh[1]);
+                sL += tg * sh[0];
+                sR += tg * sh[1];
               }
               // head shadow: H(s) = (alpha s + beta) / (s + beta), beta = 2c/a (bilinear transform)
               const aL = cur[K_HL], aR = cur[K_HR];
@@ -541,8 +588,8 @@
               }
               el[0] += erK * (eL - el[0]);
               el[1] += erK * (eR - el[1]);
-              outLv += el[0] * ext;
-              outRv += el[1] * ext;
+              busL[j] += el[0] * ext; // diffused after all sources are summed (see process)
+              busR[j] += el[1] * ext;
             }
 
             // interior path (time-aligned with the direct path, so cross-fades do not comb-filter)

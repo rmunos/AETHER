@@ -10,11 +10,11 @@
       title: '1. REBAL energy balloon',
       desc: 'Gateway REBAL: fountain out of the crown, down around you, in at the soles; then spiral, then the sustained balloon. Surf and a 4 Hz binaural beat underneath.',
       mechTitle: 'REBAL (Resonant Energy Balloon), Monroe Gateway Experience, Discovery #3',
-      mechText: 'Breathe with the sound. INHALE: the energy rises inside you from the soles to the crown (heard inside the head, getting brighter and higher). EXHALE: it leaves the crown upwards like a fountain, arcs over and flows down around the outside of your body, curls under the feet and re-enters through the soles. After six breaths the flow becomes a spiral that winds down around you and coils back up inside; then the balloon is sustained. Height is carried by the overtone pitch and brightness, left/right and front/back by the binaural renderer.',
+      mechText: 'Breathe with the sound. INHALE: the energy rises inside you from the soles to the crown (heard inside the head, getting brighter and higher). EXHALE: it leaves the crown upwards like a fountain, arcs over and flows down around the outside of your body, curls under the feet and re-enters through the soles. After six breaths the flow becomes a spiral that winds down around you and coils back up inside; then the balloon is sustained. Height is carried by the notes of the chord and the vowel of the voices (low and dark under the feet, high and open above the head), left/right and front/back by the binaural renderer.',
       reverbMix: 0.32,
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
       spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'breath', count: 4, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, fountainBreaths: 6, spiralBreaths: 6 },
-      pac: { enabled: true, gain: 0.3, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0.25, breath: 0.7, baseFreq: 108 },
+      pac: { enabled: true, gain: 0.3, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0, breath: 0.7, baseFreq: 108 },
       ganzfeld: { enabled: true, texture: 'surf', gain: 0.28, color: 0.6, sweep: 0.55 },
       sub: { enabled: true, pattern: 'breath', gain: 0.3, freq: 27, warmth: 0.5 }
     },
@@ -22,16 +22,16 @@
       title: '2. REBAL spiral, resonant voices',
       desc: 'Six voice-like streams wind down around you and coil back up inside, with a vowel that opens as they rise. Slower breathing (5 / min).',
       mechTitle: 'Spiral REBAL with resonant voices',
-      mechText: 'The resonant voices recall the Gateway "resonant tuning" hum. Their vowel moves from "oo" (low, under the feet) through "ah" (ear level) to "ee" (above the head), a height cue that works for most listeners even when pinna cues do not.',
+      mechText: 'The resonant voices recall the Gateway "resonant tuning" hum. Their vowel moves from "oo" (low, under the feet) through "ah" (ear level) to an open "ae" (above the head) while they climb through the notes of one chord, a height cue that works for most listeners even when pinna cues do not.',
       reverbMix: 0.42,
       breath: { rate: 5, inhale: 0.42, holdIn: 1, holdOut: 0 },
       spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'spiral', palette: 'choir', count: 6, gain: 0.85, distance: 2.1, turns: 1.5, room: 0.55 },
-      pac: { enabled: true, gain: 0.25, harmonics: 0.4, theta: 5.0, gamma: 40, depth: 0.2, breath: 0.8, baseFreq: 108 },
+      pac: { enabled: true, gain: 0.25, harmonics: 0.4, theta: 5.0, gamma: 40, depth: 0, breath: 0.8, baseFreq: 108 },
       sub: { enabled: true, pattern: 'breath', gain: 0.32, freq: 27, warmth: 0.5 }
     },
     surfBowls: {
       title: '3. Breath-paced surf & bowls',
-      desc: 'Ocean surf breaking once per breath, singing bowls wandering slowly around you, a soft heartbeat.',
+      desc: 'Ocean surf breaking once per breath, warm bowls wandering slowly around you, a soft heartbeat.',
       mechTitle: 'Slow paced breathing (≈ 6 breaths / min)',
       mechText: 'Breathing at about six breaths per minute with a longer exhale is the classic "resonance" breathing rate. The surf draws back on the inhale and breaks on the exhale, so you can follow it without counting.',
       reverbMix: 0.4,
@@ -63,7 +63,7 @@
     },
     horizon: {
       title: '6. Endless horizon',
-      desc: 'An endlessly rising Shepard–Risset glissando, crystal chimes far away, a slow pulse.',
+      desc: 'An endlessly rising Shepard–Risset glissando, soft chimes far away, a slow pulse.',
       mechTitle: 'Shepard–Risset paradox',
       mechText: 'Octave-spaced voices glide upwards forever under a fixed spectral envelope, so the sound rises without arriving. Combined with distant, wandering chimes it opens a sense of space and suspends the feeling of linear time.',
       reverbMix: 0.65,
@@ -111,6 +111,18 @@
       reverbMix: 0.2,
       spatial: { enabled: true, trajectory: 'orbit', palette: 'water', count: 2, gain: 0.6, speed: 0.07, distance: 0.8, room: 0.2 },
       asmr: { enabled: true, palette: 'whisper', gain: 0.55, proximity: 0.1, rate: 3, resonance: 0.6 }
+    },
+    rebalHarp: {
+      title: '12. REBAL with harp',
+      desc: 'Harp notes trace the fountain and the spiral: rising arpeggios on the inhale, falling ones on the exhale. Every note belongs to one chord.',
+      mechTitle: 'REBAL traced by harp arpeggios',
+      mechText: 'Each stream plays harp notes along its path. Clear note onsets make the streams easy to follow in space, and all notes are harmonics of the same fundamental, so whatever the streams do together stays consonant. Breathe with the sound: up through the body on the inhale, out of the crown and down around you on the exhale.',
+      reverbMix: 0.38,
+      breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'harp', count: 4, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, fountainBreaths: 6, spiralBreaths: 6 },
+      pac: { enabled: true, gain: 0.22, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0, breath: 0.7, baseFreq: 108 },
+      ganzfeld: { enabled: true, texture: 'surf', gain: 0.22, color: 0.6, sweep: 0.5 },
+      sub: { enabled: true, pattern: 'breath', gain: 0.25, freq: 27, warmth: 0.5 }
     },
     locTest: {
       title: '11. Localisation check',

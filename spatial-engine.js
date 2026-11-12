@@ -59,11 +59,15 @@
   const SEG_TIME = [1.0, 1.0, 1.05, 1.05, 1.0, 1.0, 1.0, 1.0, 0.95, 0.85, 0.6]; // relative time per segment
   const BASE_RADIUS = 1.9;
 
-  // Musical material: stream roots form an open major chord over the tonal centre
-  const STREAM_RATIOS = [1, 1.5, 2, 2.5, 3, 4];
-  const PENTA = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2]; // just pentatonic (+ octave)
+  // Musical material: every pitch is a harmonic of (tonal centre / 2), without the 7th, 9th, 11th...
+  // harmonics, so any combination of notes is consonant (octaves, fifths, fourths, thirds, sixths).
+  // Height selects the position on this ladder: low under the feet, high above the head.
+  const LADDER = [2, 3, 4, 5, 6, 8, 10, 12, 16];
+  const VOICE_OFFSETS = [0, 2, 1, 3, 4, 5]; // ladder offset of each stream: root, octave, fifth, tenth, ...
+  // Vowels for the voices (F1, F2, F3 in Hz): "oo" under the feet -> "oh" -> "ah" -> "ae" above the head
+  const VOWELS = [[300, 870, 2240], [500, 1000, 2500], [730, 1090, 2440], [660, 1700, 2400]];
 
-  const PALETTES = ['breath', 'choir', 'water', 'bowl', 'chimes'];
+  const PALETTES = ['breath', 'choir', 'harp', 'water', 'bowl', 'chimes'];
   const TRAJECTORIES = ['rebal', 'orbit', 'vertical', 'sphere', 'test', 'manual'];
   const REBAL_MODES = ['program', 'fountain', 'spiral', 'balloon'];
   const PALETTE_ALIASES = { energy: 'breath', rebal: 'breath', drops: 'water', water_drops: 'water', whisper: 'breath', crackle: 'chimes', tapping: 'chimes' };
@@ -322,7 +326,7 @@
       this.slots = [];
       for (let i = 0; i < MAX_STREAMS; i++) this.slots.push(i); // renderer slots 0..5
       this.noiseBuf = this._pinkNoise(6);
-      this.wave = this._harmonicWave(32, 1.0);
+      this.wave = this._voiceWave();
       this.streams = [];
       for (let k = 0; k < MAX_STREAMS; k++) this.streams.push(this._buildStream(k));
       this.telemetry.spatialVoices = this.streams.map((_, k) => ({ index: k, x: 0, y: 0, z: -1, w: 0, active: false, level: 0 }));
@@ -379,40 +383,40 @@
       return buf;
     }
 
-    _harmonicWave(n, tilt) {
+    /** Glottal-like source spectrum: all harmonics, falling ~8 dB per octave (warm, not buzzy). */
+    _voiceWave() {
+      const n = 48;
       const real = new Float32Array(n + 1);
       const imag = new Float32Array(n + 1);
-      for (let h = 1; h <= n; h++) imag[h] = 1 / Math.pow(h, tilt);
+      for (let h = 1; h <= n; h++) imag[h] = Math.pow(h, -1.35);
       return this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
     }
 
     // ---------------------------------------------------------------- per-stream generator graph
     _buildStream(k) {
       const ctx = this.ctx;
-      const s = { k, nextGrain: 0, lastPos: { x: 0, y: 0, z: -1.5, w: 0 } };
+      const s = { k, nextGrain: 0, lastPos: { x: 0, y: 0, z: -1.5, w: 0 }, note: -1, base: null, arp: 0 };
       s.out = ctx.createGain();
       s.out.gain.value = 0;
       s.out.connect(this.renderer.input(this.slots[k]));
 
-      // breath / air (pink noise through formant-like resonances)
+      // breath / air: pink noise through soft (low-Q) vowel resonances
       s.noise = ctx.createBufferSource();
       s.noise.buffer = this.noiseBuf;
       s.noise.loop = true;
       s.nHP = ctx.createBiquadFilter();
       s.nHP.type = 'highpass';
       s.nHP.frequency.value = 140;
-      s.nF1 = ctx.createBiquadFilter();
-      s.nF1.type = 'bandpass';
-      s.nF1.frequency.value = 600;
-      s.nF1.Q.value = 1.4;
-      s.nF2 = ctx.createBiquadFilter();
-      s.nF2.type = 'bandpass';
-      s.nF2.frequency.value = 1500;
-      s.nF2.Q.value = 2.0;
-      s.nAir = ctx.createBiquadFilter();
-      s.nAir.type = 'bandpass';
-      s.nAir.frequency.value = 4500;
-      s.nAir.Q.value = 0.8;
+      const bp = (f, q) => {
+        const b = ctx.createBiquadFilter();
+        b.type = 'bandpass';
+        b.frequency.value = f;
+        b.Q.value = q;
+        return b;
+      };
+      s.nF1 = bp(600, 1.2);
+      s.nF2 = bp(1500, 1.6);
+      s.nAir = bp(4500, 0.7);
       s.nG1 = ctx.createGain(); s.nG1.gain.value = 1.0;
       s.nG2 = ctx.createGain(); s.nG2.gain.value = 0.7;
       s.nG3 = ctx.createGain(); s.nG3.gain.value = 0.35;
@@ -424,53 +428,56 @@
       s.nHP.connect(s.nAir); s.nAir.connect(s.nG3); s.nG3.connect(s.breathVCA);
       s.breathVCA.connect(s.out);
 
-      // harmonic source (overtone selector / vowel formants / warm body)
-      s.osc = ctx.createOscillator();
-      s.osc.setPeriodicWave(this.wave);
-      s.osc.frequency.value = this._root() * STREAM_RATIOS[k];
-      s.vib = ctx.createOscillator();
-      s.vib.frequency.value = 4.6 + 0.37 * k;
-      s.vibDepth = ctx.createGain();
-      s.vibDepth.gain.value = 0;
-      s.vib.connect(s.vibDepth);
-      s.vibDepth.connect(s.osc.detune);
-      s.sel = ctx.createBiquadFilter(); // overtone selector (moves with height)
-      s.sel.type = 'bandpass';
-      s.sel.frequency.value = 800;
-      s.sel.Q.value = 11;
-      s.selG = ctx.createGain(); s.selG.gain.value = 0;
-      s.vF1 = ctx.createBiquadFilter();
-      s.vF1.type = 'bandpass';
-      s.vF1.frequency.value = 500;
-      s.vF1.Q.value = 5;
-      s.vF2 = ctx.createBiquadFilter();
-      s.vF2.type = 'bandpass';
-      s.vF2.frequency.value = 1200;
-      s.vF2.Q.value = 7;
-      s.vG1 = ctx.createGain(); s.vG1.gain.value = 0;
-      s.vG2 = ctx.createGain(); s.vG2.gain.value = 0;
-      s.body = ctx.createBiquadFilter();
-      s.body.type = 'lowpass';
-      s.body.frequency.value = 400;
-      s.body.Q.value = 0.5;
-      s.bodyG = ctx.createGain(); s.bodyG.gain.value = 0;
+      // warm voice: three slightly detuned voices (chorus), each with its own vibrato, through a
+      // low-pass and three vowel formants. The low harmonics are kept (no narrow band-pass), so the
+      // tone stays full and round at every height.
+      s.vMix = ctx.createGain();
+      s.vMix.gain.value = 0.42;
+      s.voices = [-7, 1, 8].map((cents, v) => {
+        const o = ctx.createOscillator();
+        o.setPeriodicWave(this.wave);
+        o.frequency.value = this._ladderHz(VOICE_OFFSETS[k]);
+        o.detune.value = cents + (Math.random() - 0.5) * 3;
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 4.3 + 0.55 * v + 0.17 * k + Math.random() * 0.3;
+        const depth = ctx.createGain();
+        depth.gain.value = 6;
+        lfo.connect(depth);
+        depth.connect(o.detune);
+        o.connect(s.vMix);
+        return { o, lfo, depth };
+      });
+      const filt = (type, f, q, gain) => {
+        const b = ctx.createBiquadFilter();
+        b.type = type;
+        b.frequency.value = f;
+        b.Q.value = q;
+        if (gain !== undefined) b.gain.value = gain;
+        return b;
+      };
+      s.vLP = filt('lowpass', 2000, 0.6);
+      s.vF1 = filt('peaking', 500, 3.0, 9);
+      s.vF2 = filt('peaking', 1100, 4.5, 8);
+      s.vF3 = filt('peaking', 2450, 5.0, 3);
+      s.vHP = filt('highpass', 85, 0.7);
       s.harmVCA = ctx.createGain();
       s.harmVCA.gain.value = 0;
-      s.osc.connect(s.sel); s.sel.connect(s.selG); s.selG.connect(s.harmVCA);
-      s.osc.connect(s.vF1); s.vF1.connect(s.vG1); s.vG1.connect(s.harmVCA);
-      s.osc.connect(s.vF2); s.vF2.connect(s.vG2); s.vG2.connect(s.harmVCA);
-      s.osc.connect(s.body); s.body.connect(s.bodyG); s.bodyG.connect(s.harmVCA);
+      s.vMix.connect(s.vLP);
+      s.vLP.connect(s.vF1);
+      s.vF1.connect(s.vF2);
+      s.vF2.connect(s.vF3);
+      s.vF3.connect(s.vHP);
+      s.vHP.connect(s.harmVCA);
       s.harmVCA.connect(s.out);
 
-      // one-shot grains (sparkles, droplets, strikes, bursts)
+      // one-shot grains (harp notes, droplets, bowl strikes, chimes, test bursts)
       s.grains = ctx.createGain();
       s.grains.gain.value = 1;
       s.grains.connect(s.out);
 
       const t = ctx.currentTime;
       s.noise.start(t, Math.random() * 5);
-      s.osc.start(t);
-      s.vib.start(t);
+      s.voices.forEach(({ o, lfo }) => { o.start(t); lfo.start(t); });
       return s;
     }
 
@@ -478,17 +485,21 @@
       return this.engine.params.root || 108;
     }
 
+    /** frequency of ladder position i (clamped) */
+    _ladderHz(i) {
+      const j = clamp(Math.round(i), 0, LADDER.length - 1);
+      return (this._root() / 2) * LADDER[j];
+    }
+
     _applyPalette(initial) {
       const p = this.params;
       const now = this.ctx.currentTime;
-      const choir = p.palette === 'choir';
-      this.streams.forEach((s, k) => {
+      const vib = p.palette === 'choir' ? 11 : p.palette === 'breath' ? 6 : 4;
+      this.streams.forEach((s) => {
         s.nextGrain = 0;
-        s.osc.frequency.setTargetAtTime(this._root() * STREAM_RATIOS[k], now, initial ? 0.001 : 0.08);
-        s.vibDepth.gain.setTargetAtTime(choir ? 9 : 2.5, now, 0.1);
-        s.sel.Q.setTargetAtTime(p.palette === 'breath' ? 11 : 6, now, 0.1);
-        s.vF1.Q.value = 5;
-        s.vF2.Q.value = 8;
+        s.note = -1; // forces the pitch to be set again (tonal centre may have changed)
+        s.base = null;
+        s.voices.forEach(({ depth }) => depth.gain.setTargetAtTime(vib, now, initial ? 0.001 : 0.1));
       });
     }
 
@@ -596,10 +607,27 @@
       return clamp((y + 2.1) / 3.5, 0, 1); // 0 under the feet .. 1 high above the head
     }
 
+    /** ladder position of stream k at brightness b (with hysteresis, so notes do not flicker) */
+    _noteIndex(s, k, b, n) {
+      let maxOff = 0;
+      for (let i = 0; i < n; i++) maxOff = Math.max(maxOff, VOICE_OFFSETS[i]);
+      const span = LADDER.length - 1 - maxOff;
+      const target = b * span;
+      if (s.base === null || Math.abs(target - s.base) > 0.65) s.base = clamp(Math.round(target), 0, span);
+      return s.base + VOICE_OFFSETS[k];
+    }
+
+    _vowel(b) {
+      const x = clamp(b, 0, 1) * (VOWELS.length - 1);
+      const i = Math.min(VOWELS.length - 2, Math.floor(x));
+      const t = x - i;
+      const e = t * t * (3 - 2 * t);
+      return [0, 1, 2].map((j) => VOWELS[i][j] + (VOWELS[i + 1][j] - VOWELS[i][j]) * e);
+    }
+
     _modulate(s, k, pos, res, t, gate) {
       const p = this.params;
       const pal = p.palette;
-      const root = this._root() * STREAM_RATIOS[k];
       const b = this._brightness(pos.y);
       const isRebal = p.trajectory === 'rebal';
       const st = pos.st || null;
@@ -613,18 +641,18 @@
         if (st.stage === 'exhale') {
           const a = (1 - Math.exp(-10 * st.p)) * (1 - 0.55 * st.p);
           breathLvl = balloon ? 0.32 + 0.12 * a : 0.15 + 0.7 * a;
-          harmLvl = 0.45 + 0.35 * (1 - st.p);
+          harmLvl = 0.5 + 0.35 * (1 - st.p);
         } else if (st.stage === 'inhale') {
           const a = Math.pow(Math.sin(Math.PI * st.p), 0.9);
           breathLvl = balloon ? 0.32 + 0.12 * a : 0.12 + 0.75 * a;
-          harmLvl = 0.3 + 0.7 * st.p;
+          harmLvl = 0.4 + 0.6 * st.p;
           bright = clamp(0.25 + 0.75 * st.p, b, 1);
         } else if (st.stage === 'holdIn') {
           breathLvl = 0.06;
           harmLvl = 0.85;
         } else {
           breathLvl = 0.04;
-          harmLvl = 0.25;
+          harmLvl = 0.3;
         }
         if (balloon) {
           const swell = 0.75 + 0.25 * this.breath.state(this.breath.phase).lung;
@@ -632,51 +660,44 @@
           harmLvl *= swell;
         }
       }
-      // palette-specific gains
-      let gBreath = 0, gSel = 0, gV1 = 0, gV2 = 0, gBody = 0;
-      if (pal === 'breath') {
-        gBreath = 0.55 * breathLvl;
-        gSel = 1.0;
-        gBody = 0.07;
-      } else if (pal === 'choir') {
-        gBreath = 0.12 * breathLvl;
-        gV1 = 0.9; gV2 = 0.55; gBody = 0.1;
-      } else if (pal === 'water') {
-        gBreath = 0.22 * (0.5 + 0.5 * breathLvl);
-        harmLvl = 0;
-      } else if (pal === 'bowl') {
-        gBreath = 0.03;
-        harmLvl = 0;
-      } else {
-        gBreath = 0.06 * breathLvl;
-        harmLvl = 0;
+      // palette mix: breath noise and warm voices
+      let gBreath = 0, gVoice = 0;
+      if (pal === 'breath') { gBreath = 0.5 * breathLvl; gVoice = 0.36 * harmLvl; }
+      else if (pal === 'choir') { gBreath = 0.1 * breathLvl; gVoice = 0.5 * harmLvl; }
+      else if (pal === 'harp') { gBreath = 0.22 * breathLvl; gVoice = 0.07 * harmLvl; }
+      else if (pal === 'water') { gBreath = 0.2 * (0.5 + 0.5 * breathLvl); }
+      else if (pal === 'bowl') { gBreath = 0.03; }
+      else { gBreath = 0.06 * breathLvl; }
+      if (p.trajectory === 'test') { gBreath = 0; gVoice = 0; } // localisation check: bursts only
+
+      // pitch: consonant ladder position from height; glide between notes like a singer
+      const idx = this._noteIndex(s, k, bright, res.n);
+      if (idx !== s.note) {
+        const f = this._ladderHz(idx);
+        const glide = s.note < 0 ? 0.001 : pal === 'choir' ? 0.09 : 0.06;
+        s.voices.forEach(({ o }) => o.frequency.setTargetAtTime(f, t, glide));
+        s.note = idx;
       }
-      // filters follow height: dark & low under the feet, bright & high above the head
+      // timbre follows height: dark "oo" under the feet, open "ah"/"ae" above the head
+      const [v1, v2, v3] = this._vowel(bright);
+      const lp = 900 + 4300 * Math.pow(bright, 1.2);
       const f1 = pal === 'water' ? 900 + 2600 * bright : 380 + 520 * bright;
       const f2 = pal === 'water' ? 2400 + 3000 * bright : 950 + 1750 * bright;
-      const fAir = 2400 + 5200 * bright;
-      const sel = clamp(180 * Math.pow(3600 / 180, bright), 120, 4200);
-      const selGain = gSel * 3.2 * Math.pow(Math.max(1, sel / root), 0.55);
-      // vowel: "oo" below -> "ah" at ear level -> "ee" above
-      const v1 = bright < 0.5 ? lerp(320, 720, bright * 2) : lerp(720, 330, (bright - 0.5) * 2);
-      const v2 = bright < 0.5 ? lerp(780, 1150, bright * 2) : lerp(1150, 2350, (bright - 0.5) * 2);
+      const fAir = 3000 + 5000 * bright;
 
       const R = (prm, v) => prm.linearRampToValueAtTime(v, t);
       R(s.nF1.frequency, f1);
       R(s.nF2.frequency, f2);
       R(s.nAir.frequency, fAir);
-      R(s.nG3.gain, pal === 'water' ? 0.15 : 0.12 + 0.45 * bright);
+      // the air band keeps enough 3-10 kHz energy for the ear's elevation and front/back cues
+      R(s.nG3.gain, pal === 'water' ? 0.15 : 0.22 + 0.55 * bright);
       R(s.breathVCA.gain, gBreath * gate);
-      R(s.sel.frequency, sel);
-      R(s.selG.gain, selGain);
+      R(s.vLP.frequency, lp);
       R(s.vF1.frequency, v1);
       R(s.vF2.frequency, v2);
-      R(s.vG1.gain, gV1 * 2.2);
-      R(s.vG2.gain, gV2 * 2.8);
-      R(s.body.frequency, root * (1.5 + 2 * bright));
-      R(s.bodyG.gain, gBody);
-      R(s.harmVCA.gain, 0.42 * harmLvl * gate);
-      return { breathLvl, harmLvl, bright };
+      R(s.vF3.frequency, v3);
+      R(s.harmVCA.gain, gVoice * gate);
+      return { breathLvl, harmLvl, bright, idx };
     }
 
     // ---------------------------------------------------------------- one-shot grains
@@ -693,6 +714,48 @@
       g.connect(dest);
       o.start(t);
       o.stop(t + attack + decay * 7);
+    }
+
+    /**
+     * Harmonic tone with decaying partials: partial n has amplitude amps[n-1] and time constant decay / n^tilt.
+     * Used for harp notes (fast decay of the upper partials), bowls and chimes. Only exact harmonics, so the
+     * tone is pitched and consonant, never metallic.
+     */
+    _tone(dest, t, f, lvl, decay, amps, tilt, attack, beat) {
+      const ctx = this.ctx;
+      const fmax = Math.min(ctx.sampleRate * 0.45, 9000);
+      const g = ctx.createGain();
+      g.gain.value = lvl;
+      g.connect(dest);
+      let end = t;
+      amps.forEach((a, i) => {
+        const n = i + 1;
+        const fn = f * n;
+        if (!a || fn > fmax) return;
+        const tau = decay / Math.pow(n, tilt);
+        const add = (freq, amp) => {
+          const o = ctx.createOscillator();
+          o.frequency.value = freq;
+          const e = ctx.createGain();
+          e.gain.setValueAtTime(0, t);
+          e.gain.linearRampToValueAtTime(amp, t + attack);
+          e.gain.setTargetAtTime(0, t + attack, tau);
+          o.connect(e);
+          e.connect(g);
+          o.start(t);
+          o.stop(t + attack + tau * 7);
+        };
+        add(fn, a);
+        if (beat && n <= beat.length && beat[n - 1]) add(fn + beat[n - 1], a * 0.6); // slow beating, as in a bowl
+        end = Math.max(end, t + attack + tau * 7);
+      });
+      return g;
+    }
+
+    _pluck(dest, t, f, lvl, decay) {
+      // harp-like: partials 1/n^1.5, upper partials die away first, soft finger noise for a clear onset
+      const g = this._tone(dest, t, f, lvl, decay, [1, 0.36, 0.19, 0.12, 0.08, 0.06], 0.8, 0.004);
+      this._noiseBurst(g, t, 0.01, 2400, 0.9, 0.12);
     }
 
     _noiseBurst(dest, t, dur, f, q, lvl) {
@@ -714,72 +777,73 @@
       src.start(t, Math.random() * 4, dur + 0.05);
     }
 
-    _nearestHarmonic(root, f) {
-      return root * Math.max(1, Math.round(f / root));
-    }
-
     _grain(s, k, t, pos, info, res) {
       const pal = this.params.palette;
-      const root = this._root() * STREAM_RATIOS[k];
-      const b = info.bright;
+      const idx = info.idx;
       if (this.params.trajectory === 'test') {
         this._noiseBurst(s.grains, t, 0.16, 2500, 0.35, 0.9);
         return 0.25;
       }
-      if (pal === 'breath' || pal === 'choir') {
-        const target = 600 * Math.pow(9, b) * (Math.random() < 0.5 ? 1 : 1.5);
-        const f = this._nearestHarmonic(root, target);
-        this._ping(s.grains, t, f, 0.05 + 0.05 * Math.random(), 0.003, 0.08 + 0.18 * Math.random());
-        const rate = pal === 'choir' ? 0.6 : 1.2 + 9 * Math.pow(info.energy, 2);
-        return -Math.log(1 - Math.random() * 0.97) / rate;
+      const expo = (rate) => -Math.log(1 - Math.random() * 0.97) / rate;
+      if (pal === 'breath') {
+        // sparse harp notes above the voices: chord tones, never a clash
+        const f = this._ladderHz(idx + 2 + Math.floor(Math.random() * 3));
+        this._pluck(s.grains, t, f, 0.035 + 0.025 * Math.random(), 0.55 + 0.4 * Math.random());
+        return expo(0.25 + 0.9 * info.energy * info.energy);
+      }
+      if (pal === 'choir') return 1.0; // sustained voices only
+      if (pal === 'harp') {
+        // arpeggio that climbs while the stream rises and falls while it descends
+        const dy = pos.y - s.lastPos.y;
+        s.arp = (s.arp + (dy >= 0 ? 1 : -1) + 4) % 4;
+        const f = this._ladderHz(Math.max(0, idx - 1) + s.arp);
+        this._pluck(s.grains, t, f, 0.075 + 0.025 * Math.random(), 0.75 + 0.45 * Math.random());
+        return 0.16 + 0.22 * (1 - info.energy) + 0.04 * Math.random();
       }
       if (pal === 'water') {
-        // Minnaert bubble: exponentially rising sine, pitch follows height
+        // tuned droplets (Minnaert bubble chirp centred on a chord tone one octave up)
         const ctx = this.ctx;
-        const f0 = (500 + 2200 * b) * Math.pow(1.6, Math.random() - 0.5);
+        const note = 2 * this._ladderHz(idx + 1 + Math.floor(Math.random() * 3));
+        const f0 = Math.min(note * 0.82, 5000);
         const dur = clamp(0.06 * (1500 / f0), 0.02, 0.09);
         const o = ctx.createOscillator();
         o.frequency.setValueAtTime(f0, t);
-        o.frequency.exponentialRampToValueAtTime(f0 * (1.35 + 0.4 * Math.random()), t + dur);
+        o.frequency.exponentialRampToValueAtTime(f0 * 1.52, t + dur);
         const g = ctx.createGain();
-        const lvl = 0.12 + 0.12 * Math.random();
+        const lvl = 0.1 + 0.1 * Math.random();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(lvl, t + 0.0008);
-        g.gain.setTargetAtTime(0, t + 0.001, dur / 3);
+        g.gain.linearRampToValueAtTime(lvl, t + 0.0015);
+        g.gain.setTargetAtTime(0, t + 0.002, dur / 3);
         o.connect(g);
         g.connect(s.grains);
         o.start(t);
         o.stop(t + dur * 2.5);
-        const rate = 3 + 10 * info.energy;
-        return -Math.log(1 - Math.random() * 0.97) / rate;
+        return expo(2.5 + 8 * info.energy);
       }
       if (pal === 'bowl') {
-        const f0 = root * 2;
-        [[1, 0.5, 5.5, 0.55], [2.71, 0.2, 3.0, 1.1], [5.15, 0.08, 1.6, 0], [8.43, 0.035, 0.8, 0]].forEach(([r, a, d, beat]) => {
-          this._ping(s.grains, t, f0 * r, a * 0.6, 0.004, d);
-          if (beat) this._ping(s.grains, t, f0 * r + beat, a * 0.4, 0.004, d * 0.9);
-        });
-        this._noiseBurst(s.grains, t, 0.012, 2500, 0.7, 0.2);
+        // warm bowl: harmonic partials with slow beating, felt mallet
+        const f0 = this._ladderHz(idx + 2);
+        this._tone(s.grains, t, f0, 0.32, 6.0, [1, 0.3, 0.1], 0.9, 0.006, [0.6, 0.9, 0]);
+        this._noiseBurst(s.grains, t, 0.018, 700, 0.7, 0.12);
         return 5 + Math.random() * 4;
       }
-      // chimes: just-pentatonic glass, register follows height
-      const oct = b < 0.33 ? 2 : b < 0.66 ? 4 : 8;
-      const f = this._root() * oct * PENTA[Math.floor(Math.random() * PENTA.length)];
-      const lvl = 0.08 + 0.05 * Math.random();
-      [[1, 1, 1.3], [2.0, 0.3, 0.6], [3.01, 0.12, 0.35], [4.2, 0.05, 0.2]].forEach(([r, a, d]) => this._ping(s.grains, t, f * r, lvl * a, 0.0015, d));
-      return 0.35 + -Math.log(1 - Math.random() * 0.97) * 0.7;
+      // soft chimes (celesta): harmonic partials only, register follows height
+      const f = 2 * this._ladderHz(idx + Math.floor(Math.random() * 3));
+      this._tone(s.grains, t, f, 0.06 + 0.04 * Math.random(), 1.3, [1, 0.22, 0.06], 1.0, 0.0025);
+      return 0.4 + expo(1.4);
     }
 
     _bloom(s, k, t) {
-      // soft chord swell as the energy leaves the crown
+      // the fountain sprays out of the crown: a soft upward harp arpeggio over a gentle chord swell
+      for (let i = 0; i < 5; i++) this._pluck(s.grains, t + i * 0.075, this._ladderHz(4 + i), 0.045, 1.1);
       const root = this._root();
-      [4, 5, 6, 8].forEach((h, i) => this._ping(s.grains, t + i * 0.03, root * h, 0.035, 0.12, 1.4));
+      [4, 5, 6, 8].forEach((h, i) => this._ping(s.grains, t + i * 0.03, root * h / 2, 0.022, 0.14, 1.5));
     }
 
     _ground(s, t) {
       const root = this._root();
-      this._ping(s.grains, t, root / 2, 0.22, 0.05, 0.6);
-      this._ping(s.grains, t, root, 0.1, 0.04, 0.5);
+      this._ping(s.grains, t, root / 2, 0.2, 0.05, 0.6);
+      this._pluck(s.grains, t, root, 0.07, 0.9);
     }
 
     // ---------------------------------------------------------------- main update
@@ -841,7 +905,7 @@
       // stage transitions (REBAL): bloom at the crown, grounding at the soles
       if (p.trajectory === 'rebal' && res.st) {
         if (this.prevStage && this.prevStage !== stageNow) {
-          if (stageNow === 'exhale' && (p.palette === 'breath' || p.palette === 'choir')) this._bloom(this.streams[0], 0, tSched);
+          if (stageNow === 'exhale' && ['breath', 'choir', 'harp'].includes(p.palette)) this._bloom(this.streams[0], 0, tSched);
           if (stageNow === 'inhale' && this.prevStage !== 'inhale' && p.palette !== 'chimes') this._ground(this.streams[0], tSched);
         }
         this.prevStage = stageNow;
@@ -913,7 +977,7 @@
 
     applyRendererConfig() {
       const p = this.params;
-      this.renderer.setConfig({ cue: p.cue, pinna: Math.min(1.3, 0.5 + 0.5 * p.cue), er: 0.25 + 1.1 * p.room, reverb: 0.08 + 0.55 * p.room, roomSize: 0.8 + 0.6 * p.room });
+      this.renderer.setConfig({ cue: p.cue, pinna: Math.min(1.3, 0.5 + 0.5 * p.cue), er: 0.18 + 0.8 * p.room, reverb: 0.08 + 0.55 * p.room, roomSize: 0.8 + 0.6 * p.room });
       // measured ear models: the same slider scales the fine spectral structure (1 = as measured)
       if (this.renderer.setEarCue && Math.abs(this.renderer.earK - p.cue) > 0.01) {
         clearTimeout(this._cueTimer);
@@ -923,6 +987,7 @@
   }
 
   Spatial3DModule.PALETTES = PALETTES;
+  Spatial3DModule.LADDER = LADDER;
   Spatial3DModule.TRAJECTORIES = TRAJECTORIES;
   Spatial3DModule.REBAL_MODES = REBAL_MODES;
   Spatial3DModule.Y_CROWN = Y_CROWN;

@@ -24,9 +24,11 @@ around you and coiling back up inside you.*
 * **Guided pattern**: 6 fountain breaths → 6 spiral breaths → balloon. Breath rate, inhale share and holds are
   adjustable and shared by every module.
 
-Default sound: breath noise + harmonic overtones whose pitch follows height (a robust elevation cue), with soft
-sparkles that make each stream easy to localise. Alternatives: resonant voices, water fountain, singing bowls,
-crystal chimes.
+Default sound: "breathing voices", a warm three-voice choir (detuned voices with their own vibrato, vowel formants)
+with breath noise and occasional harp notes. Every pitch is a harmonic of half the tonal centre (no 7th, 9th or 11th
+harmonics), so the streams always form one consonant chord; height selects the notes and the vowel (low "oo" under the
+feet, open "ah" above the head), a height cue that works even when pinna cues do not. Alternatives: choir, harp
+arpeggios, water fountain with tuned droplets, warm bowls, soft chimes.
 
 ## 3D rendering (`binaural-renderer.js`, `calibration.js`, `hrtf/`)
 

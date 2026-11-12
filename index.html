@@ -10,7 +10,7 @@
   <title>AETHER // 3D sound for meditation and expanded states</title>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="apple-touch-icon" href="icon-512.png" />
-  <link rel="stylesheet" href="styles.css?v=6.2" />
+  <link rel="stylesheet" href="styles.css?v=6.3" />
 </head>
 <body>
   <div class="app-shell">
@@ -199,11 +199,12 @@
             <div class="control-row">
               <div class="control-label"><span>Sound</span></div>
               <select id="spatialPalette" class="select-input">
-                <option value="breath" selected>Breath + harmonics (overtones follow height)</option>
-                <option value="choir">Resonant voice (vowel opens with height)</option>
-                <option value="water">Water fountain (stream + droplets)</option>
-                <option value="bowl">Singing bowls</option>
-                <option value="chimes">Crystal chimes</option>
+                <option value="breath" selected>Breathing voices (warm choir + breath + harp)</option>
+                <option value="choir">Choir (resonant voices)</option>
+                <option value="harp">Harp arpeggios</option>
+                <option value="water">Water fountain (tuned droplets)</option>
+                <option value="bowl">Warm bowls</option>
+                <option value="chimes">Soft chimes (celesta)</option>
               </select>
             </div>
             <div class="control-row two-col">
@@ -280,11 +281,11 @@
               <div class="control-label"><span>Timbre</span></div>
               <select id="chaosPalette" class="select-input">
                 <option value="hybrid" selected>All timbres (chosen by the attractor)</option>
-                <option value="metallic">FM bells</option>
+                <option value="metallic">Soft bells</option>
                 <option value="liquid">Liquid vowels</option>
                 <option value="plucked">Wood &amp; glass plucks</option>
                 <option value="subglitch">Deep drops</option>
-                <option value="breath">Swelling reeds</option>
+                <option value="breath">Swelling voices</option>
               </select>
             </div>
             <div class="control-row two-col">
@@ -578,15 +579,15 @@
 
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="binaural-renderer.js?v=6.2"></script>
-  <script src="spatial-engine.js?v=6.2"></script>
-  <script src="modules-a.js?v=6.2"></script>
-  <script src="modules-b.js?v=6.2"></script>
-  <script src="audio-engine.js?v=6.2"></script>
-  <script src="presets.js?v=6.2"></script>
-  <script src="hrtf/index.js?v=6.2"></script>
-  <script src="calibration.js?v=6.2"></script>
-  <script src="visualizer.js?v=6.2"></script>
-  <script src="app.js?v=6.2"></script>
+  <script src="binaural-renderer.js?v=6.3"></script>
+  <script src="spatial-engine.js?v=6.3"></script>
+  <script src="modules-a.js?v=6.3"></script>
+  <script src="modules-b.js?v=6.3"></script>
+  <script src="audio-engine.js?v=6.3"></script>
+  <script src="presets.js?v=6.3"></script>
+  <script src="hrtf/index.js?v=6.3"></script>
+  <script src="calibration.js?v=6.3"></script>
+  <script src="visualizer.js?v=6.3"></script>
+  <script src="app.js?v=6.3"></script>
 </body>
 </html>

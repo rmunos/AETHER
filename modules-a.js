@@ -48,6 +48,10 @@
         g.connect(this.hallSend);
         return g;
       });
+      // warm source wave (all harmonics, ~10 dB per octave) instead of a buzzy sawtooth
+      const nh = 40, re = new Float32Array(nh + 1), im = new Float32Array(nh + 1);
+      for (let h = 1; h <= nh; h++) im[h] = Math.pow(h, -1.6);
+      this.warmWave = ctx.createPeriodicWave(re, im);
       const len = Math.floor(ctx.sampleRate * 0.15);
       this.burst = ctx.createBuffer(1, len, ctx.sampleRate);
       const bd = this.burst.getChannelData(0);
@@ -213,14 +217,15 @@
       let end = now + 1;
       if (arch === 'metallic') {
         const car = ctx.createOscillator(), mod = ctx.createOscillator(), mg = ctx.createGain();
-        const ratio = [2, 3, 1.5, 4, 1][Math.floor((y * 10) % 5)];
+        // soft FM bell: integer ratios only and a low modulation index (harmonic, round, not metallic)
+        const ratio = [1, 2, 1, 2, 3][Math.floor((y * 10) % 5)];
         car.frequency.value = f;
         mod.frequency.value = f * ratio;
-        const dec = 0.8 + (1 - x) * 1.6;
-        mg.gain.setValueAtTime(f * (0.4 + morph * 1.8), now);
-        mg.gain.exponentialRampToValueAtTime(f * 0.02, now + dec * 0.6);
+        const dec = 1.0 + (1 - x) * 1.8;
+        mg.gain.setValueAtTime(f * (0.15 + morph * 0.7), now);
+        mg.gain.exponentialRampToValueAtTime(f * 0.01, now + dec * 0.5);
         env.gain.setValueAtTime(0.0001, now);
-        env.gain.linearRampToValueAtTime(0.2, now + 0.008);
+        env.gain.linearRampToValueAtTime(0.2, now + 0.012);
         env.gain.exponentialRampToValueAtTime(0.0001, now + dec);
         mod.connect(mg); mg.connect(car.frequency); car.connect(env);
         car.start(now); mod.start(now); end = now + dec + 0.05; car.stop(end); mod.stop(end);
@@ -240,7 +245,7 @@
         src.connect(m1); src.connect(m2); osc.connect(m1); m1.connect(env); m2.connect(env);
         src.start(now); osc.start(now); end = now + atk + dec + 0.05; osc.stop(end);
       } else if (arch === 'subglitch') {
-        const sub = ctx.createOscillator(), click = ctx.createOscillator(), ce = ctx.createGain();
+        const sub = ctx.createOscillator(), tone = ctx.createOscillator(), ce = ctx.createGain();
         while (f > root * 0.75) f /= 2;
         while (f < root * 0.37) f *= 2;
         const dec = 0.5 + (1 - x) * 0.6;
@@ -249,16 +254,18 @@
         env.gain.setValueAtTime(0.0001, now);
         env.gain.linearRampToValueAtTime(0.34, now + 0.01);
         env.gain.exponentialRampToValueAtTime(0.0001, now + dec);
-        click.frequency.value = f * 16;
-        ce.gain.setValueAtTime(0.08, now);
-        ce.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
-        sub.connect(env); click.connect(ce); ce.connect(dest);
-        sub.start(now); click.start(now); end = now + dec + 0.05; sub.stop(end); click.stop(now + 0.03);
+        // two octaves above the drop, short and soft: gives the note definition on small headphones
+        tone.frequency.value = f * 4;
+        ce.gain.setValueAtTime(0.0001, now);
+        ce.gain.linearRampToValueAtTime(0.05, now + 0.008);
+        ce.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+        sub.connect(env); tone.connect(ce); ce.connect(dest);
+        sub.start(now); tone.start(now); end = now + dec + 0.05; sub.stop(end); tone.stop(now + 0.2);
       } else if (arch === 'breath') {
         const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), fm = ctx.createBiquadFilter();
-        o1.type = 'sawtooth'; o1.frequency.value = f;
+        o1.setPeriodicWave(this.warmWave); o1.frequency.value = f;
         o2.frequency.value = f * (y > 0.5 ? 1.5 : 2);
-        fm.type = 'bandpass'; fm.Q.value = 4 + morph * 5;
+        fm.type = 'bandpass'; fm.Q.value = 2.5 + morph * 3;
         fm.frequency.setValueAtTime(Math.min(4800, f * 2), now);
         fm.frequency.exponentialRampToValueAtTime(Math.min(6400, f * 4), now + 0.6);
         const sw = 0.35 + (1 - x) * 0.5, rel = 0.25 + y * 0.3;
@@ -269,12 +276,12 @@
         o1.start(now); o2.start(now); end = now + sw + rel + 0.05; o1.stop(end); o2.stop(end);
       } else { // liquid
         const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter();
-        o1.type = 'sawtooth'; o2.type = 'triangle';
+        o1.setPeriodicWave(this.warmWave); o2.type = 'sine';
         const grace = morph > 0.5 ? (y > 0.5 ? -2 : 2) : 0;
         o1.frequency.setValueAtTime(f * Math.pow(2, grace / 12), now);
         o1.frequency.exponentialRampToValueAtTime(f, now + 0.07);
         o2.frequency.value = f * 2;
-        f1.type = 'bandpass'; f1.Q.value = 5.5 + morph * 7.5;
+        f1.type = 'bandpass'; f1.Q.value = 3.5 + morph * 4;
         f1.frequency.setValueAtTime(320 + x * 1400, now);
         f1.frequency.exponentialRampToValueAtTime(480 + y * 1900, now + 0.35);
         f2.type = 'bandpass'; f2.Q.value = 6; f2.frequency.value = 900 + (1 - x) * 2100;
@@ -340,7 +347,7 @@
       // θ-gated shimmer: overtones of the carrier, amplitude-modulated at the γ rate
       this.shimOsc = [2, 3, 5].map((h) => {
         const o = ctx.createOscillator();
-        o.type = h === 3 ? 'triangle' : 'sine';
+        o.type = 'sine';
         o.start();
         return { o, h };
       });
