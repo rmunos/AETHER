@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['spatialStageBreaths', 'spatial', 'fountainBreaths', (v) => `${Math.round(v)}`],
     ['spatialSpeed', 'spatial', 'speed', (v) => `${v.toFixed(2)} Hz`],
     ['spatialInnerSwirl', 'spatial', 'innerSwirl', pct],
+    ['spatialIntensity', 'spatial', 'intensity', (v) => (v < 0.03 ? 'natural' : `${Math.round(v * 100)}%`)],
     ['spatialRoom', 'spatial', 'room', pct],
     ['spatialCue', 'spatial', 'cue', (v) => v.toFixed(2)],
     ['chaosGain', 'chaos', 'gain', pct],
@@ -204,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     cfg.spatial.spiralBreaths = cfg.spatial.fountainBreaths;
     // listening setup chosen by the listener (renderer, ear model, cue strength) is not part of a preset
-    ['renderer', 'earModel', 'cue'].forEach((k) => { cfg.spatial[k] = engine.params.spatial[k]; });
+    ['renderer', 'earModel', 'cue', 'intensity'].forEach((k) => { cfg.spatial[k] = engine.params.spatial[k]; });
     return cfg;
   }
 
@@ -457,8 +458,12 @@ document.addEventListener('DOMContentLoaded', () => {
         $('calOpen').disabled = true;
       } else if (!earApplied) {
         earApplied = true;
+        // the listener's calibrated choice, otherwise a measured ear model (the HUTUBS listener that represents
+        // the largest group of the 93 measured people): measured ears externalise better than the modelled head
         const saved = window.AetherCalibration.loadSaved();
-        if (saved && saved.id) applyEarModel(saved.id);
+        const fallback = (window.AETHER_HRTF_INDEX || []).find((m) => /^hutubs-/.test(m.id));
+        const id = saved ? saved.id : fallback ? fallback.id : null;
+        if (id) applyEarModel(id);
       }
       updateRendererUI();
     } else {

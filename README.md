@@ -24,11 +24,11 @@ around you and coiling back up inside you.*
 * **Guided pattern**: 6 fountain breaths → 6 spiral breaths → balloon. Breath rate, inhale share and holds are
   adjustable and shared by every module.
 
-Default sound: "breathing voices", a warm three-voice choir (detuned voices with their own vibrato, vowel formants)
-with breath noise and occasional harp notes. Every pitch is a harmonic of half the tonal centre (no 7th, 9th or 11th
-harmonics), so the streams always form one consonant chord; height selects the notes and the vowel (low "oo" under the
-feet, open "ah" above the head), a height cue that works even when pinna cues do not. Alternatives: choir, harp
-arpeggios, water fountain with tuned droplets, warm bowls, soft chimes.
+Default sound: breath ("haa" on the exhale, a thinner "hhh" on the inhale), two streams. Sounds keep the same pitch
+and timbre wherever they are, so only their position moves and the ears' own cues do the localisation. Alternatives:
+water waves (swell on the inhale, break out of the crown and wash down with foam on the exhale), choir and harp (fixed
+chord notes), water drops, warm bowls, soft chimes. The inhale rises about 35 cm in front of the body (a rise along the
+body axis is straight below the ears and cannot be heard) and the fountain leans slightly forward.
 
 ## 3D rendering (`binaural-renderer.js`, `calibration.js`, `hrtf/`)
 
@@ -41,7 +41,11 @@ Front/back and up/down depend on the listener's own ears, so the app also ships 
 (MIT KEMAR and six HUTUBS listeners chosen to cover the spread of 93 measured people) and a 4-minute
 **calibration**: a knock-out tournament of A/B duels (bursts in front, above, behind, below), then a 16-sound blind
 test. The chosen model replaces the modelled head shadow and pinna cues in the same AudioWorklet (minimum-phase FIRs
-rebuilt in the browser, interpolated on a 10° grid). The browser's own HRTF panner remains available for comparison.
+rebuilt in the browser, interpolated on a 10° grid). Without a calibration the app uses HUTUBS listener A (the
+medoid of the largest group). The browser's own HRTF panner remains available for comparison.
+
+**3D intensity** (default 60 %) adds the tricks of "8D audio" on top of either renderer: up to 18 dB of extra
+broadband level difference between the ears, sounds behind and below muffled, sounds above brighter.
 
 Ear-model data: HUTUBS, TU Berlin, CC BY 4.0 (Brinkmann et al., JAES 2019, doi:10.14279/depositonce-8487);
 MIT KEMAR (Gardner & Martin, JASA 1995), free use with citation.

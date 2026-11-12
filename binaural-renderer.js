@@ -188,7 +188,7 @@
         this.fs = sampleRate;
         this.n = Math.max(1, Math.min(MAX_SOURCES, o.sources || MAX_SOURCES));
         this.cfg = {
-          headRadius: 0.0875, cue: 1, pinna: 1, torso: 1, er: 1, reverb: 0.35,
+          headRadius: 0.0875, cue: 1, pinna: 1, torso: 1, er: 1, reverb: 0.35, exaggerate: 0,
           roomSize: 1, refDist: 1, minDist: 0.4, shoulder: 0.17
         };
         if (o.cfg) Object.assign(this.cfg, o.cfg);
@@ -296,6 +296,13 @@
         const rL = Math.sqrt((x + a) * (x + a) + y * y + z * z);
         out[K_AL] = G * clamp(dc / Math.max(rL, 0.02), 0.3, 2.5);
         out[K_AR] = G * clamp(dc / Math.max(rR, 0.02), 0.3, 2.5);
+        // 8D-style exaggeration: extra broadband level difference between the ears (up to +-9 dB per ear at 90 deg)
+        const X = c.exaggerate || 0;
+        if (X > 0) {
+          const ild = X * 9 * clamp(ux, -1, 1);
+          out[K_AL] *= Math.pow(10, -ild / 20);
+          out[K_AR] *= Math.pow(10, ild / 20);
+        }
         out[K_HL] = hsAlpha(thL);
         out[K_HR] = hsAlpha(thR);
 
@@ -365,16 +372,18 @@
         const h2 = horiz * horiz;
         const frontW = Math.max(0, caz) * h2;
         const backW = Math.max(0, -caz) * h2;
-        const cue = c.cue;
+        const S = this.set ? 0 : 1; // modelled spectral cues only without a measured ear model
+        const cue = c.cue * S;
         const g = st.eqGain;
         const fq = st.eqFreq;
-        g[0] = cue * (3.5 * frontW - 1.5 * backW);
-        g[1] = cue * (6.0 * upW - 2.0 * downW);
-        g[2] = cue * 3.0 * backW;
-        g[3] = cue * (-4.0 * backW - 9.0 * downW);
-        g[4] = n1db;
+        // + 8D-style exaggeration (both renderers): brighter in front and above, muffled behind and below
+        g[0] = cue * (3.5 * frontW - 1.5 * backW) + X * (2.5 * frontW - 2.0 * backW);
+        g[1] = cue * (6.0 * upW - 2.0 * downW) + X * (4.0 * upW - 3.0 * downW);
+        g[2] = cue * 3.0 * backW + X * 1.5 * backW;
+        g[3] = cue * (-4.0 * backW - 9.0 * downW) + X * (-8.0 * backW - 8.0 * downW);
+        g[4] = n1db * S;
         fq[4] = n1;
-        g[5] = n1db * 0.45 * (1 - smooth(20, 55, polDeg));
+        g[5] = n1db * S * 0.45 * (1 - smooth(20, 55, polDeg));
         fq[5] = Math.min(n1 * N2_RATIO, 0.45 * fs);
       }
 
@@ -477,7 +486,7 @@
         const c = this.cfg;
         const erOn = c.er > 0.0005;
         const set = this.set;
-        const eqOn = !set && (c.cue > 0.0005 || c.pinna > 0.0005);
+        const eqOn = (!set && (c.cue > 0.0005 || c.pinna > 0.0005)) || (c.exaggerate || 0) > 0.0005;
         const erK = this.erLpK;
         const T = set ? set.taps : 0;
         const xL = st.xL, xR = st.xR, hCL = st.hCL, hCR = st.hCR, hPL = st.hPL, hPR = st.hPR;
@@ -765,7 +774,7 @@
   // Main-thread wrapper
   // ===========================================================================================
   const DEFAULT_CFG = {
-    headRadius: 0.0875, cue: 1, pinna: 1, torso: 1, er: 1, reverb: 0.35,
+    headRadius: 0.0875, cue: 1, pinna: 1, torso: 1, er: 1, reverb: 0.35, exaggerate: 0,
     roomSize: 1, refDist: 1, minDist: 0.4, shoulder: 0.17
   };
 

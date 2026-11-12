@@ -11,7 +11,7 @@
   const HUES = ['56, 189, 248', '251, 191, 36', '52, 211, 153', '251, 113, 133', '167, 139, 250', '244, 114, 182'];
   const WORLD = { left: -2.5, right: 2.5, top: 1.75, bottom: -2.3 };
   const STAGE_TEXT = {
-    inhale: 'INHALE ▲  energy rises inside you, from the soles to the crown',
+    inhale: 'INHALE ▲  energy rises from the soles up the front of the body into the head',
     holdIn: 'HOLD  the energy fills the head',
     exhale: 'EXHALE ▼  fountain out of the crown, over and down around you, into the soles',
     holdOut: 'HOLD  resting at the soles'
@@ -93,7 +93,7 @@
       g.restore();
     }
 
-    function drawTorus(v, meridian, stage) {
+    function drawTorus(v, meridian, stage, isSide) {
       g.save();
       const outerActive = stage === 'exhale';
       [0.82, 1.0, 1.18].forEach((ls, li) => {
@@ -124,13 +124,19 @@
           }
         });
       });
-      // core channel (inhale)
-      const f = toScr(v, 0, -1.62), c = toScr(v, 0, 0.13);
-      g.strokeStyle = stage === 'inhale' ? 'rgba(251, 191, 36, 0.75)' : 'rgba(251, 191, 36, 0.22)';
+      // inhale path: up the front of the body (side view), with the optional sway (back view)
+      const G = global.Spatial3DModule && global.Spatial3DModule.geometry;
+      const swirl = engine.params.spatial.innerSwirl || 0;
+      g.strokeStyle = stage === 'inhale' ? 'rgba(251, 191, 36, 0.75)' : 'rgba(251, 191, 36, 0.25)';
       g.lineWidth = stage === 'inhale' ? 3 : 1.6;
       g.beginPath();
-      g.moveTo(f.x, f.y);
-      g.lineTo(c.x, c.y);
+      for (let i = 0; i <= 40; i++) {
+        const p = i / 40;
+        const yy = G ? G.inhaleY(p) : -1.62 + 1.75 * p;
+        const a = G ? (isSide ? G.inhaleOffset(p) : G.inhaleSway(p, swirl)) : 0;
+        const q = toScr(v, a, yy);
+        if (i) g.lineTo(q.x, q.y); else g.moveTo(q.x, q.y);
+      }
       g.stroke();
       g.restore();
     }
@@ -166,7 +172,7 @@
         g.beginPath();
         g.rect(v.x0 + 1, v.y0 + 1, v.w - 2, v.h - 2);
         g.clip();
-        if (isRebal && sp) drawTorus(v, sp.meridian(48), disp ? disp.stage : null);
+        if (isRebal && sp) drawTorus(v, sp.meridian(48), disp ? disp.stage : null, key === 'side');
         drawBody(v, key === 'side');
         g.restore();
       });

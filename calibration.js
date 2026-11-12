@@ -106,9 +106,11 @@
         mode: engine.renderer.mode,
         earModel: engine.renderer.earModel,
         reverbMix: engine.params.reverbMix,
-        roomReverb: engine.renderer.cfg.reverb
+        roomReverb: engine.renderer.cfg.reverb,
+        exaggerate: engine.renderer.cfg.exaggerate || 0
       };
-      engine.renderer.setConfig({ reverb: CAL_REVERB });
+      // natural cues during the test: the 8D-style exaggeration would hide the differences between ear models
+      engine.renderer.setConfig({ reverb: CAL_REVERB, exaggerate: 0 });
       global.ConsciousnessAudioEngine.MODULES.forEach((m) => hooks.setEnabled(m, false));
       engine.setReverbMix(0.1);
       if (engine.renderer.mode === 'hrtf') engine.renderer.setMode('structural');
@@ -118,7 +120,7 @@
       if (!saved) return;
       stopPlayback();
       engine.setReverbMix(saved.reverbMix);
-      engine.renderer.setConfig({ reverb: saved.roomReverb });
+      engine.renderer.setConfig({ reverb: saved.roomReverb, exaggerate: saved.exaggerate });
       global.ConsciousnessAudioEngine.MODULES.forEach((m) => hooks.setEnabled(m, saved.enabled[m]));
       saved = null;
     }
