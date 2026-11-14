@@ -102,7 +102,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.addEventListener('change', () => { setEnabled(mod, el.checked); cancelJourneyOnManual(); });
   });
   $('chaosSpace3d').addEventListener('change', (e) => engine.updateModule('chaos', 'space3d', e.target.checked));
-  $('rootSelect').addEventListener('change', (e) => engine.setRoot(parseFloat(e.target.value)));
+  $('rootSelect').addEventListener('change', (e) => {
+    engine.setRoot(parseFloat(e.target.value));
+    syncUI(); // carrier, body tone and Shepard centre moved with the tonal centre
+  });
   $('masterGain').addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);
     $('masterGainVal').textContent = pct(v);
@@ -204,6 +207,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     cfg.spatial.spiralBreaths = cfg.spatial.fountainBreaths;
+    // preset pitches are written for the 108 Hz tonal centre: keep their ratio to the chosen one
+    const r = (engine.params.root || 108) / 108;
+    const scale = (mod, key, lo, hi) => { if (cfg[mod] && cfg[mod][key]) cfg[mod][key] = Math.max(lo, Math.min(hi, +(cfg[mod][key] * r).toFixed(2))); };
+    if (Math.abs(r - 1) > 1e-6) {
+      scale('pac', 'baseFreq', 40, 432);
+      scale('sub', 'freq', 24, 60);
+      scale('fractal', 'center', 65, 528);
+    }
     // listening setup chosen by the listener (renderer, ear model, cue strength) is not part of a preset
     ['renderer', 'earModel', 'cue', 'intensity'].forEach((k) => { cfg.spatial[k] = engine.params.spatial[k]; });
     return cfg;

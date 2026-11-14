@@ -10,7 +10,7 @@
   <title>AETHER // 3D sound for meditation and expanded states</title>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="apple-touch-icon" href="icon-512.png" />
-  <link rel="stylesheet" href="styles.css?v=6.4" />
+  <link rel="stylesheet" href="styles.css?v=6.5" />
 </head>
 <body>
   <div class="app-shell">
@@ -174,7 +174,7 @@
               <label class="toggle-switch"><input type="checkbox" id="spatialEnabled" checked /><span class="slider"></span></label>
             </div>
           </div>
-          <p class="module-subtitle">Tip: run the ear calibration below once; click or drag on the 3D views to place a source by hand. Each stream is rendered binaurally (head shadow, interaural delay, pinna notches, shoulder and room reflections). Inhale: energy rises from the soles up the front of the body into the head. Exhale: it fountains out of the crown, over and down around you, back into the soles. Sounds keep the same pitch wherever they are: only their position moves.</p>
+          <p class="module-subtitle">Tip: run the ear calibration below once; click or drag on the 3D views to place a source by hand. Each stream is rendered binaurally (head shadow, interaural delay, pinna notches, shoulder and room reflections). Inhale: energy rises from the soles up the front of the body into the head. Exhale: it fountains out of the crown, over and down around you, back into the soles. Four streams, one per direction (front, right, back, left), each with its own sound; sounds keep their pitch wherever they are.</p>
           <div class="control-list">
             <div class="control-row">
               <div class="control-label"><span>Movement</span></div>
@@ -199,10 +199,11 @@
             <div class="control-row">
               <div class="control-label"><span>Sound</span></div>
               <select id="spatialPalette" class="select-input">
-                <option value="breath" selected>Breath</option>
-                <option value="waves">Water waves</option>
-                <option value="choir">Choir (sustained chord)</option>
-                <option value="harp">Harp (chord notes)</option>
+                <option value="quad" selected>Four sounds: breath front, water right, voice behind, harp left</option>
+                <option value="breath">Breath (a vowel per direction)</option>
+                <option value="waves">Water waves (a character per direction)</option>
+                <option value="choir">Choir (a chord note per direction)</option>
+                <option value="harp">Harp (a note per direction)</option>
                 <option value="water">Water drops</option>
                 <option value="bowl">Warm bowls</option>
                 <option value="chimes">Soft chimes (celesta)</option>
@@ -210,8 +211,8 @@
             </div>
             <div class="control-row two-col">
               <div>
-                <div class="control-label"><span>Streams</span><span class="mono-val" id="spatialCountVal">2</span></div>
-                <input type="range" id="spatialCount" min="1" max="6" step="1" value="2" />
+                <div class="control-label"><span>Streams</span><span class="mono-val" id="spatialCountVal">4</span></div>
+                <input type="range" id="spatialCount" min="1" max="4" step="1" value="4" />
               </div>
               <div>
                 <div class="control-label"><span>Level</span><span class="mono-val" id="spatialGainVal">85%</span></div>
@@ -584,15 +585,15 @@
 
   <audio id="bgAudioKeepAlive" src="silence.wav" loop playsinline preload="auto"></audio>
 
-  <script src="binaural-renderer.js?v=6.4"></script>
-  <script src="spatial-engine.js?v=6.4"></script>
-  <script src="modules-a.js?v=6.4"></script>
-  <script src="modules-b.js?v=6.4"></script>
-  <script src="audio-engine.js?v=6.4"></script>
-  <script src="presets.js?v=6.4"></script>
-  <script src="hrtf/index.js?v=6.4"></script>
-  <script src="calibration.js?v=6.4"></script>
-  <script src="visualizer.js?v=6.4"></script>
-  <script src="app.js?v=6.4"></script>
+  <script src="binaural-renderer.js?v=6.5"></script>
+  <script src="spatial-engine.js?v=6.5"></script>
+  <script src="modules-a.js?v=6.5"></script>
+  <script src="modules-b.js?v=6.5"></script>
+  <script src="audio-engine.js?v=6.5"></script>
+  <script src="presets.js?v=6.5"></script>
+  <script src="hrtf/index.js?v=6.5"></script>
+  <script src="calibration.js?v=6.5"></script>
+  <script src="visualizer.js?v=6.5"></script>
+  <script src="app.js?v=6.5"></script>
 </body>
 </html>

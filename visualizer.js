@@ -9,6 +9,8 @@
   'use strict';
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const HUES = ['56, 189, 248', '251, 191, 36', '52, 211, 153', '251, 113, 133', '167, 139, 250', '244, 114, 182'];
+  // colours of the four sounds (palette "four sounds")
+  const KIND_HUES = { breath: '226, 232, 240', water: '56, 189, 248', voice: '251, 191, 36', harp: '167, 139, 250' };
   const WORLD = { left: -2.5, right: 2.5, top: 1.75, bottom: -2.3 };
   const STAGE_TEXT = {
     inhale: 'INHALE ▲  energy rises from the soles up the front of the body into the head',
@@ -193,7 +195,7 @@
         g.rect(v.x0 + 1, v.y0 + 1, v.w - 2, v.h - 2);
         g.clip();
         disp.streams.forEach((s, k) => {
-          const hue = HUES[k % HUES.length];
+          const hue = (s.label && KIND_HUES[s.label]) || HUES[k % HUES.length];
           const tr = trails[k];
           if (tr && tr.length > 2) {
             g.beginPath();
@@ -221,6 +223,12 @@
             g.beginPath();
             g.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
             g.stroke();
+          }
+          if (s.label && s.w < 0.5) {
+            g.font = '10px "JetBrains Mono", monospace';
+            g.fillStyle = `rgba(${hue}, 0.9)`;
+            g.textAlign = 'left';
+            g.fillText(s.label, p.x + r * 1.6 + 2, p.y - r * 0.8);
           }
         });
         g.restore();

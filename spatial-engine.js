@@ -44,7 +44,7 @@
     }
   };
 
-  const MAX_STREAMS = 6;
+  const MAX_STREAMS = 4; // one stream per direction: front, right, back, left
   const LOOKAHEAD = 0.15; // seconds: audio parameters are scheduled this far ahead
   const UPDATE_DT = 0.024; // seconds between scheduled control points
 
@@ -67,16 +67,35 @@
   const HARP_NOTES = [4, 5, 6, 8, 10, 12];
   const CHIME_NOTES = [4, 5, 6, 8, 10, 12];
 
+  // Each stream has a direction (0 front, 1 right, 2 back, 3 left: the cardinal direction it flows down on) and a
+  // sound tied to it, so the four streams can be told apart and followed. Palette 'quad' (default) gives each
+  // direction its own kind of sound; the single-sound palettes vary a fixed detail per direction.
+  const DIR_NAMES = ['front', 'right', 'back', 'left'];
+  const QUAD_KINDS = ['breath', 'waves', 'voice', 'harp'];
+  const QUAD_LABELS = ['breath', 'water', 'voice', 'harp'];
+  const QUAD_TRIM = { breath: 1.0, waves: 1.0, voice: 1.0, harp: 1.0 }; // loudness match between the four kinds (measured: within 1 dB)
+  // Level trims per palette after the v6.5 reverb calibration (until v6.4 an over-loud room reverb carried the level)
+  const PALETTE_TRIM = { quad: 1.5, breath: 1.5, waves: 1.68, choir: 1.41, harp: 3.2, water: 9.0, bowl: 2.0, chimes: 7.8 };
+  const TEST_TRIM = 3.3;
+  const DIR_NOTE = [4, 6, 3, 5]; // chord note per direction (harmonics of root/2): front 2x, right 3x, back 1.5x, left 2.5x root
+  const BREATH_VOWEL = [[0, 0], [-260, 900], [-250, -420], [-120, 500]]; // F1/F2 offsets: "haa", "hee", "hoo", "heh"
+  const WAVE_VARIANT = [
+    { cut: 1.0, foam: 0.7 }, // front: smooth wash
+    { cut: 1.5, foam: 1.6 }, // right: bubbling
+    { cut: 0.5, foam: 0.35 }, // back: deep surf
+    { cut: 1.25, foam: 2.4 } // left: spray
+  ];
+
   // REBAL inhale path in front of the body and forward lean of the fountain jet (metres)
   const INHALE_FWD = 0.36;
   const INHALE_SWAY = 0.22; // lateral sway amplitude for innerSwirl = 1
   const SPIRAL_COIL = 0.34; // radius of the rising coil in the spiral pattern
   const JET_LEAN = 0.25;
 
-  const PALETTES = ['breath', 'waves', 'choir', 'harp', 'water', 'bowl', 'chimes'];
+  const PALETTES = ['quad', 'breath', 'waves', 'choir', 'harp', 'water', 'bowl', 'chimes'];
   const TRAJECTORIES = ['rebal', 'orbit', 'vertical', 'sphere', 'test', 'manual'];
   const REBAL_MODES = ['program', 'fountain', 'spiral', 'balloon'];
-  const PALETTE_ALIASES = { energy: 'breath', rebal: 'breath', drops: 'water', water_drops: 'water', wave: 'waves', surf: 'waves', whisper: 'breath', crackle: 'chimes', tapping: 'chimes' };
+  const PALETTE_ALIASES = { four: 'quad', directions: 'quad', energy: 'breath', rebal: 'breath', drops: 'water', water_drops: 'water', wave: 'waves', surf: 'waves', whisper: 'breath', crackle: 'chimes', tapping: 'chimes' };
   const TRAJECTORY_ALIASES = { orbit8d: 'orbit', circle: 'orbit', zenith_arch: 'vertical', helix3d: 'sphere', infinity: 'sphere', mixed: 'sphere' };
 
   const TEST_POINTS = [
@@ -367,7 +386,7 @@
       if (TRAJECTORY_ALIASES[p.trajectory]) p.trajectory = TRAJECTORY_ALIASES[p.trajectory];
       if (!TRAJECTORIES.includes(p.trajectory)) p.trajectory = 'rebal';
       if (!REBAL_MODES.includes(p.rebalMode)) p.rebalMode = 'program';
-      p.count = clamp(Math.round(p.count || 2), 1, MAX_STREAMS);
+      p.count = clamp(Math.round(p.count || 4), 1, MAX_STREAMS);
       p.gain = clamp(p.gain !== undefined ? p.gain : 0.8, 0, 1.5);
       p.speed = clamp(p.speed !== undefined ? p.speed : 0.08, 0.01, 0.6);
       p.distance = clamp(p.distance !== undefined ? p.distance : 1.9, 0.6, 3.5);
@@ -463,7 +482,7 @@
     // ---------------------------------------------------------------- per-stream generator graph
     _buildStream(k) {
       const ctx = this.ctx;
-      const s = { k, nextGrain: 0, lastPos: { x: 0, y: 0, z: -1.5, w: 0 }, ih: 0 };
+      const s = { k, nextGrain: 0, lastPos: { x: 0, y: 0, z: -1.5, w: 0 }, ih: 0, dir: k % 4, dirTuned: -1 };
       s.out = ctx.createGain();
       s.out.gain.value = 0;
       s.out.connect(this.renderer.input(this.slots[k]));
@@ -535,7 +554,7 @@
       s.voices = [-7, 1, 8].map((cents, v) => {
         const o = ctx.createOscillator();
         o.setPeriodicWave(this.wave);
-        o.frequency.value = this._note(k);
+        o.frequency.value = (this._root() / 2) * DIR_NOTE[k % 4];
         o.detune.value = cents + (Math.random() - 0.5) * 3;
         const lfo = ctx.createOscillator();
         lfo.frequency.value = 4.3 + 0.55 * v + 0.17 * k + Math.random() * 0.3;
@@ -575,21 +594,38 @@
       return this.engine.params.root || 108;
     }
 
-    /** fixed chord note of stream k */
-    _note(k) {
-      return (this._root() / 2) * CHORD[k % CHORD.length];
+    /** fixed chord note of a stream, set by its direction */
+    _note(s) {
+      return (this._root() / 2) * DIR_NOTE[(s && s.dir) || 0];
+    }
+
+    /** direction of stream k: the cardinal direction it flows down on (REBAL), or a fixed order otherwise */
+    _dirIndex(k, n, cycle) {
+      if (this.params.trajectory !== 'rebal') return k % 4;
+      const az = baseAzimuth(k, n, cycle);
+      return ((Math.round(az / (Math.PI / 2)) % 4) + 4) % 4;
+    }
+
+    /** the kind of sound a stream makes */
+    _kind(s) {
+      const pal = this.params.palette;
+      return pal === 'quad' ? QUAD_KINDS[s.dir || 0] : pal;
+    }
+
+    _tuneVoices(s, immediate) {
+      const now = this.ctx.currentTime;
+      const vib = this._kind(s) === 'choir' || this._kind(s) === 'voice' ? 9 : 4;
+      s.voices.forEach(({ o, depth }) => {
+        o.frequency.setTargetAtTime(this._note(s), now, immediate ? 0.001 : 0.08);
+        depth.gain.setTargetAtTime(vib, now, immediate ? 0.001 : 0.1);
+      });
+      s.dirTuned = s.dir;
     }
 
     _applyPalette(initial) {
-      const p = this.params;
-      const now = this.ctx.currentTime;
-      const vib = p.palette === 'choir' ? 9 : 4;
-      this.streams.forEach((s, k) => {
+      this.streams.forEach((s) => {
         s.nextGrain = 0;
-        s.voices.forEach(({ o, depth }) => {
-          o.frequency.setTargetAtTime(this._note(k), now, initial ? 0.001 : 0.08);
-          depth.gain.setTargetAtTime(vib, now, initial ? 0.001 : 0.1);
-        });
+        this._tuneVoices(s, initial);
       });
     }
 
@@ -731,21 +767,28 @@
       // inhale vs exhale timbre, smoothed over ~0.15 s
       s.ih += ((stage === 'inhale' ? 1 : 0) - s.ih) * 0.15;
       const ih = s.ih;
+      if (s.dirTuned !== s.dir) this._tuneVoices(s, false);
+      const d = s.dir || 0;
+      const kind = this._kind(s);
+      const trim = pal === 'quad' ? QUAD_TRIM[kind] || 1 : 1;
 
       let gBreath = 0, gWave = 0, gVoice = 0;
-      if (pal === 'breath') gBreath = 1.2 * lvl;
-      else if (pal === 'waves') { gBreath = 0.1 * lvl; gWave = 0.9; }
-      else if (pal === 'choir') { gBreath = 0.1 * lvl; gVoice = 0.5 * (0.35 + 0.65 * lvl); }
-      else if (pal === 'harp') gBreath = 0.2 * lvl;
-      else if (pal === 'water') gBreath = 0.2 * (0.5 + 0.5 * lvl);
-      else if (pal === 'bowl') gBreath = 0.03;
+      if (kind === 'breath') gBreath = 1.2 * lvl;
+      else if (kind === 'waves') { gBreath = 0.1 * lvl; gWave = 0.9; }
+      else if (kind === 'choir' || kind === 'voice') { gBreath = 0.08 * lvl; gVoice = 0.5 * (0.35 + 0.65 * lvl); }
+      else if (kind === 'harp') gBreath = (pal === 'quad' ? 0.12 : 0.2) * lvl;
+      else if (kind === 'water') gBreath = 0.2 * (0.5 + 0.5 * lvl);
+      else if (kind === 'bowl') gBreath = 0.03;
       else gBreath = 0.06 * lvl;
+      gBreath *= trim; gWave *= trim; gVoice *= trim;
       if (p.trajectory === 'test') { gBreath = 0; gWave = 0; gVoice = 0; } // localisation check: bursts only
+      const wv = WAVE_VARIANT[d];
+      const vw = BREATH_VOWEL[d];
 
       const R = (prm, v) => prm.linearRampToValueAtTime(v, t);
-      // breath: "haa" on the exhale, a thinner, airier "hhh" on the inhale
-      R(s.nF1.frequency, lerp(620, 950, ih));
-      R(s.nF2.frequency, lerp(1250, 2100, ih));
+      // breath: "haa" on the exhale, a thinner, airier "hhh" on the inhale; a fixed vowel colour per direction
+      R(s.nF1.frequency, lerp(620, 950, ih) + vw[0] * (1 - 0.5 * ih));
+      R(s.nF2.frequency, lerp(1250, 2100, ih) + vw[1] * (1 - 0.5 * ih));
       R(s.nAir.frequency, lerp(3800, 5200, ih));
       R(s.nG1.gain, lerp(1.0, 0.5, ih));
       R(s.nG2.gain, lerp(0.7, 0.85, ih));
@@ -753,9 +796,9 @@
       R(s.nG4.gain, lerp(0.28, 0.45, ih));
       R(s.breathVCA.gain, gBreath * gate);
       // water waves: swell on the inhale, break and wash on the exhale
-      R(s.wLP.frequency, cut);
+      R(s.wLP.frequency, Math.min(9000, cut * wv.cut));
       R(s.wBody.gain, wave);
-      R(s.foamG.gain, 1.4 * foam);
+      R(s.foamG.gain, 1.4 * foam * wv.foam);
       R(s.waveVCA.gain, gWave * gate);
       R(s.harmVCA.gain, gVoice * gate);
       return { lvl, energy: clamp(lvl, 0, 1) };
@@ -832,18 +875,25 @@
     }
 
     _grain(s, k, t, pos, info, res) {
-      const pal = this.params.palette;
+      const quad = this.params.palette === 'quad';
+      const pal = this._kind(s);
       if (this.params.trajectory === 'test') {
         this._noiseBurst(s.grains, t, 0.16, 2500, 0.35, 0.9);
         return 0.25;
       }
       const expo = (rate) => -Math.log(1 - Math.random() * 0.97) / rate;
       const half = this._root() / 2;
-      if (pal === 'breath' || pal === 'waves' || pal === 'choir') return 1.0; // continuous sounds only
+      if (pal === 'breath' || pal === 'waves' || pal === 'choir' || pal === 'voice') return 1.0; // continuous sounds only
       if (pal === 'harp') {
-        // chord notes in random order: no melodic direction tied to height
-        const h = HARP_NOTES[Math.floor(Math.random() * HARP_NOTES.length)];
-        this._pluck(s.grains, t, half * h, 0.07 + 0.03 * Math.random(), 0.8 + 0.5 * Math.random());
+        if (quad) {
+          // the harp stream of the four: chord notes in a free order, dense enough to follow its path
+          const h = HARP_NOTES[Math.floor(Math.random() * HARP_NOTES.length)];
+          this._pluck(s.grains, t, half * h, (0.1 + 0.04 * Math.random()) * QUAD_TRIM.harp, 0.8 + 0.5 * Math.random());
+          return 0.22 + 0.22 * Math.random() + 0.15 * (1 - info.energy);
+        }
+        // one harp per stream, each on its own chord note (or its octave): four distinct pitches
+        const f = this._note(s) * (Math.random() < 0.35 ? 2 : 1);
+        this._pluck(s.grains, t, f, 0.07 + 0.03 * Math.random(), 0.8 + 0.5 * Math.random());
         return 0.28 + 0.3 * Math.random() + 0.25 * (1 - info.energy);
       }
       if (pal === 'water') {
@@ -866,7 +916,7 @@
         return expo(2.5 + 8 * info.energy);
       }
       if (pal === 'bowl') {
-        this._tone(s.grains, t, this._note(k), 0.32, 6.0, [1, 0.3, 0.1], 0.9, 0.006, [0.6, 0.9, 0]);
+        this._tone(s.grains, t, this._note(s), 0.32, 6.0, [1, 0.3, 0.1], 0.9, 0.006, [0.6, 0.9, 0]);
         this._noiseBurst(s.grains, t, 0.018, 700, 0.7, 0.12);
         return 5 + Math.random() * 4;
       }
@@ -929,13 +979,14 @@
         const dist = Math.hypot(pos.x, pos.y, pos.z);
         const ext = Math.cos(clamp(pos.w, 0, 1) * Math.PI / 2);
         const nearComp = lerp(1, clamp(Math.pow(dist / 1.0, 0.6), 0.5, 1), ext);
-        s.out.gain.linearRampToValueAtTime(p.gain * norm * nearComp, tSched);
+        const trim = p.trajectory === 'test' ? TEST_TRIM : PALETTE_TRIM[p.palette] || 1;
+        s.out.gain.linearRampToValueAtTime(p.gain * norm * nearComp * trim, tSched);
         this.renderer.setPosition(this.slots[k], pos.x, pos.y, pos.z, pos.w, tSched);
+        s.dir = this._dirIndex(k, n, res.st ? res.st.cycle : 0);
         const info = this._modulate(s, k, pos, res, tSched, gate);
-        info.energy = clamp(0.35 * info.breathLvl + 0.65 * info.harmLvl, 0, 1);
         if (pos.st && pos.st.stage === 'exhale') info.energy = clamp(1.1 - pos.st.p, 0.2, 1);
         // grains for the window (lastGrain, tSched]
-        if (s.nextGrain < now - 0.5 || s.nextGrain === 0) s.nextGrain = now + 0.05 + 0.13 * k;
+        if (!Number.isFinite(s.nextGrain) || s.nextGrain < now - 0.5 || s.nextGrain === 0) s.nextGrain = now + 0.05 + 0.13 * k;
         let guard = 0;
         while (s.nextGrain < tSched && guard++ < 16) {
           const tg = Math.max(s.nextGrain, now + 0.01);
@@ -964,7 +1015,7 @@
         p: res.st ? res.st.p : 0,
         cycle: res.st ? res.st.cycle : 0,
         testIndex: res.testIndex,
-        streams: res.streams.map((q) => ({ x: q.x, y: q.y, z: q.z, w: q.w }))
+        streams: res.streams.map((q, k) => ({ x: q.x, y: q.y, z: q.z, w: q.w, dir: this.streams[k].dir, label: p.palette === 'quad' ? QUAD_LABELS[this.streams[k].dir] : null }))
       });
       if (this.frames.length > 60) this.frames.shift();
     }
@@ -980,7 +1031,7 @@
       const u = b.t > a.t ? clamp((t - a.t) / (b.t - a.t), 0, 1) : 0;
       const streams = a.streams.map((s, k) => {
         const q = b.streams[k] || s;
-        return { x: lerp(s.x, q.x, u), y: lerp(s.y, q.y, u), z: lerp(s.z, q.z, u), w: lerp(s.w, q.w, u) };
+        return { x: lerp(s.x, q.x, u), y: lerp(s.y, q.y, u), z: lerp(s.z, q.z, u), w: lerp(s.w, q.w, u), dir: s.dir, label: s.label };
       });
       return { label: a.label, mode: a.mode, stage: a.stage, p: lerp(a.p, b.stage === a.stage ? b.p : a.p, u), cycle: a.cycle, testIndex: a.testIndex, streams };
     }
@@ -1030,6 +1081,7 @@
 
   Spatial3DModule.PALETTES = PALETTES;
   Spatial3DModule.CHORD = CHORD;
+  Spatial3DModule.QUAD = { DIR_NAMES, QUAD_KINDS, QUAD_LABELS, DIR_NOTE };
   Spatial3DModule.TRAJECTORIES = TRAJECTORIES;
   Spatial3DModule.REBAL_MODES = REBAL_MODES;
   Spatial3DModule.Y_CROWN = Y_CROWN;

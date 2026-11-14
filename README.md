@@ -24,11 +24,12 @@ around you and coiling back up inside you.*
 * **Guided pattern**: 6 fountain breaths → 6 spiral breaths → balloon. Breath rate, inhale share and holds are
   adjustable and shared by every module.
 
-Default sound: breath ("haa" on the exhale, a thinner "hhh" on the inhale), two streams. Sounds keep the same pitch
-and timbre wherever they are, so only their position moves and the ears' own cues do the localisation. Alternatives:
-water waves (swell on the inhale, break out of the crown and wash down with foam on the exhale), choir and harp (fixed
-chord notes), water drops, warm bowls, soft chimes. The inhale rises about 35 cm in front of the body (a rise along the
-body axis is straight below the ears and cannot be heard) and the fountain leans slightly forward.
+Default sound: four streams, one per direction, each with its own sound so they can be told apart and followed:
+breath in front, water on the right, a hummed voice behind, harp on the left. Sounds keep the same pitch wherever they
+are, so only their position moves. Alternatives use one kind of sound with a fixed detail per direction: breath (vowel
+colour), water waves (wash, bubbling, deep surf, spray), choir, harp and bowls (a chord note each); water drops, soft
+chimes. The inhale rises about 35 cm in front of the body (a rise along the body axis is straight below the ears and
+cannot be heard) and the fountain leans slightly forward.
 
 ## 3D rendering (`binaural-renderer.js`, `calibration.js`, `hrtf/`)
 
@@ -54,7 +55,7 @@ MIT KEMAR (Gardner & Martin, JASA 1995), free use with citation.
 
 | # | Module | What it does |
 |---|--------|--------------|
-| 00 | Breath, tuning, space | breath pacer (rate, inhale share, holds), tonal centre (108 Hz default), hall reverb with tuned shimmer |
+| 00 | Breath, tuning, space | breath pacer (rate, inhale share, holds), tonal centre (108 Hz default; voices, harp, binaural carrier, body tone, Shepard centre and shimmer follow it), hall reverb with tuned shimmer (3D streams included) |
 | 01 | 3D space & REBAL | REBAL fountain/spiral/balloon, orbit, vertical loop, sphere wander, localisation check, drag-to-place |
 | 02 | Edge of chaos | logistic map + Hénon attractor choose notes, timbres, rhythm and 3D position; motifs mutate before looping |
 | 03 | Binaural beat | every partial pair beats at the same rate; overtone shimmer at γ on the beat crests; breath swell |

@@ -114,6 +114,10 @@
     return [VOWELS[i][0] + (VOWELS[j][0] - VOWELS[i][0]) * t, VOWELS[i][1] + (VOWELS[j][1] - VOWELS[i][1]) * t];
   }
 
+// Level trim after the v6.5 reverb calibration: until v6.4 an over-loud hall/room reverb carried this module's loudness.
+  const TEXTURE_TRIM = { surf: 9.0, cavern: 4.5, rain: 7.0, wind: 7.0 };
+  const RITUAL_TRIM = { whisper: 1.6, throat: 1.6, shamanic: 2.6, crackle: 2.2, tapping: 2.2 };
+
   class TextureModule {
     constructor(engine) {
       this.engine = engine;
@@ -173,7 +177,8 @@
 
     update() {
       const now = this.ctx.currentTime;
-      this.bus.gain.setTargetAtTime(this.p.enabled ? this.p.gain * 0.6 : 0, now, 0.1);
+      const trim = TEXTURE_TRIM[this.p.texture || 'surf'] || 5;
+      this.bus.gain.setTargetAtTime(this.p.enabled ? this.p.gain * 0.6 * trim : 0, now, 0.1);
     }
 
     _drop(t) {
@@ -329,7 +334,7 @@
 
     update(key) {
       const now = this.ctx.currentTime;
-      const g = this.p.enabled ? this.p.gain : 0;
+      const g = this.p.enabled ? this.p.gain * (RITUAL_TRIM[this.p.palette] || 1.6) : 0;
       this.inputs.forEach((i) => i.gain.setTargetAtTime(g, now, 0.06));
       if (key === 'root') {
         const root = this.engine.params.root;

@@ -26,6 +26,10 @@
   };
   const ARCHETYPES = ['metallic', 'liquid', 'plucked', 'subglitch', 'breath'];
 
+// Level trim after the v6.5 reverb calibration: until v6.4 an over-loud hall/room reverb carried this module's loudness.
+  const CHAOS_TRIM = 7.2;
+  const SHEPARD_TRIM = 5.6;
+
   class ChaosModule {
     constructor(engine) {
       this.engine = engine;
@@ -74,8 +78,8 @@
     update(key) {
       const now = this.ctx.currentTime;
       const g = this._gainTarget();
-      this.bus.gain.setTargetAtTime(this.p.space3d ? 0 : g * 0.5, now, 0.05);
-      this.slotGain.forEach((sg) => sg.gain.setTargetAtTime(this.p.space3d ? g * 0.9 : 0, now, 0.05));
+      this.bus.gain.setTargetAtTime(this.p.space3d ? 0 : g * 0.5 * CHAOS_TRIM, now, 0.05);
+      this.slotGain.forEach((sg) => sg.gain.setTargetAtTime(this.p.space3d ? g * 0.9 * CHAOS_TRIM : 0, now, 0.05));
       if (key === 'enabled' && this.p.enabled) this.next = 0;
     }
 
@@ -470,7 +474,7 @@
 
     update() {
       const now = this.ctx.currentTime;
-      this.bus.gain.setTargetAtTime(this.p.enabled ? this.p.gain * 0.5 : 0, now, 0.08);
+      this.bus.gain.setTargetAtTime(this.p.enabled ? this.p.gain * 0.5 * SHEPARD_TRIM : 0, now, 0.08);
     }
 
     tick(now, elapsed, isBg) {

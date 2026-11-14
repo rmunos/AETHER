@@ -7,30 +7,30 @@
 
   const PRESETS = {
     rebalGateway: {
-      title: '1. REBAL breath',
-      desc: 'Gateway REBAL with two breath streams: up the front of the body into the head on the inhale; out of the crown, over and down around you on the exhale. Fountain, then spiral, then the sustained balloon.',
+      title: '1. REBAL, four directions',
+      desc: 'Four streams, four sounds: breath in front, water on the right, a hummed voice behind, harp on the left. Up the front of the body on the inhale; out of the crown, over and down around you on the exhale. Fountain, then spiral, then the sustained balloon.',
       mechTitle: 'REBAL (Resonant Energy Balloon), Monroe Gateway Experience, Discovery #3',
-      mechText: 'Breathe with the sound. INHALE: the energy rises from the soles up the front of your body and enters the head. EXHALE: it leaves the crown upwards like a fountain, arcs over, flows down around the outside of your body, curls under the feet and re-enters through the soles. After six breaths the flow becomes a spiral that winds down around you and coils back up; then the balloon is sustained. The breath keeps the same timbre wherever it is, so what you hear move is its position: your ears do the localisation. Raise or lower the 3D intensity in module 01.',
+      mechText: 'Breathe with the sound. INHALE: the energy rises from the soles up the front of your body and enters the head. EXHALE: it leaves the crown upwards like a fountain, arcs over, flows down around the outside of your body, curls under the feet and re-enters through the soles. After six breaths the flow becomes a spiral that winds down around you and coils back up; then the balloon is sustained. Each direction has its own sound (breath in front, water on the right, voice behind, harp on the left), so the four streams can be told apart and followed as they flow down around you; in the spiral you hear each of them circle. The sounds keep their pitch wherever they are: what moves is their position. Raise or lower the 3D intensity in module 01.',
       reverbMix: 0.3,
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'breath', count: 2, gain: 0.95, distance: 1.9, turns: 1.25, room: 0.45, innerSwirl: 0.5, fountainBreaths: 6, spiralBreaths: 6 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'quad', count: 4, gain: 0.95, distance: 1.9, turns: 1.25, room: 0.45, innerSwirl: 0.5, fountainBreaths: 6, spiralBreaths: 6 },
       pac: { enabled: true, gain: 0.16, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0, breath: 0.7, baseFreq: 108 },
       sub: { enabled: true, pattern: 'breath', gain: 0.24, freq: 27, warmth: 0.5 }
     },
     rebalWaves: {
       title: '2. REBAL water waves',
-      desc: 'Each breath is a wave: it swells as it rises up the body, breaks out of the crown and washes down around you in foam, then flows back in at the soles.',
+      desc: 'Each breath is a wave: it swells as it rises up the body, breaks out of the crown and washes down around you, then flows back in at the soles. Four water sounds: a smooth wash in front, bubbling on the right, deep surf behind, spray on the left.',
       mechTitle: 'REBAL as water waves',
       mechText: 'The same REBAL flow carried by water: the wave gathers while you breathe in, breaks over your head when you breathe out and pours down around you, with bubbling foam that the ears can follow in space. Water is broadband and full of tiny transients, which gives the ears clear direction cues.',
       reverbMix: 0.32,
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'waves', count: 2, gain: 0.95, distance: 1.9, turns: 1.25, room: 0.5, innerSwirl: 0.5, fountainBreaths: 6, spiralBreaths: 6 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'waves', count: 4, gain: 0.95, distance: 1.9, turns: 1.25, room: 0.5, innerSwirl: 0.5, fountainBreaths: 6, spiralBreaths: 6 },
       pac: { enabled: true, gain: 0.14, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0, breath: 0.7, baseFreq: 108 },
       sub: { enabled: true, pattern: 'breath', gain: 0.22, freq: 27, warmth: 0.5 }
     },
     rebalChoir: {
       title: '3. REBAL spiral, voices',
-      desc: 'Four voices hold one chord while they wind down around you and coil back up. Slower breathing (5 / min).',
+      desc: 'Four voices, one per direction, hold the notes of one chord (the lowest behind you) while they wind down around you and coil back up. Slower breathing (5 / min).',
       mechTitle: 'Spiral REBAL with resonant voices',
       mechText: 'The voices recall the Gateway "resonant tuning" hum. Each holds its note of a major chord, so only their positions move: they spiral down around you on the exhale and coil back up the body on the inhale.',
       reverbMix: 0.42,
@@ -41,12 +41,12 @@
     },
     rebalHarp: {
       title: '4. REBAL with harp',
-      desc: 'Harp notes from one chord, played along the paths of three streams: clear note onsets that are easy to follow in space.',
+      desc: 'Four harps, one per direction, each on its own note of the chord: clear note onsets that are easy to follow in space.',
       mechTitle: 'REBAL traced by harp notes',
       mechText: 'Each stream plays chord notes in a free order along its path; the onsets make the streams easy to follow in space and the notes always agree with each other. Breathe with the sound: up the body on the inhale, out of the crown and down around you on the exhale.',
       reverbMix: 0.38,
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
-      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'harp', count: 3, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, fountainBreaths: 6, spiralBreaths: 6 },
+      spatial: { enabled: true, trajectory: 'rebal', rebalMode: 'program', palette: 'harp', count: 4, gain: 0.9, distance: 1.9, turns: 1.25, room: 0.45, fountainBreaths: 6, spiralBreaths: 6 },
       pac: { enabled: true, gain: 0.18, harmonics: 0.3, theta: 4.0, gamma: 40, depth: 0, breath: 0.7, baseFreq: 108 },
       sub: { enabled: true, pattern: 'breath', gain: 0.24, freq: 27, warmth: 0.5 }
     },

@@ -13,6 +13,14 @@
  *              binaural renderer -> spatialBus (+ natural room reverb) -> mixBus.
  * Renderer slots: 0-5 Module 01 streams, 6-8 chaos events, 9-11 close-up & ritual, 12 ear-model calibration.
  */
+// Reverb levels. Until v6.4 both impulse responses were normalised to 0.0324 x sample rate (a power gain of about
+// +31 dB), so the room reverb was ~23 dB louder than the direct 3D sound and the hall swamped every module; the
+// limiter hid it. Calibrated now: room reverb ~10 dB below the direct sound at the default room (45 %), hall
+// ~8 dB below a module's dry sound at 40 % (0 dB at 100 %).
+const ROOM_ENERGY = 0.75;
+const HALL_ENERGY = 0.232;
+const SPATIAL_HALL_SEND = 0.8; // 3D streams -> hall: ~11 dB below their direct sound at 40 %, ~2 dB at 100 %
+
 class ConsciousnessAudioEngine {
   constructor() {
     this.ctx = null;
@@ -25,7 +33,7 @@ class ConsciousnessAudioEngine {
       root: 108, // tonal centre (Hz): every module is tuned to it
       breath: { rate: 6, inhale: 0.45, holdIn: 0, holdOut: 0 },
       spatial: {
-        enabled: true, palette: 'breath', trajectory: 'rebal', rebalMode: 'program', count: 2, gain: 0.9,
+        enabled: true, palette: 'quad', trajectory: 'rebal', rebalMode: 'program', count: 4, gain: 0.9,
         speed: 0.08, distance: 1.9, room: 0.45, cue: 1.0, turns: 1.25, twist: 0, innerSwirl: 0.5, intensity: 0.6,
         fountainBreaths: 6, spiralBreaths: 6, renderer: 'structural', earModel: null, manualPos: null
       },
@@ -63,7 +71,7 @@ class ConsciousnessAudioEngine {
     // ---- master chain
     this.mixBus = ctx.createGain();
     this.limiter = ctx.createDynamicsCompressor();
-    this.limiter.threshold.value = -12;
+    this.limiter.threshold.value = -8; // catches peaks only (v6.4: -12 dB, constantly compressing an over-loud reverb)
     this.limiter.knee.value = 6;
     this.limiter.ratio.value = 12;
     this.limiter.attack.value = 0.003;
@@ -107,7 +115,7 @@ class ConsciousnessAudioEngine {
     this.reverbSendGain = ctx.createGain();
     this.reverbNode = ctx.createConvolver();
     this.reverbNode.normalize = false;
-    this.reverbNode.buffer = this._impulse(3.6, 3.0, 0.028, 0.9);
+    this.reverbNode.buffer = this._impulse(3.6, 3.0, 0.028, 0.9, HALL_ENERGY);
     this.reverbReturn = ctx.createGain();
     this.reverbSendGain.connect(this.reverbNode);
     this.reverbNode.connect(this.reverbReturn);
@@ -139,9 +147,15 @@ class ConsciousnessAudioEngine {
     this.renderer.output.connect(this.spatialBus);
     this.roomVerb = ctx.createConvolver();
     this.roomVerb.normalize = false;
-    this.roomVerb.buffer = this._impulse(1.5, 1.15, 0.03, 0.55);
+    this.roomVerb.buffer = this._impulse(1.5, 1.15, 0.03, 0.55, ROOM_ENERGY);
     this.renderer.reverbSend.connect(this.roomVerb);
     this.roomVerb.connect(this.spatialBus);
+    // the 3D streams also feed the hall and its shimmer, so the "Hall reverb & shimmer" control acts on them
+    this.spatialHallSend = ctx.createGain();
+    this.spatialHallSend.gain.value = SPATIAL_HALL_SEND;
+    this.renderer.output.connect(this.spatialHallSend);
+    this.spatialHallSend.connect(this.reverbSendGain);
+    this.setReverbMix(this.params.reverbMix);
 
     // ---- shared breath clock
     this.breath = new window.AetherBreathClock(this.params.breath);
@@ -160,8 +174,11 @@ class ConsciousnessAudioEngine {
     for (const key of ConsciousnessAudioEngine.MODULES) this.nodes[key].update('init');
   }
 
-  /** Stereo impulse response: early reflections + decorrelated exponentially decaying noise with HF damping. */
-  _impulse(seconds, rt60, preDelay, level) {
+  /**
+   * Stereo impulse response: early reflections + decorrelated exponentially decaying noise with HF damping,
+   * normalised to a total energy (sum of squared samples) per channel, i.e. its power gain for white noise.
+   */
+  _impulse(seconds, rt60, preDelay, level, energy) {
     const ctx = this.ctx;
     const rate = ctx.sampleRate;
     const len = Math.floor(rate * seconds);
@@ -175,16 +192,16 @@ class ConsciousnessAudioEngine {
         if (i < len) d[i] += (Math.random() < 0.5 ? -1 : 1) * (0.5 - 0.3 * (t / 0.08)) * level;
       }
       let lp = 0;
-      let e = 0;
       for (let i = pre; i < len; i++) {
         const t = (i - pre) / rate;
         const env = Math.exp((-6.91 * t) / rt60) * (1 - Math.exp(-t / 0.02));
         const damp = Math.min(0.93, 0.25 + 0.68 * (t / rt60)); // brighter early, darker late
         lp = lp * damp + (Math.random() * 2 - 1) * (1 - damp);
         d[i] += lp * env * level;
-        e += d[i] * d[i];
       }
-      const norm = 1 / Math.sqrt(e / rate + 1e-9) * 0.18;
+      let eAll = 0;
+      for (let i = 0; i < len; i++) eAll += d[i] * d[i];
+      const norm = Math.sqrt(energy / (eAll + 1e-12));
       for (let i = 0; i < len; i++) d[i] *= norm;
     }
     return buf;
@@ -247,10 +264,21 @@ class ConsciousnessAudioEngine {
     this.reverbSendGain.gain.setTargetAtTime(val * 1.4, now, 0.08);
     this.shimmerGain.gain.setTargetAtTime(Math.pow(val, 1.3) * 0.9, now, 0.08);
     this.dryBus.gain.setTargetAtTime(1 - val * 0.35, now, 0.08);
+    if (this.spatialBus) this.spatialBus.gain.setTargetAtTime(1 - val * 0.25, now, 0.08);
   }
 
   setRoot(hz) {
+    const old = this.params.root || 108;
     this.params.root = hz;
+    // pitches set in Hz (binaural carrier, body tone, Shepard centre) keep their ratio to the tonal centre
+    const r = hz / old;
+    const P = this.params;
+    const scale = (mod, key, lo, hi) => {
+      if (P[mod] && P[mod][key]) P[mod][key] = Math.max(lo, Math.min(hi, +(P[mod][key] * r).toFixed(2)));
+    };
+    scale('pac', 'baseFreq', 40, 432);
+    scale('sub', 'freq', 24, 60);
+    scale('fractal', 'center', 65, 528);
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
     this.shimmerVoices.forEach((v) => v.bp.frequency.setTargetAtTime(hz * v.h, now, 0.2));
@@ -258,6 +286,9 @@ class ConsciousnessAudioEngine {
       const m = this.nodes[key];
       if (m && m.update) m.update('root', hz);
     }
+    if (this.nodes.pac) this.nodes.pac.update('baseFreq');
+    if (this.nodes.sub) this.nodes.sub.update('freq');
+    if (this.nodes.fractal) this.nodes.fractal.update('center');
   }
 
   setBreath(key, val) {
